@@ -591,10 +591,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 finishAffinity();
             }
         } else {
-            resource_purchase_sheet.dismiss();
-            PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred, please login again!");
-            auth.signOut();
-            finishAffinity();
+            sheetbinding.cashRadiobutton.setText("Cash (₹0)");
         }
         if (userData.containsKey("coins")) {
             sheetbinding.coinsRadiobutton.setText("Coins (".concat(String.valueOf(((Number) userData.get("coins")).longValue()).concat(")")));
