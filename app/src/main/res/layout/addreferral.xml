@@ -1,0 +1,120 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:id="@+id/background"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FFFFFF"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/upper_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingLeft="30dp"
+            android:paddingRight="20dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:layout_weight="1">
+
+            <TextView
+                android:id="@+id/title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Referral"
+                android:textSize="30sp"
+                android:textColor="#000000"
+                android:layout_weight="1"
+                android:fontFamily="@font/bold" />
+
+            <TextView
+                android:id="@+id/skip_txt"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="10dp"
+                android:paddingTop="5dp"
+                android:paddingRight="10dp"
+                android:paddingBottom="5dp"
+                android:text="Skip"
+                android:textSize="12sp"
+                android:textColor="#9E9E9E"
+                android:fontFamily="@font/medium"
+                android:background="@drawable/ripple_mask_only_light" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/edittext_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingLeft="30dp"
+            android:paddingRight="30dp"
+            android:gravity="center_vertical"
+            android:orientation="vertical"
+            android:layout_weight="4">
+
+            <LinearLayout
+                android:id="@+id/et_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:background="@drawable/rounded_shape_gray">
+
+                <EditText
+                    android:id="@+id/edittext"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingLeft="10dp"
+                    android:paddingTop="12dp"
+                    android:paddingRight="10dp"
+                    android:paddingBottom="12dp"
+                    android:background="@android:color/transparent"
+                    android:gravity="center_vertical"
+                    android:textSize="12sp"
+                    android:textColor="#000000"
+                    android:hint="Enter referral code"
+                    android:textColorHint="#9E9E9E"
+                    android:singleLine="true"
+                    android:imeOptions="actionDone"
+                    android:fontFamily="@font/semibold" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/error_txt"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:text="Invalid referral code"
+                android:textSize="10sp"
+                android:textColor="#000000"
+                android:fontFamily="@font/medium"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/add_btn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="40dp"
+                android:layout_marginBottom="10dp"
+                android:gravity="center_horizontal|center_vertical"
+                android:orientation="horizontal"
+                android:background="@drawable/ripple_bg_black">
+
+                <TextView
+                    android:id="@+id/add_btn_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="15dp"
+                    android:layout_marginBottom="15dp"
+                    android:text="Add referral"
+                    android:textSize="14sp"
+                    android:textColor="#FFFFFF"
+                    android:fontFamily="@font/semibold" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,135 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:id="@+id/container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FFFFFF"
+        android:gravity="center_horizontal|center_vertical"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/middle_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal|center_vertical"
+            android:orientation="vertical"
+            android:layout_weight="1"
+            android:layout_centerInParent="true">
+
+            <ImageView
+                android:id="@+id/image"
+                android:layout_width="match_parent"
+                android:layout_height="100dp"
+                android:src="@drawable/app_update_illus"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:id="@+id/title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="15dp"
+                android:text="New update available!"
+                android:textSize="16sp"
+                android:textColor="#000000"
+                android:fontFamily="@font/bold" />
+
+            <TextView
+                android:id="@+id/subtext"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="60dp"
+                android:paddingRight="60dp"
+                android:gravity="center_horizontal|center_vertical"
+                android:text="@string/new_app_message"
+                android:textSize="12sp"
+                android:textColor="#9E9E9E"
+                android:fontFamily="@font/semibold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/gap"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:orientation="horizontal"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/btn_download"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="20dp"
+            android:layout_marginRight="20dp"
+            android:paddingLeft="8dp"
+            android:paddingTop="15dp"
+            android:paddingRight="8dp"
+            android:paddingBottom="15dp"
+            android:gravity="center_horizontal|center_vertical"
+            android:text="Download"
+            android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:fontFamily="@font/semibold"
+            android:background="@drawable/ripple_bg_black" />
+
+        <LinearLayout
+            android:id="@+id/see_changes_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="20dp"
+            android:background="#FAFAFA"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/new_changes_txt"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="10dp"
+                android:paddingTop="10dp"
+                android:paddingRight="70dp"
+                android:paddingBottom="10dp"
+                android:text="1. bahahahsiaiasisusshhshhsdh\n2. jahshshshshhhzhzhshshhshs\n3. jajshshshshjszhjshshshshshshhshshshahahahhah\n4. jahshshahahajahahhshshshshshshhahahshshhshssh"
+                android:textSize="11sp"
+                android:textColor="#9E9E9E"
+                android:fontFamily="@font/semibold"
+                android:visibility="gone" />
+
+            <RelativeLayout
+                android:id="@+id/btn_see_changes"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <TextView
+                    android:id="@+id/btn_see_changes_txt"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingLeft="8dp"
+                    android:paddingTop="15dp"
+                    android:paddingRight="8dp"
+                    android:paddingBottom="15dp"
+                    android:gravity="center_horizontal|center_vertical"
+                    android:text="See changes"
+                    android:textSize="12sp"
+                    android:textColor="#9E9E9E"
+                    android:fontFamily="@font/semibold"
+                    android:layout_centerInParent="true" />
+
+                <ImageView
+                    android:id="@+id/icon_see_changes"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_marginRight="15dp"
+                    android:padding="3dp"
+                    android:src="@drawable/icon_down_arrow"
+                    android:scaleType="fitCenter"
+                    android:tint="#9E9E9E"
+                    android:layout_alignParentRight="true"
+                    android:layout_centerVertical="true" />
+            </RelativeLayout>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,85 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true">
+
+    <RelativeLayout
+        android:id="@+id/wrapperlayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FFFFFF">
+
+        <LinearLayout
+            android:id="@+id/textcontainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal|center_vertical"
+            android:orientation="vertical"
+            android:layout_centerInParent="true">
+
+            <TextView
+                android:id="@+id/appname"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="5dp"
+                android:text="PrepNest."
+                android:textSize="30sp"
+                android:textColor="#000000" />
+
+            <TextView
+                android:id="@+id/appmotto"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="You need, we provide"
+                android:textSize="12sp"
+                android:textColor="#9E9E9E"
+                android:fontFamily="@font/medium" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/bottomcontainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="50dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true">
+
+            <TextView
+                android:id="@+id/fromtext"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="FROM"
+                android:textSize="12sp"
+                android:textColor="#9E9E9E"
+                android:fontFamily="@font/medium" />
+
+            <LinearLayout
+                android:id="@+id/cocode_logo_container"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/cocode_logo"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_marginRight="3dp"
+                    android:src="@drawable/cocode_logo"
+                    android:scaleType="fitCenter" />
+
+                <TextView
+                    android:id="@+id/cocode_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="CoCode Studio"
+                    android:textSize="14sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/semibold" />
+            </LinearLayout>
+        </LinearLayout>
+    </RelativeLayout>
+</LinearLayout>

@@ -1,0 +1,81 @@
+<resources>
+    <!--  🌙 Default App Theme (with NoActionBar)  -->
+    <style name="Theme.PrepNest" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!--  Primary brand colors  -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryVariant">@color/colorPrimaryVariant</item>
+        <item name="colorOnPrimary">@color/colorOnPrimary</item>
+        <item name="colorSecondary">@color/colorSecondary</item>
+        <item name="colorSecondaryVariant">@color/colorSecondaryVariant</item>
+        <item name="colorOnSecondary">@color/colorOnSecondary</item>
+        <!--  Background & surfaces  -->
+        <item name="android:colorBackground">@color/colorBackground</item>
+        <item name="colorSurface">@color/colorSurface</item>
+        <item name="colorOnSurface">@color/colorOnSurface</item>
+        <!--  Error colors  -->
+        <item name="colorError">@color/colorError</item>
+        <item name="colorOnError">@color/colorOnError</item>
+        <!--  Status bar color  -->
+<!--        <item name="android:statusBarColor">@android:color/white</item>-->
+        <!--  Light status bar icons (dark text/icons for better visibility on light backgrounds)  -->
+<!--        <item name="android:windowLightStatusBar">true</item>-->
+        <item name="android:windowTranslucentStatus">false</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowBackground">@color/white</item>
+<!--        <item name="android:fitsSystemWindows">true</item>-->
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="colorControlActivated">@color/colorSecondary</item>
+        <item name="colorControlHighlight">@color/colorSecondaryVariant</item>
+        <item name="android:textColorHighlight">@color/colorSecondaryVariant</item>
+        <item name="android:navigationBarColor">@android:color/white</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+    </style>
+    <!--  🚀 Fullscreen Theme (no status bar, no action bar)  -->
+    <style name="Theme.PrepNest.Fullscreen" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowFullscreen">true</item>
+<!--        <item name="android:fitsSystemWindows">true</item>-->
+<!--        <item name="android:statusBarColor">@android:color/holo_purple</item>-->
+<!--        <item name="android:windowLightStatusBar">true</item>-->
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowTranslucentStatus">false</item>
+    </style>
+
+    <!--  ✨ Transparent Status Bar (status bar visible but transparent)  -->
+    <style name="Theme.PrepNest.TransparentStatusBar" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@android:color/white</item>
+        <!--  Light status bar icons (dark text/icons for better visibility on light backgrounds)  -->
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+    <!--  💬 Dialog Theme  -->
+    <style name="Theme.PrepNest.Dialog" parent="Theme.MaterialComponents.Dialog.Alert">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorOnPrimary">@color/colorOnPrimary</item>
+    </style>
+
+<!--    <style name="Theme.PrepNest.AppBarOverlay" parent="ThemeOverlay.MaterialComponents" />-->
+
+<!--    <style name="Theme.PrepNest.PopupOverlay" parent="ThemeOverlay.MaterialComponents" />-->
+
+    <style name="roundedFab">
+        <item name="cornerFamilyTopLeft">rounded</item>
+        <item name="cornerSizeTopLeft">30%</item>
+        <item name="cornerFamilyTopRight">rounded</item>
+        <item name="cornerSizeTopRight">30%</item>
+        <item name="cornerFamilyBottomLeft">rounded</item>
+        <item name="cornerSizeBottomLeft">30%</item>
+        <item name="cornerFamilyBottomRight">rounded</item>
+        <item name="cornerSizeBottomRight">30%</item>
+    </style>
+
+    <style name="CustomTabLayout" parent="Widget.Design.TabLayout">
+        <item name="tabTextAppearance">@style/CustomTabTextAppearance</item>
+    </style>
+
+    <style name="CustomTabTextAppearance" parent="TextAppearance.Design.Tab">
+        <item name="android:textSize">11sp</item>
+        <item name="android:textColor">@color/colorSecondary</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:fontFamily">@font/semibold
+        </item> <!-- Added line to set textAllCaps to false -->
+    </style>
+</resources>

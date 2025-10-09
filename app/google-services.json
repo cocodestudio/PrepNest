@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "575800512668",
+    "firebase_url": "https://prepnest-65133-default-rtdb.firebaseio.com",
+    "project_id": "prepnest-65133",
+    "storage_bucket": "prepnest-65133.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:575800512668:android:22cbe82e32ce56236e5d59",
+        "android_client_info": {
+          "package_name": "com.cocode.prepnest"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWNFAtPMthaJ4JgSlSDm427cEqVTeRkJ4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:575800512668:android:cad38d3a668ae45f6e5d59",
+        "android_client_info": {
+          "package_name": "com.app.prepnest.admin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWNFAtPMthaJ4JgSlSDm427cEqVTeRkJ4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

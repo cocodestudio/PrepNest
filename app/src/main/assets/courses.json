@@ -1,0 +1,154 @@
+{
+  "BICVJT8": {
+    "name": "B.Tech in Computer Science Engineering",
+    "duration": 4
+  },
+  "BIMTCBQ": {
+    "name": "B.Tech in Mechanical Engineering",
+    "duration": 4
+  },
+  "BIC5NFW": {
+    "name": "B.Tech in Civil Engineering",
+    "duration": 4
+  },
+  "BIESZHF": {
+    "name": "B.Tech in Electrical Engineering",
+    "duration": 4
+  },
+  "BIELN0J": {
+    "name": "B.Tech in Electronics & Communication Engineering",
+    "duration": 4
+  },
+  "BIBLE0Q": {
+    "name": "B.Sc (Hons.) in Biotechnology",
+    "duration": 3
+  },
+  "BIMFAV2": {
+    "name": "B.Sc (Hons.) in Microbiology",
+    "duration": 3
+  },
+  "BIAWKGY": {
+    "name": "B.Sc (Hons.) in Agriculture",
+    "duration": 4
+  },
+  "BOBJPFA": {
+    "name": "BBA (Bachelor of Business Administration)",
+    "duration": 3
+  },
+  "BOCGAK6": {
+    "name": "B.Com (Bachelor of Commerce)",
+    "duration": 3
+  },
+  "BLB03S" : {
+    "name" : "LL.B.",
+    "duration" : 3
+  },
+  "BL0OHD": {
+    "name": "B.A. LL.B. (Integrated)",
+    "duration": 5
+  },
+  "BLHMMK": {
+    "name": "BBA LL.B. (Integrated)",
+    "duration": 5
+  },
+  "BLA8ID": {
+    "name": "B.Com LL.B. (Integrated)",
+    "duration": 5
+  },
+  "BOCBL4N": {
+    "name": "BCA (Bachelor of Computer Applications)",
+    "duration": 3
+  },
+  "BOEHXDZ": {
+    "name": "B.Ed (Bachelor of Education)",
+    "duration": 2
+  },
+  "BOPZDQL": {
+    "name": "B.Pharm (Bachelor of Pharmacy)",
+    "duration": 4
+  },
+  "BON6SOM": {
+    "name": "BNYS (Bachelor of Naturopathy and Yogic Sciences)",
+    "duration": 5.5
+  },
+  "MICXC2Y": {
+    "name": "M.Tech in Computer Science Engineering",
+    "duration": 2
+  },
+  "MIMB4CE": {
+    "name": "M.Tech in Mechanical Engineering",
+    "duration": 2
+  },
+  "MICCSFD": {
+    "name": "M.Tech in Civil Engineering",
+    "duration": 2
+  },
+  "MIELMZ9": {
+    "name": "M.Tech in Electrical Engineering",
+    "duration": 2
+  },
+  "MIE8ZPN": {
+    "name": "M.Tech in Electronics & Communication Engineering",
+    "duration": 2
+  },
+  "MIB8B9C": {
+    "name": "M.Sc in Biotechnology",
+    "duration": 2
+  },
+  "MIMOY2H": {
+    "name": "M.Sc in Microbiology",
+    "duration": 2
+  },
+  "MIMQ24L": {
+    "name": "M.Sc in Mathematics",
+    "duration": 2
+  },
+  "MIPD4JY": {
+    "name": "M.Sc in Physics",
+    "duration": 2
+  },
+  "MICMYLV": {
+    "name": "M.Sc in Chemistry",
+    "duration": 2
+  },
+  "MIM6U14": {
+    "name": "M.Sc in Medical Physics",
+    "duration": 2
+  },
+  "MIFGYTJ": {
+    "name": "M.Sc in Food Science & Technology",
+    "duration": 2
+  },
+  "MID1PSU": {
+    "name": "M.Sc in Data Sciences",
+    "duration": 2
+  },
+  "MOB5AWV": {
+    "name": "MBA (Master of Business Administration)",
+    "duration": 2
+  },
+  "MOC7P2A": {
+    "name": "M.Com (Master of Commerce)",
+    "duration": 2
+  },
+  "LOLS4WT": {
+    "name": "LL.M (Master of Laws)",
+    "duration": 2
+  },
+  "MOCIJZ7": {
+    "name": "MCA (Master of Computer Applications)",
+    "duration": 2
+  },
+  "MOE20SN": {
+    "name": "M.Ed (Master of Education)",
+    "duration": 2
+  },
+  "MOP8Y8B": {
+    "name": "M.Pharm (Master of Pharmacy)",
+    "duration": 2
+  },
+  "MINCY8A": {
+    "name": "M.Sc in Naturopathy and Yogic Sciences",
+    "duration": 2
+  }
+}

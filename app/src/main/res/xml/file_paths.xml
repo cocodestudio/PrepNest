@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- For user profile images using getCacheDir() -->
+    <cache-path
+        name="cache"
+        path="." />
+
+    <!-- For APK shared using getExternalCacheDir() -->
+    <external-cache-path
+        name="shared_apk"
+        path="." />
+    <external-files-path
+        name="external_files"
+        path="." />
+</paths>

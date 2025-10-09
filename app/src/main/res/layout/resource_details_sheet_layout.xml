@@ -1,0 +1,399 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingLeft="20dp"
+        android:paddingRight="20dp"
+        android:background="#FFFFFF"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/line"
+            android:layout_width="50dp"
+            android:layout_height="3dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="20dp"
+            android:padding="8dp"
+            android:orientation="horizontal"
+            android:layout_gravity="center_horizontal"
+            android:background="@drawable/sheet_line_indicator" />
+
+        <TextView
+            android:id="@+id/resource_title"
+            android:focusable="false"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="What is Operating System\?"
+            android:textSize="14sp"
+            android:textColor="#000000"
+            android:fontFamily="@font/bold" />
+
+        <TextView
+            android:id="@+id/resource_course"
+            android:focusable="false"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="70dp"
+            android:text="BCA"
+            android:textSize="11sp"
+            android:textColor="#9E9E9E"
+            android:fontFamily="@font/semibold" />
+
+        <RelativeLayout
+            android:id="@+id/academic_info_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:padding="2dp">
+
+            <LinearLayout
+                android:id="@+id/semester_container"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal|center_vertical"
+                android:orientation="vertical"
+                android:layout_alignParentLeft="true">
+
+                <TextView
+                    android:id="@+id/semester_title"
+                    android:focusable="false"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="5dp"
+                    android:text="@string/hint_semester"
+                    android:textSize="12sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/semibold" />
+
+                <TextView
+                    android:id="@+id/semester_value_txt"
+                    android:focusable="false"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingLeft="13dp"
+                    android:paddingTop="3dp"
+                    android:paddingRight="13dp"
+                    android:paddingBottom="3dp"
+                    android:background="#F5F5F5"
+                    android:text="Even"
+                    android:textSize="10sp"
+                    android:textColor="#757575"
+                    android:fontFamily="@font/semibold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/session_container"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="20dp"
+                android:gravity="center_horizontal|center_vertical"
+                android:orientation="vertical"
+                android:layout_toRightOf="@id/semester_container">
+
+                <TextView
+                    android:id="@+id/session_title"
+                    android:focusable="false"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="5dp"
+                    android:text="Session"
+                    android:textSize="12sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/semibold" />
+
+                <TextView
+                    android:id="@+id/session_value_txt"
+                    android:focusable="false"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingLeft="13dp"
+                    android:paddingTop="3dp"
+                    android:paddingRight="13dp"
+                    android:paddingBottom="3dp"
+                    android:background="#F5F5F5"
+                    android:text="2024-25"
+                    android:textSize="10sp"
+                    android:textColor="#757575"
+                    android:fontFamily="@font/semibold" />
+            </LinearLayout>
+        </RelativeLayout>
+
+        <RelativeLayout
+            android:id="@+id/subject_info_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp">
+
+            <LinearLayout
+                android:id="@+id/subject_container"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="20dp"
+                android:gravity="center_horizontal|center_vertical"
+                android:orientation="vertical"
+                android:layout_alignParentLeft="true">
+
+                <TextView
+                    android:id="@+id/subject_title"
+                    android:focusable="false"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="5dp"
+                    android:text="Subject"
+                    android:textSize="12sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/semibold" />
+
+                <TextView
+                    android:id="@+id/subject_value"
+                    android:focusable="false"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingLeft="13dp"
+                    android:paddingTop="3dp"
+                    android:paddingRight="13dp"
+                    android:paddingBottom="3dp"
+                    android:background="#F5F5F5"
+                    android:text="C++"
+                    android:textSize="10sp"
+                    android:textColor="#757575"
+                    android:fontFamily="@font/semibold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/subtype_container"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal|center_vertical"
+                android:orientation="vertical"
+                android:layout_toRightOf="@id/subject_container">
+
+                <TextView
+                    android:id="@+id/subtype_title"
+                    android:focusable="false"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="5dp"
+                    android:text="Type"
+                    android:textSize="12sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/semibold" />
+
+                <TextView
+                    android:id="@+id/subtype_value"
+                    android:focusable="false"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingLeft="13dp"
+                    android:paddingTop="3dp"
+                    android:paddingRight="13dp"
+                    android:paddingBottom="3dp"
+                    android:background="#F5F5F5"
+                    android:text="Exam Notes"
+                    android:textSize="10sp"
+                    android:textColor="#757575"
+                    android:fontFamily="@font/semibold" />
+            </LinearLayout>
+        </RelativeLayout>
+
+        <RelativeLayout
+            android:id="@+id/other_info_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp">
+
+            <TextView
+                android:id="@+id/rating_title"
+                android:focusable="false"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="5dp"
+                android:text="Rating"
+                android:textSize="12sp"
+                android:textColor="#000000"
+                android:fontFamily="@font/semibold"
+                android:visibility="gone"
+                android:layout_alignParentLeft="true" />
+
+            <LinearLayout
+                android:id="@+id/rating_container"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="25dp"
+                android:paddingLeft="14dp"
+                android:paddingTop="3dp"
+                android:paddingRight="14dp"
+                android:paddingBottom="3dp"
+                android:background="#FFF3E0"
+                android:gravity="center_horizontal|center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone"
+                android:layout_below="@id/rating_title">
+
+                <TextView
+                    android:id="@+id/rating_txt"
+                    android:focusable="false"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="4.5"
+                    android:textSize="10sp"
+                    android:textColor="#F57C00"
+                    android:translationY="1.5dp"
+                    android:fontFamily="@font/medium" />
+
+                <ImageView
+                    android:id="@+id/rating_img"
+                    android:focusable="false"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_marginLeft="3dp"
+                    android:src="@drawable/icon_star"
+                    android:scaleType="fitCenter"
+                    android:tint="#F57C00" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/date_of_upload_title"
+                android:focusable="false"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="5dp"
+                android:text="Uploaded on"
+                android:textSize="12sp"
+                android:textColor="#000000"
+                android:fontFamily="@font/semibold"
+                android:layout_toRightOf="@id/rating_container" />
+
+            <TextView
+                android:id="@+id/date_of_upload_value"
+                android:focusable="false"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="13dp"
+                android:paddingTop="3dp"
+                android:paddingRight="13dp"
+                android:paddingBottom="3dp"
+                android:background="#F5F5F5"
+                android:text="01 Jan 1970"
+                android:textSize="10sp"
+                android:textColor="#757575"
+                android:fontFamily="@font/semibold"
+                android:layout_below="@id/date_of_upload_title"
+                android:layout_toRightOf="@id/rating_container" />
+        </RelativeLayout>
+
+        <LinearLayout
+            android:id="@+id/tags_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:layout_below="@id/top_container">
+
+            <TextView
+                android:id="@+id/best_choice_tag"
+                android:focusable="false"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="6dp"
+                android:paddingLeft="10dp"
+                android:paddingTop="2dp"
+                android:paddingRight="10dp"
+                android:paddingBottom="2dp"
+                android:background="#000000"
+                android:text="Best choice"
+                android:textColor="#FFFFFF"
+                android:fontFamily="@font/semibold"
+                android:textSize="8sp" />
+
+            <TextView
+                android:id="@+id/recommended_tag"
+                android:focusable="false"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="10dp"
+                android:paddingTop="2dp"
+                android:paddingRight="10dp"
+                android:paddingBottom="2dp"
+                android:background="#000000"
+                android:text="Recommend"
+                android:textColor="#FFFFFF"
+                android:fontFamily="@font/semibold"
+                android:textSize="8sp" />
+        </LinearLayout>
+
+        <RelativeLayout
+            android:id="@+id/price_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="15dp"
+            android:layout_marginBottom="20dp">
+
+            <TextView
+                android:id="@+id/price_title"
+                android:focusable="false"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="5dp"
+                android:text="Price"
+                android:textSize="12sp"
+                android:textColor="#000000"
+                android:fontFamily="@font/semibold" />
+
+            <TextView
+                android:id="@+id/cash_value"
+                android:focusable="false"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="13dp"
+                android:paddingTop="3dp"
+                android:paddingRight="13dp"
+                android:paddingBottom="3dp"
+                android:background="#F5F5F5"
+                android:text="₹20"
+                android:textSize="10sp"
+                android:textColor="#757575"
+                android:fontFamily="@font/semibold"
+                android:layout_below="@id/price_title" />
+
+            <TextView
+                android:id="@+id/slash"
+                android:focusable="false"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="5dp"
+                android:layout_marginRight="5dp"
+                android:gravity="center_vertical"
+                android:text="/"
+                android:textSize="10sp"
+                android:textColor="#9E9E9E"
+                android:fontFamily="@font/semibold"
+                android:layout_below="@id/price_title"
+                android:layout_alignBottom="@id/cash_value"
+                android:layout_toEndOf="@id/cash_value" />
+
+            <TextView
+                android:id="@+id/coins_value"
+                android:focusable="false"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="13dp"
+                android:paddingTop="3dp"
+                android:paddingRight="13dp"
+                android:paddingBottom="3dp"
+                android:background="#F5F5F5"
+                android:text="100 coins"
+                android:textSize="10sp"
+                android:textColor="#757575"
+                android:fontFamily="@font/semibold"
+                android:layout_below="@id/price_title"
+                android:layout_toRightOf="@id/slash" />
+        </RelativeLayout>
+    </LinearLayout>
+</LinearLayout>
