@@ -1,221 +1,215 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/container"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:layout_height="wrap_content"
+    android:background="#FFFFFF"
+    android:orientation="vertical"
+    android:paddingLeft="20dp"
+    android:paddingRight="20dp">
 
     <LinearLayout
-        android:id="@+id/container"
+        android:id="@+id/line"
+        android:layout_width="50dp"
+        android:layout_height="3dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="20dp"
+        android:background="@drawable/sheet_line_indicator"
+        android:orientation="horizontal"
+        android:padding="8dp" />
+
+    <TextView
+        android:id="@+id/resource_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:focusable="false"
+        android:fontFamily="@font/bold"
+        android:text=""
+        android:textColor="#000000"
+        android:textSize="14sp" />
+
+    <LinearLayout
+        android:id="@+id/meta_data_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:layout_marginBottom="25dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/rating_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="13dp"
+            android:background="#FFF3E0"
+            android:gravity="center_horizontal|center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="10dp"
+            android:paddingTop="2dp"
+            android:paddingRight="10dp"
+            android:paddingBottom="2dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/rating_txt"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:focusable="false"
+                android:fontFamily="@font/medium"
+                android:text=""
+                android:textColor="#F57C00"
+                android:textSize="12sp"
+                android:translationY="1.5dp" />
+
+            <ImageView
+                android:id="@+id/rating_img"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_marginStart="3dp"
+                android:focusable="false"
+                android:scaleType="fitCenter"
+                android:src="@drawable/icon_star"
+                app:tint="#F57C00" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/subject_name_txt"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="13dp"
+            android:background="#F5F5F5"
+            android:focusable="false"
+            android:fontFamily="@font/medium"
+            android:paddingLeft="10dp"
+            android:paddingTop="2dp"
+            android:paddingRight="10dp"
+            android:paddingBottom="2dp"
+            android:text=""
+            android:textColor="#757575"
+            android:textSize="12sp"
+            android:translationY="1.0dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/session_txt"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="13dp"
+            android:background="#F5F5F5"
+            android:focusable="false"
+            android:fontFamily="@font/medium"
+            android:paddingLeft="10dp"
+            android:paddingTop="2dp"
+            android:paddingRight="10dp"
+            android:paddingBottom="2dp"
+            android:text=""
+            android:textColor="#757575"
+            android:textSize="12sp"
+            android:translationY="1.0dp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/choose_payment_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:focusable="false"
+        android:fontFamily="@font/semibold"
+        android:text="@string/choose_payment_method"
+        android:textColor="#000000"
+        android:textSize="12sp" />
+
+    <RadioGroup
+        android:id="@+id/radiogroup"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingLeft="20dp"
-        android:paddingRight="20dp"
-        android:background="#FFFFFF"
-        android:orientation="vertical">
+        android:layout_marginBottom="30dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-        <LinearLayout
-            android:id="@+id/line"
-            android:layout_width="50dp"
-            android:layout_height="3dp"
-            android:layout_marginTop="10dp"
-            android:layout_marginBottom="20dp"
+        <RadioButton
+            android:id="@+id/cash_radiobutton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:focusable="false"
+            android:fontFamily="@font/medium"
+            android:gravity="center_vertical"
             android:padding="8dp"
-            android:orientation="horizontal"
-            android:layout_gravity="center_horizontal"
-            android:background="@drawable/sheet_line_indicator" />
+            android:text=""
+            android:textColor="#000000"
+            android:textSize="12sp" />
 
-        <TextView
-            android:id="@+id/resource_title"
-            android:focusable="false"
+        <RadioButton
+            android:id="@+id/coins_radiobutton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="What is Blockchain\?"
-            android:textSize="14sp"
+            android:focusable="false"
+            android:fontFamily="@font/medium"
+            android:gravity="center_vertical"
+            android:padding="8dp"
+            android:text=""
             android:textColor="#000000"
-            android:fontFamily="@font/bold" />
+            android:textSize="12sp" />
+    </RadioGroup>
+
+    <LinearLayout
+        android:id="@+id/btns_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="20dp"
+        android:gravity="end|center_vertical"
+        android:orientation="horizontal">
 
         <LinearLayout
-            android:id="@+id/meta_data_container"
+            android:id="@+id/btn_wishlist"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
-            android:layout_marginBottom="25dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:layout_below="@id/tags_container">
-
-            <LinearLayout
-                android:id="@+id/rating_container"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginRight="13dp"
-                android:paddingLeft="10dp"
-                android:paddingTop="2dp"
-                android:paddingRight="10dp"
-                android:paddingBottom="2dp"
-                android:background="#FFF3E0"
-                android:gravity="center_horizontal|center_vertical"
-                android:orientation="horizontal"
-                android:visibility="gone">
-
-                <TextView
-                    android:id="@+id/rating_txt"
-                    android:focusable="false"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="4.5"
-                    android:textSize="12sp"
-                    android:textColor="#F57C00"
-                    android:translationY="1.5dp"
-                    android:fontFamily="@font/medium" />
-
-                <ImageView
-                    android:id="@+id/rating_img"
-                    android:focusable="false"
-                    android:layout_width="10dp"
-                    android:layout_height="10dp"
-                    android:layout_marginLeft="3dp"
-                    android:src="@drawable/icon_star"
-                    android:scaleType="fitCenter"
-                    android:tint="#F57C00" />
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/subject_name_txt"
-                android:focusable="false"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginRight="13dp"
-                android:paddingLeft="10dp"
-                android:paddingTop="2dp"
-                android:paddingRight="10dp"
-                android:paddingBottom="2dp"
-                android:background="#F5F5F5"
-                android:text="• C++"
-                android:textSize="12sp"
-                android:textColor="#757575"
-                android:translationY="1.0dp"
-                android:fontFamily="@font/medium"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/session_txt"
-                android:focusable="false"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginRight="13dp"
-                android:paddingLeft="10dp"
-                android:paddingTop="2dp"
-                android:paddingRight="10dp"
-                android:paddingBottom="2dp"
-                android:background="#F5F5F5"
-                android:text="2024-25"
-                android:textSize="12sp"
-                android:textColor="#757575"
-                android:translationY="1.0dp"
-                android:fontFamily="@font/medium"
-                android:visibility="gone" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/choose_payment_title"
-            android:focusable="false"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Choose payment method"
-            android:textSize="12sp"
-            android:textColor="#000000"
-            android:fontFamily="@font/semibold" />
-
-        <RadioGroup
-            android:id="@+id/radiogroup"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="30dp"
+            android:background="#F5F5F5"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <RadioButton
-                android:id="@+id/cash_radiobutton"
+            <ImageView
+                android:id="@+id/icon_wishlist"
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="3dp"
                 android:focusable="false"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:padding="8dp"
-                android:gravity="center_vertical"
-                android:text="Cash (₹100)"
-                android:textSize="12sp"
-                android:textColor="#000000"
-                android:checked="true"
-                android:fontFamily="@font/medium" />
-
-            <RadioButton
-                android:id="@+id/coins_radiobutton"
-                android:focusable="false"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:padding="8dp"
-                android:gravity="center_vertical"
-                android:text="Coins (45)"
-                android:textSize="12sp"
-                android:textColor="#000000"
-                android:fontFamily="@font/medium" />
-        </RadioGroup>
-
-        <LinearLayout
-            android:id="@+id/btns_container"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="20dp"
-            android:gravity="right|center_vertical"
-            android:orientation="horizontal">
-
-            <LinearLayout
-                android:id="@+id/btn_wishlist"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="#F5F5F5"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <ImageView
-                    android:id="@+id/icon_wishlist"
-                    android:focusable="false"
-                    android:layout_width="25dp"
-                    android:layout_height="25dp"
-                    android:layout_marginLeft="8dp"
-                    android:layout_marginRight="3dp"
-                    android:padding="5dp"
-                    android:src="@drawable/icon_heart_hollow"
-                    android:scaleType="fitCenter" />
-
-                <TextView
-                    android:id="@+id/btn_wishlist_txt"
-                    android:focusable="false"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginRight="13dp"
-                    android:paddingTop="10dp"
-                    android:paddingBottom="10dp"
-                    android:text="Add to wishlist"
-                    android:textSize="12sp"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/medium" />
-            </LinearLayout>
+                android:padding="5dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/icon_heart_hollow" />
 
             <TextView
-                android:id="@+id/btn_buy"
-                android:focusable="false"
+                android:id="@+id/btn_wishlist_txt"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="10dp"
-                android:paddingLeft="16dp"
+                android:layout_marginEnd="13dp"
+                android:focusable="false"
+                android:fontFamily="@font/medium"
                 android:paddingTop="10dp"
-                android:paddingRight="16dp"
                 android:paddingBottom="10dp"
-                android:background="#000000"
-                android:text="Buy for ₹10"
-                android:textSize="12sp"
-                android:textColor="#FFFFFF"
-                android:fontFamily="@font/medium" />
+                android:text="@string/add_to_wishlist"
+                android:textColor="#000000"
+                android:textSize="12sp" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/btn_buy"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:background="#000000"
+            android:focusable="false"
+            android:fontFamily="@font/medium"
+            android:paddingLeft="16dp"
+            android:paddingTop="10dp"
+            android:paddingRight="16dp"
+            android:paddingBottom="10dp"
+            android:text=""
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
     </LinearLayout>
 </LinearLayout>

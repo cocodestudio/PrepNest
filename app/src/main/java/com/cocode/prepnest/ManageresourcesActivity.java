@@ -2,9 +2,9 @@ package com.cocode.prepnest;
 
 import android.os.Bundle;
 import android.view.View;
-import android.view.View.OnClickListener;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
@@ -18,7 +18,6 @@ import com.google.firebase.FirebaseApp;
 public class ManageresourcesActivity extends AppCompatActivity {
 
     private ManageresourcesBinding binding;
-    private LogUtils logFile;
     private NetworkMonitor networkMonitor;
 
     @Override
@@ -33,23 +32,20 @@ public class ManageresourcesActivity extends AppCompatActivity {
 
     private void initialize(Bundle _savedInstanceState) {
 
-        binding.backIcon.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                finish();
-                overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
-            }
+        binding.backIcon.setOnClickListener(_view -> {
+            finish();
+            overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
         });
     }
 
     private void initializeLogic() {
-        logFile = new LogUtils(this);
+        LogUtils logFile = new LogUtils(this);
         networkMonitor = new NetworkMonitor(this);
         logFile.addActivity();
         designUI();
         if (getIntent().hasExtra("navigation type")) {
             if (getIntent().getStringExtra("navigation type").equals("owner")) {
-                binding.layoutsPager.setCurrentItem((int) 1);
+                binding.layoutsPager.setCurrentItem(1);
             }
         }
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -86,6 +82,8 @@ public class ManageresourcesActivity extends AppCompatActivity {
         }).attach();
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         getWindow().setStatusBarColor(0xFFFFFFFF);
+
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
 
@@ -94,6 +92,7 @@ public class ManageresourcesActivity extends AppCompatActivity {
             super(fa);
         }
 
+        @NonNull
         @Override
         public Fragment createFragment(int position) {
             if (position == 0) {

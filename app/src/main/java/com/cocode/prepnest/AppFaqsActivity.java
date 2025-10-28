@@ -3,17 +3,16 @@ package com.cocode.prepnest;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.cocode.prepnest.databinding.AppFaqsBinding;
 import com.cocode.prepnest.databinding.FaqItemLayoutBinding;
-import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.firebase.FirebaseApp;
 
 import java.util.ArrayList;
@@ -22,12 +21,8 @@ import java.util.HashMap;
 
 public class AppFaqsActivity extends AppCompatActivity {
 
+    private final ArrayList<HashMap<String, Object>> faqsList = new ArrayList<>();
     private AppFaqsBinding binding;
-
-    private ArrayList<HashMap<String, Object>> faqsList = new ArrayList<>();
-
-
-    private OnCompleteListener nouse_onCompleteListener;
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -41,12 +36,9 @@ public class AppFaqsActivity extends AppCompatActivity {
 
     private void initialize(Bundle _savedInstanceState) {
 
-        binding.backIcon.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                finish();
-                overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
-            }
+        binding.backIcon.setOnClickListener(_view -> {
+            finish();
+            overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
         });
     }
 
@@ -62,10 +54,11 @@ public class AppFaqsActivity extends AppCompatActivity {
                 binding.backIcon.performClick();
             }
         });
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
     public void addingFAQs() {
-        HashMap<String, Object> faqItem = new HashMap<>();
+        HashMap<String, Object> faqItem;
         faqItem = new HashMap<>();
         faqItem.put("ques", "What is PrepNest?");
         faqItem.put("extra", getString(R.string.app_introduction_msg));
@@ -103,8 +96,9 @@ public class AppFaqsActivity extends AppCompatActivity {
             _data = _arr;
         }
 
+        @NonNull
         @Override
-        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             LayoutInflater _inflater = getLayoutInflater();
             View _v = _inflater.inflate(R.layout.faq_item_layout, null);
             RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -118,27 +112,24 @@ public class AppFaqsActivity extends AppCompatActivity {
             FaqItemLayoutBinding binding = FaqItemLayoutBinding.bind(_view);
 
             PrepNestUtil.roundViewWithRipple(binding.quesContainer, "#FFFFFF", 0, 0, "#FFFFFF", "#F5F5F5");
-            binding.questionTxt.setText(_data.get((int) _position).get("ques").toString());
-            binding.extraText.setText(_data.get((int) _position).get("extra").toString());
-            binding.quesContainer.setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(View _view) {
-                    PrepNestUtil.TransitionManager(binding.container, 250);
-                    if (binding.extraContentContainer.getVisibility() == View.VISIBLE) {
-                        binding.extraContentContainer.setVisibility(View.GONE);
-                        binding.iconDropDown
-                                .animate()
-                                .rotation(0)
-                                .setDuration(250)
-                                .start();
-                    } else {
-                        binding.extraContentContainer.setVisibility(View.VISIBLE);
-                        binding.iconDropDown
-                                .animate()
-                                .rotation(180)
-                                .setDuration(250)
-                                .start();
-                    }
+            binding.questionTxt.setText(_data.get(_position).get("ques").toString());
+            binding.extraText.setText(_data.get(_position).get("extra").toString());
+            binding.quesContainer.setOnClickListener(_view1 -> {
+                PrepNestUtil.TransitionManager(binding.container, 250);
+                if (binding.extraContentContainer.getVisibility() == View.VISIBLE) {
+                    binding.extraContentContainer.setVisibility(View.GONE);
+                    binding.iconDropDown
+                            .animate()
+                            .rotation(0)
+                            .setDuration(250)
+                            .start();
+                } else {
+                    binding.extraContentContainer.setVisibility(View.VISIBLE);
+                    binding.iconDropDown
+                            .animate()
+                            .rotation(180)
+                            .setDuration(250)
+                            .start();
                 }
             });
         }

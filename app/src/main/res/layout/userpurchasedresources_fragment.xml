@@ -37,9 +37,9 @@
             <ImageView
                 android:id="@+id/empty_box_image"
                 android:layout_width="match_parent"
-                android:layout_height="150dp"
+                android:layout_height="200dp"
                 android:layout_marginBottom="10dp"
-                android:src="@drawable/empty_box_illus"
+                android:src="@drawable/icon_empty_box"
                 android:scaleType="fitCenter" />
 
             <TextView
@@ -65,7 +65,7 @@
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/items_list"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="0dp"
                 android:layout_weight="1" />
         </LinearLayout>
     </LinearLayout>

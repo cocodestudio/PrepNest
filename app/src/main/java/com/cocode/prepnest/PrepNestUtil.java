@@ -9,12 +9,16 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.os.Build;
 import android.util.TypedValue;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowInsetsController;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.LinearLayout;
 import android.widget.Toast;
+
+import androidx.core.content.ContextCompat;
 
 public class PrepNestUtil {
 
@@ -53,6 +57,32 @@ public class PrepNestUtil {
         InputMethodManager imm = (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) {
             imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+        }
+    }
+
+    public static void changeNavBarColor(Activity activity, boolean isLight) {
+        if (activity == null) return;
+
+        int colorResId = R.color.white;
+
+        if (!isLight) {
+            colorResId = R.color.black;
+        }
+
+        Window window = activity.getWindow();
+        window.setNavigationBarDividerColor(ContextCompat.getColor(activity, colorResId));
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowInsetsController insetsController = window.getInsetsController();
+            if (insetsController != null) {
+                insetsController.setSystemBarsAppearance(
+                        WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+                        WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+                );
+            }
+        } else {
+            View decorView = window.getDecorView();
+            decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         }
     }
 
@@ -100,16 +130,6 @@ public class PrepNestUtil {
             if (!progress_dialog.isShowing()) {
                 progress_dialog.show();
                 progress_dialog.setContentView(R.layout.progress_bar);
-                LinearLayout container = progress_dialog.findViewById(R.id.container);
-                if (container != null) {
-                    container.setBackground(new GradientDrawable() {
-                        public GradientDrawable getIns(int a, int b) {
-                            this.setCornerRadius(a);
-                            this.setColor(b);
-                            return this;
-                        }
-                    }.getIns((int) 70, 0xFFFFFFFF));
-                }
             }
 
         } else {
@@ -122,12 +142,16 @@ public class PrepNestUtil {
 
 
     public static void TransitionManager(final View view, final double duration) {
-        LinearLayout viewgroup = (LinearLayout) view;
+        if (view instanceof ViewGroup) {
+            ViewGroup viewGroup = (ViewGroup) view;
 
-        android.transition.AutoTransition autoTransition = new android.transition.AutoTransition();
-        autoTransition.setDuration((long) duration);
-        android.transition.TransitionManager.beginDelayedTransition(viewgroup, autoTransition);
+            android.transition.AutoTransition autoTransition = new android.transition.AutoTransition();
+            autoTransition.setDuration((long) duration);
+
+            android.transition.TransitionManager.beginDelayedTransition(viewGroup, autoTransition);
+        }
     }
+
 
     public static float getDip(Context context, int input) {
         return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, input, context.getResources().getDisplayMetrics());

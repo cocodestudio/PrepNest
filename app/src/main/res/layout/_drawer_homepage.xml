@@ -16,7 +16,7 @@
             android:id="@+id/profile_container"
             android:layout_width="80dp"
             android:layout_height="80dp"
-            android:layout_marginLeft="20dp"
+            android:layout_marginStart="20dp"
             android:layout_marginTop="20dp"
             android:layout_marginBottom="10dp"
             android:background="#FAFAFA"
@@ -39,7 +39,6 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="5dp"
-                android:text="PU"
                 android:textSize="25sp"
                 android:textColor="#000000"
                 android:fontFamily="@font/semibold" />
@@ -49,9 +48,8 @@
             android:id="@+id/user_name_txt"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="20dp"
+            android:layout_marginStart="20dp"
             android:layout_marginBottom="20dp"
-            android:text="PrepNest User"
             android:textSize="18sp"
             android:textColor="#000000"
             android:fontFamily="@font/semibold" />
@@ -70,7 +68,7 @@
                 android:id="@+id/profile_icon"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:layout_marginRight="10dp"
+                android:layout_marginEnd="10dp"
                 android:padding="3dp"
                 android:src="@drawable/icon_user"
                 android:scaleType="fitCenter" />
@@ -81,7 +79,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="15dp"
                 android:layout_marginBottom="15dp"
-                android:text="My profile"
+                android:text="@string/my_profile"
                 android:textSize="12sp"
                 android:textColor="#000000"
                 android:fontFamily="@font/medium" />
@@ -101,7 +99,7 @@
                 android:id="@+id/my_resources_icon"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:layout_marginRight="10dp"
+                android:layout_marginEnd="10dp"
                 android:padding="3dp"
                 android:src="@drawable/icon_resources"
                 android:scaleType="fitCenter" />
@@ -112,7 +110,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="15dp"
                 android:layout_marginBottom="15dp"
-                android:text="My resources"
+                android:text="@string/my_resources"
                 android:textSize="12sp"
                 android:textColor="#000000"
                 android:fontFamily="@font/medium" />
@@ -132,7 +130,7 @@
                 android:id="@+id/wishlist_icon"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:layout_marginRight="10dp"
+                android:layout_marginEnd="10dp"
                 android:padding="3dp"
                 android:src="@drawable/icon_heart_filled"
                 android:scaleType="fitCenter" />
@@ -143,7 +141,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="15dp"
                 android:layout_marginBottom="15dp"
-                android:text="Wishlist"
+                android:text="@string/wishlist"
                 android:textSize="12sp"
                 android:textColor="#000000"
                 android:fontFamily="@font/medium" />
@@ -163,18 +161,18 @@
                 android:id="@+id/become_provider_icon"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:layout_marginRight="10dp"
+                android:layout_marginEnd="10dp"
                 android:padding="3dp"
                 android:src="@drawable/icon_star"
                 android:scaleType="fitCenter" />
 
             <TextView
                 android:id="@+id/become_provider_txt"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="15dp"
                 android:layout_marginBottom="15dp"
-                android:text="Become a provider"
+                android:text="@string/become_a_provider"
                 android:textSize="12sp"
                 android:textColor="#000000"
                 android:layout_weight="1"
@@ -187,7 +185,7 @@
                 android:padding="3dp"
                 android:src="@drawable/icon_pending"
                 android:scaleType="fitCenter"
-                android:tint="#9E9E9E" />
+                app:tint="#9E9E9E" />
         </LinearLayout>
 
         <LinearLayout
@@ -205,7 +203,7 @@
                 android:id="@+id/upload_resource_icon"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:layout_marginRight="10dp"
+                android:layout_marginEnd="10dp"
                 android:padding="3dp"
                 android:src="@drawable/icon_upload"
                 android:scaleType="fitCenter" />
@@ -216,7 +214,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="15dp"
                 android:layout_marginBottom="15dp"
-                android:text="Upload a resource"
+                android:text="@string/upload_a_resource"
                 android:textSize="12sp"
                 android:textColor="#000000"
                 android:fontFamily="@font/medium" />
@@ -237,7 +235,7 @@
                 android:id="@+id/my_uploaded_resources_icon"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:layout_marginRight="10dp"
+                android:layout_marginEnd="10dp"
                 android:padding="3dp"
                 android:src="@drawable/icon_uploaded_resources"
                 android:scaleType="fitCenter" />
@@ -248,7 +246,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="15dp"
                 android:layout_marginBottom="15dp"
-                android:text="My uploaded resources"
+                android:text="@string/my_uploaded_resources"
                 android:textSize="12sp"
                 android:textColor="#000000"
                 android:fontFamily="@font/medium" />
@@ -268,7 +266,7 @@
                 android:id="@+id/refer_and_earn_icon"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:layout_marginRight="10dp"
+                android:layout_marginEnd="10dp"
                 android:padding="3dp"
                 android:src="@drawable/icon_share"
                 android:scaleType="fitCenter" />
@@ -279,7 +277,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="15dp"
                 android:layout_marginBottom="15dp"
-                android:text="Refer and earn"
+                android:text="@string/refer_and_earn"
                 android:textSize="12sp"
                 android:textColor="#000000"
                 android:fontFamily="@font/medium" />
@@ -294,13 +292,13 @@
             android:paddingRight="20dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:visibility="gone">
+            android:visibility="visible">
 
             <ImageView
                 android:id="@+id/report_icon"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:layout_marginRight="10dp"
+                android:layout_marginEnd="10dp"
                 android:padding="3dp"
                 android:src="@drawable/icon_error"
                 android:scaleType="fitCenter" />
@@ -311,7 +309,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="15dp"
                 android:layout_marginBottom="15dp"
-                android:text="Report us"
+                android:text="@string/report_a_issue"
                 android:textSize="12sp"
                 android:textColor="#000000"
                 android:fontFamily="@font/medium" />
@@ -330,7 +328,7 @@
                 android:id="@+id/icon_faqs"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:layout_marginRight="10dp"
+                android:layout_marginEnd="10dp"
                 android:padding="3dp"
                 android:src="@drawable/icon_help"
                 android:scaleType="fitCenter" />
@@ -341,7 +339,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="15dp"
                 android:layout_marginBottom="15dp"
-                android:text="FAQs"
+                android:text="@string/faqs"
                 android:textSize="12sp"
                 android:textColor="#000000"
                 android:fontFamily="@font/medium" />
@@ -350,7 +348,7 @@
         <LinearLayout
             android:id="@+id/ghost_linear"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
             android:padding="8dp"
             android:orientation="horizontal"
             android:layout_weight="1" />
@@ -376,7 +374,7 @@
                 android:id="@+id/logout_icon"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:layout_marginRight="10dp"
+                android:layout_marginEnd="10dp"
                 android:padding="3dp"
                 android:src="@drawable/icon_logout"
                 android:scaleType="fitCenter" />
@@ -387,7 +385,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"
                 android:layout_marginBottom="18dp"
-                android:text="Logout"
+                android:text="@string/logout"
                 android:textSize="12sp"
                 android:textColor="#000000"
                 android:fontFamily="@font/medium" />

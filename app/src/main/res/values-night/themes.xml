@@ -27,7 +27,6 @@
         <item name="colorControlActivated">@color/colorSecondary</item>
         <item name="colorControlHighlight">@color/colorSecondaryVariant</item>
         <item name="android:textColorHighlight">@color/colorSecondaryVariant</item>
-        <item name="android:navigationBarColor">@android:color/white</item>
         <item name="android:enforceNavigationBarContrast">false</item>
     </style>
     <!--  🚀 Fullscreen Theme (no status bar, no action bar)  -->

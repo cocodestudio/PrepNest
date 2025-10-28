@@ -1,20 +1,18 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
-
     <LinearLayout
         android:id="@+id/container"
         android:layout_width="match_parent"
         android:layout_height="300dp"
         android:background="#FFFFFF"
         android:orientation="vertical">
-
         <RelativeLayout
             android:id="@+id/header"
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
-
             <LinearLayout
                 android:id="@+id/dot_1"
                 android:layout_width="8dp"
@@ -22,9 +20,8 @@
                 android:padding="8dp"
                 android:background="#000000"
                 android:orientation="vertical"
-                android:layout_toLeftOf="@id/dot_2"
+                android:layout_toStartOf="@id/dot_2"
                 android:layout_centerVertical="true" />
-
             <LinearLayout
                 android:id="@+id/dot_2"
                 android:layout_width="8dp"
@@ -36,36 +33,33 @@
                 android:orientation="vertical"
                 android:layout_centerHorizontal="true"
                 android:layout_centerVertical="true" />
-
             <LinearLayout
                 android:id="@+id/dot_3"
                 android:layout_width="8dp"
                 android:layout_height="8dp"
                 android:background="#F5F5F5"
                 android:orientation="vertical"
-                android:layout_toRightOf="@id/dot_2"
+                android:layout_toEndOf="@id/dot_2"
                 android:layout_centerVertical="true" />
-
             <TextView
                 android:id="@+id/btn_next"
                 android:focusable="false"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:layout_marginRight="10dp"
+                android:layout_marginEnd="10dp"
                 android:layout_marginBottom="8dp"
                 android:paddingLeft="8dp"
                 android:paddingTop="2dp"
                 android:paddingRight="8dp"
                 android:paddingBottom="2dp"
-                android:text="Next"
+                android:text="@string/next"
                 android:textColor="#000000"
                 android:textSize="13sp"
                 android:fontFamily="@font/semibold"
                 android:background="@drawable/ripple_mask_only_light"
-                android:layout_alignParentRight="true" />
+                android:layout_alignParentEnd="true" />
         </RelativeLayout>
-
         <androidx.viewpager.widget.ViewPager
             android:id="@+id/viewpager"
             android:layout_width="match_parent"

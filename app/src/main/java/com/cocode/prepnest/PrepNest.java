@@ -5,10 +5,12 @@ import android.content.Intent;
 import android.util.Log;
 
 import com.google.firebase.FirebaseApp;
+import com.google.firebase.analytics.FirebaseAnalytics;
 import com.google.firebase.appcheck.FirebaseAppCheck;
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory;
 
 public class PrepNest extends Application {
+    private static FirebaseAnalytics firebaseAnalytics;
     @Override
     public void onCreate() {
         super.onCreate();
@@ -18,6 +20,8 @@ public class PrepNest extends Application {
         firebaseAppCheck.installAppCheckProviderFactory(
                 PlayIntegrityAppCheckProviderFactory.getInstance()
         );
+
+        firebaseAnalytics = FirebaseAnalytics.getInstance(this);
 
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
             try {
@@ -48,5 +52,8 @@ public class PrepNest extends Application {
             android.os.Process.killProcess(android.os.Process.myPid());
             System.exit(1);
         });
+    }
+    public static FirebaseAnalytics getFirebaseAnalytics() {
+        return firebaseAnalytics;
     }
 }

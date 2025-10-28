@@ -1,11 +1,13 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:fitsSystemWindows="true">
 
     <LinearLayout
-        android:id="@+id/header"
+        android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#FFFFFF"
@@ -16,8 +18,8 @@
             android:id="@+id/back_icon"
             android:layout_width="30dp"
             android:layout_height="30dp"
-            android:layout_marginLeft="20dp"
-            android:layout_marginRight="10dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="10dp"
             android:padding="6dp"
             android:src="@drawable/icon_back"
             android:scaleType="fitCenter"
@@ -25,12 +27,12 @@
 
         <TextView
             android:id="@+id/header_title"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:paddingTop="15dp"
             android:paddingBottom="15dp"
             android:gravity="center_horizontal|center_vertical"
-            android:text="Resources"
+            android:text="@string/resources"
             android:textSize="16sp"
             android:textColor="#000000"
             android:layout_weight="1"
@@ -40,8 +42,8 @@
             android:id="@+id/filter_icon"
             android:layout_width="30dp"
             android:layout_height="30dp"
-            android:layout_marginLeft="10dp"
-            android:layout_marginRight="20dp"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="20dp"
             android:padding="6dp"
             android:src="@drawable/icon_filter"
             android:scaleType="fitCenter" />
@@ -50,7 +52,7 @@
     <LinearLayout
         android:id="@+id/background"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:background="#FFFFFF"
         android:orientation="vertical"
         android:layout_weight="1">
@@ -61,7 +63,8 @@
             android:layout_height="100dp"
             android:gravity="center_horizontal|center_vertical"
             android:orientation="vertical"
-            android:layout_weight="1">
+            android:layout_weight="1"
+            tools:ignore="NestedWeights">
 
             <ProgressBar
                 android:id="@+id/progressbar"
@@ -83,9 +86,9 @@
             <ImageView
                 android:id="@+id/empty_image"
                 android:layout_width="match_parent"
-                android:layout_height="150dp"
+                android:layout_height="200dp"
                 android:layout_marginBottom="10dp"
-                android:src="@drawable/empty_box_illus"
+                android:src="@drawable/icon_empty_box"
                 android:scaleType="fitCenter" />
 
             <TextView
@@ -104,5 +107,14 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:visibility="gone" />
+
+        <com.google.android.gms.ads.AdView
+            android:id="@+id/adView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:adSize="BANNER"
+            app:adUnitId="ca-app-pub-3940256099942544/6300978111"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="10dp"/>
     </LinearLayout>
 </LinearLayout>

@@ -23,12 +23,9 @@ import java.util.List;
 
 public class ImageviewActivity extends AppCompatActivity {
 
+    private final List<Uri> imageURIs = new ArrayList<>();
     private ImageviewBinding binding;
     private LogUtils logFile;
-    private HashMap<String, Object> map = new HashMap<>();
-
-    private List<Uri> imageURIs = new ArrayList<>();
-
     private SharedPreferences features_visit;
 
     @Override
@@ -55,16 +52,18 @@ public class ImageviewActivity extends AppCompatActivity {
 //        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
 //        getWindow().setStatusBarColor(0xFFFFFFFF);
         if (features_visit.contains("features visit")) {
-            map = new Gson().fromJson(features_visit.getString("features visit", ""), new TypeToken<HashMap<String, Object>>() {
+            HashMap<String, Object> map = new Gson().fromJson(features_visit.getString("features visit", ""), new TypeToken<HashMap<String, Object>>() {
             }.getType());
             if (map.containsKey("first resource view")) {
                 if (map.get("first resource view").toString().equals("false")) {
                     PrepNestUtil.showToast(ImageviewActivity.this, "Swipe left to see more !");
                     map.put("first resource view", "true");
-                    features_visit.edit().putString("features visit", new Gson().toJson(map)).commit();
+                    features_visit.edit().putString("features visit", new Gson().toJson(map)).apply();
                 }
             }
         }
+
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
     public void initializeAndAttachAdapter() {
@@ -95,12 +94,10 @@ public class ImageviewActivity extends AppCompatActivity {
             logFile.addLog("RESOURCE", "FOLDER EXISTS");
             File[] files = folder.listFiles();
             logFile.addLog("RESOURCE", "HAS FILES : ".concat(String.valueOf((long) (files.length))));
-            if (files != null) {
-                for (File file : files) {
-                    if (file.isFile()) {
-                        Uri fileUri = Uri.fromFile(file);
-                        imageURIs.add(fileUri);
-                    }
+            for (File file : files) {
+                if (file.isFile()) {
+                    Uri fileUri = Uri.fromFile(file);
+                    imageURIs.add(fileUri);
                 }
             }
         }

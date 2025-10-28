@@ -1,7 +1,9 @@
 [versions]
 agp = "8.11.2"
+appUpdate = "2.1.0"
 circleimageview = "3.1.0"
 core = "3.5.3"
+firebaseAnalytics = "23.0.0"
 firebaseBom = "33.6.0"
 glide = "4.16.0"
 google-services = "4.4.2"
@@ -16,14 +18,20 @@ firebaseDatabase = "22.0.1"
 firebaseStorage = "22.0.1"
 okhttp = "4.12.0"
 photoview = "2.3.0"
+playServicesAds = "24.7.0"
 qrgenerator = "1.0.5"
 shimmer = "0.5.0"
+spotlight = "2.0.5"
 startupRuntime = "1.1.1"
 firebaseAppcheckPlayintegrity = "19.0.1"
+activity = "1.11.0"
+constraintlayout = "2.2.1"
 
 [libraries]
+app-update = { module = "com.google.android.play:app-update", version.ref = "appUpdate" }
 circleimageview = { module = "de.hdodenhof:circleimageview", version.ref = "circleimageview" }
 core = { module = "com.google.zxing:core", version.ref = "core" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics", version.ref = "firebaseAnalytics" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
 glide = { module = "com.github.bumptech.glide:glide", version.ref = "glide" }
@@ -38,10 +46,14 @@ firebase-database = { group = "com.google.firebase", name = "firebase-database",
 firebase-storage = { group = "com.google.firebase", name = "firebase-storage", version.ref = "firebaseStorage" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 photoview = { module = "com.github.chrisbanes:PhotoView", version.ref = "photoview" }
+play-services-ads = { module = "com.google.android.gms:play-services-ads", version.ref = "playServicesAds" }
 qrgenerator = { module = "com.github.androidmads:QRGenerator", version.ref = "qrgenerator" }
 shimmer = { module = "com.facebook.shimmer:shimmer", version.ref = "shimmer" }
+spotlight = { module = "com.github.takusemba:spotlight", version.ref = "spotlight" }
 startup-runtime = { group = "androidx.startup", name = "startup-runtime", version.ref = "startupRuntime" }
 firebase-appcheck-playintegrity = { group = "com.google.firebase", name = "firebase-appcheck-playintegrity", version.ref = "firebaseAppcheckPlayintegrity" }
+activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
+constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 
 
 [plugins]

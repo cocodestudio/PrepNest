@@ -9,10 +9,11 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.viewpager.widget.PagerAdapter;
 import androidx.viewpager.widget.ViewPager.OnPageChangeListener;
@@ -24,7 +25,6 @@ import com.cocode.prepnest.databinding.OverviewSheetBinding;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -33,45 +33,31 @@ import com.google.firebase.database.ValueEventListener;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-import org.json.JSONObject;
-
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 
 
 public class BecomeproviderActivity extends AppCompatActivity {
 
-    private FirebaseDatabase _firebase = FirebaseDatabase.getInstance();
-
+    private final FirebaseDatabase _firebase = FirebaseDatabase.getInstance();
+    private final HashMap<String, Object> userData = new HashMap<>();
+    private final boolean isPhnVerified = false;
+    private final ArrayList<HashMap<String, Object>> provider_overview_list = new ArrayList<>();
+    private final Intent toProfile = new Intent();
+    private final DatabaseReference users = _firebase.getReference("users");
+    private final DatabaseReference requests = _firebase.getReference("requests/provider_requests");
     private BecomeproviderBinding binding;
-    private HashMap<String, Object> userData = new HashMap<>();
     private boolean hasProfile = false;
     private boolean hasPhnNumber = false;
     private boolean isEmailVerified = false;
-    private boolean isPhnVerified = false;
     private boolean isEligible = false;
     private HashMap<String, Object> features_visit_map = new HashMap<>();
-    private HashMap<String, Object> add_items = new HashMap<>();
-    private HashMap<String, Object> requestMap = new HashMap<>();
     private LogUtils logFile;
     private NetworkMonitor networkMonitor;
-
-    private ArrayList<HashMap<String, Object>> provider_overview_list = new ArrayList<>();
-
     private com.google.android.material.bottomsheet.BottomSheetDialog eligibility_issues_sheet;
     private com.google.android.material.bottomsheet.BottomSheetDialog provider_overview_sheet;
     private SharedPreferences features_visit;
     private FirebaseAuth auth;
-    private Intent toProfile = new Intent();
-    private DatabaseReference users = _firebase.getReference("users");
-    private ChildEventListener _users_child_listener;
-    private DatabaseReference requests = _firebase.getReference("requests/provider_requests");
-    private ChildEventListener _requests_child_listener;
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -87,22 +73,16 @@ public class BecomeproviderActivity extends AppCompatActivity {
         features_visit = getSharedPreferences("features visit", Activity.MODE_PRIVATE);
         auth = FirebaseAuth.getInstance();
 
-        binding.backIcon.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                finish();
-                overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
-            }
+        binding.backIcon.setOnClickListener(_view -> {
+            finish();
+            overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
         });
 
-        binding.btnVerification.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                if (isEligible) {
-                    sendRequest();
-                } else {
-                    showEligibilityIssuesSheet();
-                }
+        binding.btnVerification.setOnClickListener(_view -> {
+            if (isEligible) {
+                sendRequest();
+            } else {
+                showEligibilityIssuesSheet();
             }
         });
     }
@@ -143,6 +123,7 @@ public class BecomeproviderActivity extends AppCompatActivity {
     public void designUI() {
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
 
@@ -151,7 +132,7 @@ public class BecomeproviderActivity extends AppCompatActivity {
         logFile.addLog("USER", "GETTING USER DATA");
         users.child(auth.getCurrentUser().getUid()).addValueEventListener(new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot snapshot) {
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (snapshot.exists()) {
                     userData.clear();
                     for (DataSnapshot child : snapshot.getChildren()) {
@@ -175,16 +156,16 @@ isPhnVerified = true;
                             }
                             if (hasProfile && (hasPhnNumber && isEmailVerified)) {
                                 isEligible = true;
-                                binding.title.setText("Eligible");
+                                binding.title.setText(getString(R.string.eligible));
                                 binding.subtext.setText(getString(R.string.provider_eligible_message));
                                 binding.btnVerificationTxt.setText(getString(R.string.send_request));
-                                binding.image.setImageResource(R.drawable.provider_eligible_illus);
+                                binding.image.setImageResource(R.drawable.icon_checked);
                             } else {
                                 isEligible = false;
-                                binding.title.setText("Not eligible");
+                                binding.title.setText(getString(R.string.not_eligible));
                                 binding.subtext.setText(getString(R.string.provider_not_eligible_message));
                                 binding.btnVerificationTxt.setText(getString(R.string.see_eligibility_issues));
-                                binding.image.setImageResource(R.drawable.provider_not_eligible_illus);
+                                binding.image.setImageResource(R.drawable.icon_report_error);
                             }
                         });
                     }
@@ -200,7 +181,7 @@ isPhnVerified = true;
             }
 
             @Override
-            public void onCancelled(DatabaseError error) {
+            public void onCancelled(@NonNull DatabaseError error) {
 
                 if (!isFinishing() && !isDestroyed()) {
                     logFile.addLog("USER", "FAILED TO LOAD USER DATA : ".concat(error.toString()));
@@ -229,9 +210,22 @@ isPhnVerified = true;
 
                 provider_overview_sheet.setOnShowListener(dialog -> {
                     BottomSheetDialog d = (BottomSheetDialog) dialog;
-                    View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+                    FrameLayout bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+
                     if (bottomSheet != null) {
+                        // 1. Make background transparent (your existing part)
                         bottomSheet.setBackgroundResource(android.R.color.transparent);
+
+                        // 2. Force wrap content height
+//                        ViewGroup.LayoutParams layoutParams = bottomSheet.getLayoutParams();
+//                        layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+//                        bottomSheet.setLayoutParams(layoutParams);
+//
+//                        // 3. Configure bottom sheet behavior
+//                        BottomSheetBehavior<FrameLayout> behavior = BottomSheetBehavior.from(bottomSheet);
+//                        behavior.setFitToContents(true);
+//                        behavior.setSkipCollapsed(true);
+//                        behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
                     }
                 });
 
@@ -276,7 +270,7 @@ isPhnVerified = true;
                                     return this;
                                 }
                             }.getIns((int) 360, 0xFF000000));
-                            sheetbinding.btnNext.setText("Next");
+                            sheetbinding.btnNext.setText(R.string.next);
                         } else {
                             if (_position == 1) {
                                 sheetbinding.dot2.setBackground(new GradientDrawable() {
@@ -286,7 +280,7 @@ isPhnVerified = true;
                                         return this;
                                     }
                                 }.getIns((int) 360, 0xFF000000));
-                                sheetbinding.btnNext.setText("Next");
+                                sheetbinding.btnNext.setText(R.string.next);
                             } else {
                                 if (_position == 2) {
                                     sheetbinding.dot3.setBackground(new GradientDrawable() {
@@ -296,9 +290,7 @@ isPhnVerified = true;
                                             return this;
                                         }
                                     }.getIns((int) 360, 0xFF000000));
-                                    sheetbinding.btnNext.setText("Done");
-                                } else {
-
+                                    sheetbinding.btnNext.setText(R.string.done);
                                 }
                             }
                         }
@@ -332,20 +324,17 @@ isPhnVerified = true;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
                 sheetbinding.viewpager.setAdapter(new ViewpagerAdapter(provider_overview_list));
-                ((PagerAdapter) sheetbinding.viewpager.getAdapter()).notifyDataSetChanged();
-                sheetbinding.btnNext.setOnClickListener(new OnClickListener() {
-                    @Override
-                    public void onClick(View _view) {
-                        if (sheetbinding.viewpager.getCurrentItem() == 0) {
-                            sheetbinding.viewpager.setCurrentItem((int) 1);
+                sheetbinding.viewpager.getAdapter().notifyDataSetChanged();
+                sheetbinding.btnNext.setOnClickListener(_view -> {
+                    if (sheetbinding.viewpager.getCurrentItem() == 0) {
+                        sheetbinding.viewpager.setCurrentItem(1);
+                    } else {
+                        if (sheetbinding.viewpager.getCurrentItem() == 1) {
+                            sheetbinding.viewpager.setCurrentItem(2);
                         } else {
-                            if (sheetbinding.viewpager.getCurrentItem() == 1) {
-                                sheetbinding.viewpager.setCurrentItem((int) 2);
-                            } else {
-                                features_visit_map.put("provider overview", "true");
-                                features_visit.edit().putString("features visit", new Gson().toJson(features_visit_map)).commit();
-                                provider_overview_sheet.dismiss();
-                            }
+                            features_visit_map.put("provider overview", "true");
+                            features_visit.edit().putString("features visit", new Gson().toJson(features_visit_map)).apply();
+                            provider_overview_sheet.dismiss();
                         }
                     }
                 });
@@ -355,69 +344,8 @@ isPhnVerified = true;
         }
     }
 
-
-    public class ViewpagerAdapter extends PagerAdapter {
-
-        Context _context;
-        ArrayList<HashMap<String, Object>> _data;
-
-        public ViewpagerAdapter(Context _ctx, ArrayList<HashMap<String, Object>> _arr) {
-            _context = _ctx;
-            _data = _arr;
-        }
-
-        public ViewpagerAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _context = BecomeproviderActivity.this;
-            _data = _arr;
-        }
-
-        @Override
-        public int getCount() {
-            return _data.size();
-        }
-
-        @Override
-        public boolean isViewFromObject(View _view, Object _object) {
-            return _view == _object;
-        }
-
-        @Override
-        public void destroyItem(ViewGroup _container, int _position, Object _object) {
-            _container.removeView((View) _object);
-        }
-
-        @Override
-        public int getItemPosition(Object _object) {
-            return super.getItemPosition(_object);
-        }
-
-        @Override
-        public CharSequence getPageTitle(int pos) {
-            // Use the Activity Event (onTabLayoutNewTabAdded) in order to use this method
-            return "page " + String.valueOf(pos);
-        }
-
-        @Override
-        public Object instantiateItem(ViewGroup _container, final int _position) {
-            OverviewItemBinding binding = OverviewItemBinding.inflate(LayoutInflater.from(_context), _container, false);
-
-
-            binding.title.setText(_data.get(_position).get("title").toString());
-
-            binding.subtext.setText(_data.get(_position).get("subtext").toString());
-
-            View _view = binding.getRoot();
-            _container.addView(_view);
-            return _view;
-        }
-    }
-
-    {
-    }
-
-
     public void addProviderOverviewItems() {
-        add_items = new HashMap<>();
+        HashMap<String, Object> add_items = new HashMap<>();
         add_items.put("title", "What is provider?");
         add_items.put("subtext", "A Provider is a special type of user on PrepNest who can upload and share educational resources within the app. These resources are made available for other users to purchase. Becoming a provider gives you exclusive access to upload your own content and earn from it.");
         provider_overview_list.add(add_items);
@@ -430,7 +358,6 @@ isPhnVerified = true;
         add_items.put("subtext", "As a provider, you’ll earn 30% of the amount each time a user purchases your resources. The earnings can be in cash or coins, depending on which payment method the user chooses during the transaction.");
         provider_overview_list.add(add_items);
     }
-
 
     public void showEligibilityIssuesSheet() {
         eligibility_issues_sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(BecomeproviderActivity.this);
@@ -454,18 +381,18 @@ isPhnVerified = true;
             sheetbinding.iconStatusProfile.setImageResource(R.drawable.icon_check_circle_round);
             sheetbinding.profileStatusTxt.setTextColor(0xFF4CAF50);
             sheetbinding.iconStatusProfile.setColorFilter(0xFF4CAF50);
-            sheetbinding.profileStatusTxt.setText("Profile picture is uploaded");
+            sheetbinding.profileStatusTxt.setText(R.string.profile_picture_is_uploaded);
         } else {
             sheetbinding.iconStatusProfile.setImageResource(R.drawable.icon_cancel);
             sheetbinding.profileStatusTxt.setTextColor(0xFFD32F2F);
             sheetbinding.iconStatusProfile.setColorFilter(0xFFD32F2F);
-            sheetbinding.profileStatusTxt.setText("Profile picture is not uploaded");
+            sheetbinding.profileStatusTxt.setText(R.string.profile_picture_is_not_uploaded);
         }
         if (hasPhnNumber) {
             sheetbinding.iconStatusPhone.setImageResource(R.drawable.icon_check_circle_round);
             sheetbinding.phoneStatusTxt.setTextColor(0xFF4CAF50);
             sheetbinding.iconStatusPhone.setColorFilter(0xFF4CAF50);
-            sheetbinding.phoneStatusTxt.setText("Phone number is linked");
+            sheetbinding.phoneStatusTxt.setText(R.string.phone_number_is_linked);
 			/*
 if (isPhnVerified) {
 
@@ -480,44 +407,39 @@ phone_status_txt.setText("Phone number is not verified");
             sheetbinding.iconStatusPhone.setImageResource(R.drawable.icon_cancel);
             sheetbinding.phoneStatusTxt.setTextColor(0xFFD32F2F);
             sheetbinding.iconStatusPhone.setColorFilter(0xFFD32F2F);
-            sheetbinding.phoneStatusTxt.setText("Phone number is not linked");
+            sheetbinding.phoneStatusTxt.setText(R.string.phone_number_is_not_linked);
         }
         if (isEmailVerified) {
             sheetbinding.iconStatusEmail.setImageResource(R.drawable.icon_check_circle_round);
             sheetbinding.emailStatusTxt.setTextColor(0xFF4CAF50);
             sheetbinding.iconStatusEmail.setColorFilter(0xFF4CAF50);
-            sheetbinding.emailStatusTxt.setText("Email address is verified");
+            sheetbinding.emailStatusTxt.setText(R.string.email_address_is_verified);
         } else {
             sheetbinding.iconStatusEmail.setImageResource(R.drawable.icon_cancel);
             sheetbinding.emailStatusTxt.setTextColor(0xFFD32F2F);
             sheetbinding.iconStatusEmail.setColorFilter(0xFFD32F2F);
-            sheetbinding.emailStatusTxt.setText("Email address is not verified");
+            sheetbinding.emailStatusTxt.setText(R.string.email_address_is_not_verified);
         }
-        sheetbinding.btnFix.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                toProfile.setClass(BecomeproviderActivity.this, UserprofileActivity.class);
-                startActivity(toProfile);
-                overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                eligibility_issues_sheet.dismiss();
-            }
+        sheetbinding.btnFix.setOnClickListener(_view -> {
+            toProfile.setClass(BecomeproviderActivity.this, UserprofileActivity.class);
+            startActivity(toProfile);
+            overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+            eligibility_issues_sheet.dismiss();
         });
         eligibility_issues_sheet.setCancelable(true);
         eligibility_issues_sheet.show();
     }
 
-
     public void sendRequest() {
         PrepNestUtil.showLoadingDialog(this, true);
         logFile.addLog("PROVIDER", "SENDING REQUEST");
         long currentTimeInMS = System.currentTimeMillis();
-        requestMap = new HashMap<>();
-        requestMap.put("timestamp", String.valueOf((long) (currentTimeInMS)));
+        HashMap<String, Object> requestMap = new HashMap<>();
+        requestMap.put("timestamp", String.valueOf(currentTimeInMS));
         requests.child(auth.getCurrentUser().getUid()).updateChildren(requestMap).addOnCompleteListener(addRequest -> {
             if (addRequest.isSuccessful()) {
                 users.child(auth.getCurrentUser().getUid()).child("provider verification status").setValue("pending").addOnCompleteListener(updateRequest -> {
                     if (updateRequest.isSuccessful()) {
-                        sendNotifications("admin", "Provider Request", "New provider request from '".concat(userData.get("name").toString().concat("'")));
                         logFile.addLog("PROVIDER", "REQUEST SENT SUCCESSFULLY");
                         PrepNestUtil.showToast(BecomeproviderActivity.this, "Request is successfully sent.");
                         binding.backIcon.performClick();
@@ -535,66 +457,61 @@ phone_status_txt.setText("Phone number is not verified");
         });
     }
 
+    public class ViewpagerAdapter extends PagerAdapter {
 
-    public void sendNotifications(final String topic, final String title, final String message) {
-        new Thread(() -> {
-            try {
-                URL url = new URL("https://us-central1-prepnest-65133.cloudfunctions.net/sendNotification");
+        Context _context;
+        ArrayList<HashMap<String, Object>> _data;
 
-                // Open Connection
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                conn.setDoOutput(true);
-                conn.setDoInput(true);
+        public ViewpagerAdapter(Context _ctx, ArrayList<HashMap<String, Object>> _arr) {
+            _context = _ctx;
+            _data = _arr;
+        }
 
-                //Create JSON Object
-                JSONObject jsonParam = new JSONObject();
-                jsonParam.put("topic", topic);
-                jsonParam.put("title", title);
-                jsonParam.put("body", message);
+        public ViewpagerAdapter(ArrayList<HashMap<String, Object>> _arr) {
+            _context = BecomeproviderActivity.this;
+            _data = _arr;
+        }
 
-                // Write JSON to request body
-                try (OutputStream os = conn.getOutputStream()) {
-                    byte[] input = jsonParam.toString().getBytes("utf-8");
-                    os.write(input, 0, input.length);
-                }
+        @Override
+        public int getCount() {
+            return _data.size();
+        }
 
-                // Get response
-                int responseCode = conn.getResponseCode();
-                BufferedReader br;
-                if (responseCode >= 200 && responseCode < 300) {
-                    br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
-                } else {
-                    br = new BufferedReader(new InputStreamReader(conn.getErrorStream(), "utf-8"));
-                }
+        @Override
+        public boolean isViewFromObject(@NonNull View _view, @NonNull Object _object) {
+            return _view == _object;
+        }
 
-                StringBuilder response = new StringBuilder();
-                String responseLine;
-                while ((responseLine = br.readLine()) != null) {
-                    response.append(responseLine.trim());
-                }
-                br.close();
+        @Override
+        public void destroyItem(ViewGroup _container, int _position, @NonNull Object _object) {
+            _container.removeView((View) _object);
+        }
 
-                // Show result on UI Thread
-				        /*
-		runOnUiThread(() -> {
-            _loadingDialog(false);
-			Toast.makeText(BecomeproviderActivity.this, "Response: " + response, Toast.LENGTH_SHORT).show();
-		});
-        */
-                conn.disconnect();
-            } catch (Exception e) {
-                e.printStackTrace();
-				        /*
-        _loadingDialog(false);
-		runOnUiThread(() -> {
-			Toast.makeText(BecomeproviderActivity.this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-		});
-        */
-            }
-        }).start();
+        @Override
+        public int getItemPosition(@NonNull Object _object) {
+            return super.getItemPosition(_object);
+        }
 
+        @Override
+        public CharSequence getPageTitle(int pos) {
+            // Use the Activity Event (onTabLayoutNewTabAdded) in order to use this method
+            return "page " + pos;
+        }
+
+        @NonNull
+        @Override
+        public Object instantiateItem(@NonNull ViewGroup _container, final int _position) {
+            OverviewItemBinding binding = OverviewItemBinding.inflate(LayoutInflater.from(_context), _container, false);
+
+
+            binding.title.setText(_data.get(_position).get("title").toString());
+
+            binding.subtext.setText(_data.get(_position).get("subtext").toString());
+
+            View _view = binding.getRoot();
+            _container.addView(_view);
+            return _view;
+        }
     }
 
 }

@@ -7,6 +7,7 @@ import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.View;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.cocode.prepnest.databinding.MainBinding;
@@ -28,21 +29,19 @@ import java.util.TimerTask;
 
 public class MainActivity extends AppCompatActivity {
 
-    private Timer _timer = new Timer();
-
+    private final Timer _timer = new Timer();
+    private final FirebaseAuth auth = FirebaseAuth.getInstance();
+    private final DatabaseReference users = FirebaseDatabase.getInstance().getReference("users");
+    private final Intent toHomePage = new Intent();
+    private final Intent toOnboarding = new Intent();
+    private final Intent toLogin = new Intent();
+    private final Intent toNoConnection = new Intent();
     private MainBinding binding;
     private HashMap<String, Object> userData = new HashMap<>();
     private NetworkMonitor networkMonitor;
     private HashMap<String, Object> features_visit_map = new HashMap<>();
-    private FirebaseAuth auth = FirebaseAuth.getInstance();
-    private DatabaseReference users = FirebaseDatabase.getInstance().getReference("users");
     private LogUtils logFile;
-
-    private Intent toHomePage = new Intent();
     private TimerTask timer;
-    private Intent toOnboarding = new Intent();
-    private Intent toLogin = new Intent();
-    private Intent toNoConnection = new Intent();
     private SharedPreferences features_visit;
 
     @Override
@@ -66,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
         logFile.addLog("OPEN", "APP IS OPENED");
         createUI();
         networkMonitor = new NetworkMonitor(this);
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
 
@@ -91,9 +91,9 @@ public class MainActivity extends AppCompatActivity {
                 logFile.addLog("USER", "USER DATA IS LOADING");
                 users.child(auth.getCurrentUser().getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
                     @Override
-                    public void onDataChange(DataSnapshot dataSnapshot) {
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
 
-                        userData = dataSnapshot.getValue(new GenericTypeIndicator<HashMap<String, Object>>() {
+                        userData = dataSnapshot.getValue(new GenericTypeIndicator<>() {
                         });
 
                         if (userData != null) {
@@ -124,7 +124,7 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     @Override
-                    public void onCancelled(DatabaseError databaseError) {
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
 
                         PrepNestUtil.showToast(MainActivity.this, databaseError.toString());
 
@@ -136,26 +136,23 @@ public class MainActivity extends AppCompatActivity {
                 timer = new TimerTask() {
                     @Override
                     public void run() {
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (features_visit_map.get("onboarding").toString().equals("false")) {
-                                    logFile.addLog("NAVIGATION", "NAVIGATING TO ONBOARDING");
-                                    toOnboarding.setClass(MainActivity.this, OnboardingActivity.class);
-                                    startActivity(toOnboarding);
-                                } else {
-                                    logFile.addLog("NAVIGATION", "NAVIGATING TO LOGIN");
-                                    toLogin.setClass(MainActivity.this, LoginActivity.class);
-                                    startActivity(toLogin);
-                                }
-                                overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
-                                timer.cancel();
-                                finish();
+                        runOnUiThread(() -> {
+                            if (features_visit_map.get("onboarding").toString().equals("false")) {
+                                logFile.addLog("NAVIGATION", "NAVIGATING TO ONBOARDING");
+                                toOnboarding.setClass(MainActivity.this, OnboardingActivity.class);
+                                startActivity(toOnboarding);
+                            } else {
+                                logFile.addLog("NAVIGATION", "NAVIGATING TO LOGIN");
+                                toLogin.setClass(MainActivity.this, LoginActivity.class);
+                                startActivity(toLogin);
                             }
+                            overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+                            timer.cancel();
+                            finish();
                         });
                     }
                 };
-                _timer.schedule(timer, (int) (3000));
+                _timer.schedule(timer, 3000);
             }
         } else {
             toNoConnection.setClass(MainActivity.this, NoconnectionActivity.class);
@@ -181,7 +178,7 @@ public class MainActivity extends AppCompatActivity {
             features_visit_map.put("provider overview", "false");
             features_visit_map.put("upload guidance", "false");
             features_visit_map.put("first resource view", "false");
-            features_visit.edit().putString("features visit", new Gson().toJson(features_visit_map)).commit();
+            features_visit.edit().putString("features visit", new Gson().toJson(features_visit_map)).apply();
         }
     }
 

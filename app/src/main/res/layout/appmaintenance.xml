@@ -1,8 +1,8 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:fitsSystemWindows="true">
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
 
     <LinearLayout
         android:id="@+id/container"
@@ -15,30 +15,30 @@
         <ImageView
             android:id="@+id/image"
             android:layout_width="match_parent"
-            android:layout_height="100dp"
-            android:src="@drawable/app_maintenance_illus"
-            android:scaleType="fitCenter" />
+            android:layout_height="250dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/icon_maintenance" />
 
         <TextView
             android:id="@+id/title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="15dp"
-            android:text="Maintenance"
-            android:textSize="16sp"
+            android:fontFamily="@font/bold"
+            android:text="@string/maintenance"
             android:textColor="#000000"
-            android:fontFamily="@font/bold" />
+            android:textSize="16sp" />
 
         <TextView
             android:id="@+id/subtext"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:fontFamily="@font/semibold"
+            android:gravity="center_horizontal|center_vertical"
             android:paddingLeft="60dp"
             android:paddingRight="60dp"
-            android:gravity="center_horizontal|center_vertical"
             android:text="@string/app_maintenance_message"
-            android:textSize="12sp"
             android:textColor="#9E9E9E"
-            android:fontFamily="@font/semibold" />
+            android:textSize="12sp" />
     </LinearLayout>
 </LinearLayout>

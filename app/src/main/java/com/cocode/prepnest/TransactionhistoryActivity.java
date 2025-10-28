@@ -4,16 +4,18 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.cocode.prepnest.databinding.TransHistoryBinding;
 import com.cocode.prepnest.databinding.TransactionhistoryBinding;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.MobileAds;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.ChildEventListener;
@@ -35,25 +37,17 @@ import java.util.HashMap;
 
 public class TransactionhistoryActivity extends AppCompatActivity {
 
-    private FirebaseDatabase _firebase = FirebaseDatabase.getInstance();
-
+    private final FirebaseDatabase _firebase = FirebaseDatabase.getInstance();
+    private final ArrayList<HashMap<String, Object>> historyList = new ArrayList<>();
+    private final DatabaseReference transaction_history = _firebase.getReference("transactions_history");
+    private final Intent toNoConnection = new Intent();
     private TransactionhistoryBinding binding;
-    private String amountType = "";
     private double amount = 0;
-    private boolean hasAmount = false;
-    private boolean hasType = false;
-    private boolean hasTime = false;
-    private String typeValue = "";
     private History_listviewAdapter adapter;
     private ChildEventListener transactionListener;
     private LogUtils logFile;
     private NetworkMonitor networkMonitor;
-
-    private ArrayList<HashMap<String, Object>> historyList = new ArrayList<>();
-
-    private DatabaseReference transaction_history = _firebase.getReference("transactions_history");
     private FirebaseAuth auth;
-    private Intent toNoConnection = new Intent();
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -68,12 +62,9 @@ public class TransactionhistoryActivity extends AppCompatActivity {
     private void initialize(Bundle _savedInstanceState) {
         auth = FirebaseAuth.getInstance();
 
-        binding.backIcon.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                finish();
-                overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
-            }
+        binding.backIcon.setOnClickListener(_view -> {
+            finish();
+            overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
         });
     }
 
@@ -92,13 +83,20 @@ public class TransactionhistoryActivity extends AppCompatActivity {
                 binding.backIcon.performClick();
             }
         });
+        loadBannerAd();
+    }
+
+    private void loadBannerAd() {
+        MobileAds.initialize(this, initializationStatus -> {});
+        AdRequest adRequest = new AdRequest.Builder().build();
+        binding.adView.loadAd(adRequest);
     }
 
     @Override
     public void onStart() {
         super.onStart();
         if (PrepNestUtil.isConnected(TransactionhistoryActivity.this)) {
-            PrepNestUtil.showLoadingDialog(this, true);
+            showProgressBar(true);
             checkDataExistence();
             getTransactionHistory();
         } else {
@@ -135,6 +133,7 @@ public class TransactionhistoryActivity extends AppCompatActivity {
         binding.historyListview.setVerticalScrollBarEnabled(false);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
 
@@ -171,40 +170,41 @@ public class TransactionhistoryActivity extends AppCompatActivity {
         if (transactionListener == null) {
             transactionListener = new ChildEventListener() {
                 @Override
-                public void onChildAdded(DataSnapshot snapshot, String previousChildName) {
-                    GenericTypeIndicator<HashMap<String, Object>> ind = new GenericTypeIndicator<HashMap<String, Object>>() {
+                public void onChildAdded(@NonNull DataSnapshot snapshot, String previousChildName) {
+                    GenericTypeIndicator<HashMap<String, Object>> ind = new GenericTypeIndicator<>() {
                     };
                     HashMap<String, Object> map = snapshot.getValue(ind);
                     historyList.add(map);
                     adapter.notifyDataSetChanged();
+                    showProgressBar(false);
                     toggleEmptyState();
-                    PrepNestUtil.showLoadingDialog(TransactionhistoryActivity.this, false);
                     logFile.addLog("TRANSACTIONS HISTORY", "HISTORY LOADED SUCCESSFULLY");
                 }
 
                 @Override
-                public void onChildChanged(DataSnapshot snapshot, String previousChildName) {
+                public void onChildChanged(@NonNull DataSnapshot snapshot, String previousChildName) {
                     if (!isFinishing() && !isDestroyed()) {
-                        PrepNestUtil.showLoadingDialog(TransactionhistoryActivity.this, false);
+                        showProgressBar(true);
                     }
                     reloadAllData();
                 }
 
                 @Override
-                public void onChildRemoved(DataSnapshot snapshot) {
+                public void onChildRemoved(@NonNull DataSnapshot snapshot) {
                     if (!isFinishing() && !isDestroyed()) {
-                        PrepNestUtil.showLoadingDialog(TransactionhistoryActivity.this, false);
+                        showProgressBar(true);
                     }
                     reloadAllData();
                 }
 
                 @Override
-                public void onChildMoved(DataSnapshot snapshot, String previousChildName) {
+                public void onChildMoved(@NonNull DataSnapshot snapshot, String previousChildName) {
                 }
 
                 @Override
-                public void onCancelled(DatabaseError error) {
-                    PrepNestUtil.showLoadingDialog(TransactionhistoryActivity.this, false);
+                public void onCancelled(@NonNull DatabaseError error) {
+                    showProgressBar(false);
+                    PrepNestUtil.showToast(getApplicationContext(), "Failed to load data, try again later.");
                 }
             };
 
@@ -212,25 +212,34 @@ public class TransactionhistoryActivity extends AppCompatActivity {
         transaction_history.child(auth.getCurrentUser().getUid()).addChildEventListener(transactionListener);
     }
 
+    public void showProgressBar(boolean show) {
+        if (show) {
+            binding.progressBarLayout.setVisibility(View.VISIBLE);
+        } else {
+            binding.progressBarLayout.setVisibility(View.GONE);
+        }
+    }
+
 
     public void toggleEmptyState() {
-        if (historyList != null && (historyList.size() > 0)) {
+        if (historyList != null && (!historyList.isEmpty())) {
             binding.historyListview.setVisibility(View.VISIBLE);
             binding.emptyContainer.setVisibility(View.GONE);
         } else {
             binding.historyListview.setVisibility(View.GONE);
             binding.emptyContainer.setVisibility(View.VISIBLE);
         }
+        binding.progressBarLayout.setVisibility(View.GONE);
     }
 
 
     public void reloadAllData() {
         transaction_history.child(auth.getCurrentUser().getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot _dataSnapshot) {
+            public void onDataChange(@NonNull DataSnapshot _dataSnapshot) {
                 historyList.clear();
                 try {
-                    GenericTypeIndicator<HashMap<String, Object>> _ind = new GenericTypeIndicator<HashMap<String, Object>>() {
+                    GenericTypeIndicator<HashMap<String, Object>> _ind = new GenericTypeIndicator<>() {
                     };
                     for (DataSnapshot _data : _dataSnapshot.getChildren()) {
                         HashMap<String, Object> _map = _data.getValue(_ind);
@@ -240,13 +249,14 @@ public class TransactionhistoryActivity extends AppCompatActivity {
                     _e.printStackTrace();
                 }
                 adapter.notifyDataSetChanged();
+                showProgressBar(false);
                 toggleEmptyState();
-                PrepNestUtil.showLoadingDialog(TransactionhistoryActivity.this, false);
             }
 
             @Override
-            public void onCancelled(DatabaseError _databaseError) {
-                PrepNestUtil.showLoadingDialog(TransactionhistoryActivity.this, false);
+            public void onCancelled(@NonNull DatabaseError _databaseError) {
+                showProgressBar(false);
+                PrepNestUtil.showToast(getApplicationContext(), "Failed to load data, try again later.");
             }
         });
     }
@@ -256,17 +266,18 @@ public class TransactionhistoryActivity extends AppCompatActivity {
         logFile.addLog("TRANSACTIONS HISTORY", "CHECKING DATA EXISTENCE");
         transaction_history.child(auth.getCurrentUser().getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot _dataSnapshot) {
+            public void onDataChange(@NonNull DataSnapshot _dataSnapshot) {
                 if (!_dataSnapshot.exists() || !_dataSnapshot.hasChildren()) {
                     logFile.addLog("TRANSACTIONS HISTORY", "CHECKED SUCCESSFULLY");
+                    showProgressBar(false);
                     toggleEmptyState();
-                    PrepNestUtil.showLoadingDialog(TransactionhistoryActivity.this, false);
                 }
             }
 
             @Override
-            public void onCancelled(DatabaseError _databaseError) {
-                PrepNestUtil.showLoadingDialog(TransactionhistoryActivity.this, false);
+            public void onCancelled(@NonNull DatabaseError _databaseError) {
+                showProgressBar(false);
+                PrepNestUtil.showToast(getApplicationContext(), "Failed to load data, try again later");
             }
         });
     }
@@ -279,8 +290,9 @@ public class TransactionhistoryActivity extends AppCompatActivity {
             _data = _arr;
         }
 
+        @NonNull
         @Override
-        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             LayoutInflater _inflater = getLayoutInflater();
             View _v = _inflater.inflate(R.layout.trans_history, null);
             RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -294,22 +306,22 @@ public class TransactionhistoryActivity extends AppCompatActivity {
             TransHistoryBinding binding = TransHistoryBinding.bind(_view);
 
             PrepNestUtil.roundViewWithRipple(binding.container, "#FFFFFF", 0, 0, "#FFFFFF", "#E0E0E0");
-            amountType = "";
-            typeValue = "";
-            hasAmount = _data.get((int) (_data.size() - 1) - _position).containsKey("amount");
-            hasType = _data.get((int) (_data.size() - 1) - _position).containsKey("type");
-            hasTime = _data.get((int) (_data.size() - 1) - _position).containsKey("timestamp");
+            String amountType = "";
+            String typeValue = "";
+            boolean hasAmount = _data.get(_data.size() - 1 - _position).containsKey("amount");
+            boolean hasType = _data.get(_data.size() - 1 - _position).containsKey("type");
+            boolean hasTime = _data.get(_data.size() - 1 - _position).containsKey("timestamp");
             if (hasAmount && hasType) {
-                typeValue = _data.get((int) (_data.size() - 1) - _position).get("type").toString();
+                typeValue = _data.get(_data.size() - 1 - _position).get("type").toString();
                 logFile.addLog("HISTORY", String.valueOf((long) ((_data.size() - 1) - _position)).concat("-TYPE VALUE: ").concat(typeValue));
-                if ((typeValue.equals("purchase") || typeValue.equals("resource_sold")) && _data.get((int) (_data.size() - 1) - _position).containsKey("amount type")) {
-                    amountType = _data.get((int) (_data.size() - 1) - _position).get("amount type").toString();
+                if ((typeValue.equals("purchase") || typeValue.equals("resource_sold")) && _data.get(_data.size() - 1 - _position).containsKey("amount type")) {
+                    amountType = _data.get(_data.size() - 1 - _position).get("amount type").toString();
                     logFile.addLog("HISTORY", String.valueOf((long) ((_data.size() - 1) - _position)).concat("-AMOUNT TYPE HERE: ").concat(amountType));
                 } else {
                     if (typeValue.equals("cash_deduct") || typeValue.equals("cash_add")) {
                         amountType = "cash";
                     } else {
-                        if (typeValue.equals("purchase_reward") || (typeValue.equals("resource_reward") || (typeValue.equals("refer_success") || (typeValue.equals("refer_reward") || typeValue.equals("welcome_bonus"))))) {
+                        if (typeValue.equals("purchase_reward") || typeValue.equals("resource_reward") || typeValue.equals("refer_success") || typeValue.equals("refer_reward") || typeValue.equals("welcome_bonus") || typeValue.equals("rewarded_ads")) {
                             amountType = "coins";
                         }
                     }
@@ -318,7 +330,7 @@ public class TransactionhistoryActivity extends AppCompatActivity {
                 if (!amountType.isEmpty()) {
                     binding.container.setVisibility(View.VISIBLE);
                     binding.line.setVisibility(View.VISIBLE);
-                    amount = Double.parseDouble(_data.get((int) (_data.size() - 1) - _position).get("amount").toString());
+                    amount = Double.parseDouble(_data.get(_data.size() - 1 - _position).get("amount").toString());
                     logFile.addLog("HISTORY", String.valueOf((long) ((_data.size() - 1) - _position)).concat("-AMOUNT: ").concat(amountType));
                 } else {
                     binding.container.setVisibility(View.GONE);
@@ -385,6 +397,11 @@ public class TransactionhistoryActivity extends AppCompatActivity {
                         binding.type.setText("Welcome bonus");
                         binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
                         break;
+                    case "rewarded_ads" :
+                        binding.amountTxt.setTextColor(0xFF4CAF50);
+                        binding.type.setText("Rewarded ad");
+                        binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
+                        break;
                     case "purchase_reward":
                         binding.amountTxt.setTextColor(0xFF4CAF50);
                         binding.type.setText("Purchase reward");
@@ -407,8 +424,8 @@ public class TransactionhistoryActivity extends AppCompatActivity {
             if (hasTime) {
                 binding.container.setVisibility(View.VISIBLE);
                 binding.line.setVisibility(View.VISIBLE);
-                binding.timestamp.setText(formatTimeDifference(_data.get((int) (_data.size() - 1) - _position).get("timestamp").toString()));
-                switch (_data.get((int) (_data.size() - 1) - _position).getOrDefault("status", "").toString()) {
+                binding.timestamp.setText(formatTimeDifference(_data.get(_data.size() - 1 - _position).get("timestamp").toString()));
+                switch (_data.get(_data.size() - 1 - _position).getOrDefault("status", "").toString()) {
                     case "pending":
                         binding.status.setVisibility(View.VISIBLE);
                         binding.status.setTextColor(0xFFFF9800);
@@ -434,11 +451,8 @@ public class TransactionhistoryActivity extends AppCompatActivity {
             } else {
                 binding.line.setVisibility(View.VISIBLE);
             }
-            binding.container.setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(View _view) {
+            binding.container.setOnClickListener(_view1 -> {
 
-                }
             });
         }
 

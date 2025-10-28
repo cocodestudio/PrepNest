@@ -3,15 +3,11 @@ package com.cocode.prepnest;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
-import android.content.pm.ApplicationInfo;
-import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
-import android.view.View.OnClickListener;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.FileProvider;
 
 import com.cocode.prepnest.databinding.ReferpageBinding;
 import com.google.firebase.FirebaseApp;
@@ -19,11 +15,6 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -37,8 +28,6 @@ public class ReferpageActivity extends AppCompatActivity {
 
     private ArrayList<String> referredUsers = new ArrayList<>();
 
-    private FirebaseAuth auth;
-
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -51,30 +40,17 @@ public class ReferpageActivity extends AppCompatActivity {
     }
 
     private void initialize(Bundle _savedInstanceState) {
-        auth = FirebaseAuth.getInstance();
-
-        binding.backIcon.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                finish();
-                overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
-            }
+        binding.backIcon.setOnClickListener(_view -> {
+            finish();
+            overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
         });
 
-        binding.referCodeMain.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                ((ClipboardManager) getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("clipboard", binding.referCode.getText().toString()));
-                PrepNestUtil.showToast(ReferpageActivity.this, "Copied!");
-            }
+        binding.referCodeMain.setOnClickListener(_view -> {
+            ((ClipboardManager) getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("clipboard", binding.referCode.getText().toString()));
+            PrepNestUtil.showToast(ReferpageActivity.this, "Copied!");
         });
 
-        binding.referBtn.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                sendReferLink();
-            }
-        });
+        binding.referBtn.setOnClickListener(_view -> sendReferLink());
     }
 
     private void initializeLogic() {
@@ -84,7 +60,7 @@ public class ReferpageActivity extends AppCompatActivity {
         designUI();
         if ((FirebaseAuth.getInstance().getCurrentUser() != null)) {
             logFile.addLog("USER", "USER IS LOGGED IN");
-            binding.referCode.setText(FirebaseAuth.getInstance().getCurrentUser().getUid().substring((int) (0), (int) (7)));
+            binding.referCode.setText(FirebaseAuth.getInstance().getCurrentUser().getUid().substring(0, 7));
             fetchReferData();
         } else {
             logFile.addLog("USER", "USER IS NOT LOGGED IN");
@@ -116,6 +92,7 @@ public class ReferpageActivity extends AppCompatActivity {
         PrepNestUtil.roundViewWithRipple(binding.referCodeMain, "#F5F5F5", 30, 0, "#000000", "#E0E0E0");
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
 
@@ -134,7 +111,12 @@ public class ReferpageActivity extends AppCompatActivity {
                 }
                 if (referredUsers != null && !referredUsers.isEmpty()) {
                     binding.totalReferredAmountTxt.setText(String.valueOf((long) (referredUsers.size())));
+                } else {
+                    binding.totalReferredAmountTxt.setText("0");
+
                 }
+            } else {
+                binding.totalReferredAmountTxt.setText("0");
             }
             PrepNestUtil.showLoadingDialog(this, false);
             logFile.addLog("REFERRAL", "REFERRAL DATA LOADED");
@@ -147,43 +129,6 @@ public class ReferpageActivity extends AppCompatActivity {
         }
     }
 
-
-    public void shareApk() {
-        try {
-            ApplicationInfo app = ReferpageActivity.this.getApplicationInfo();
-            String apkPath = app.sourceDir;
-            File originalApk = new File(apkPath);
-
-            File shareFile = new File(getExternalCacheDir(), "prepnest.apk");
-            try (InputStream in = new FileInputStream(originalApk);
-                 OutputStream out = new FileOutputStream(shareFile)) {
-
-                byte[] buf = new byte[1024];
-                int len;
-                while ((len = in.read(buf)) > 0) {
-                    out.write(buf, 0, len);
-                }
-            }
-            Uri apkUri = FileProvider.getUriForFile(
-                    this,
-                    getPackageName() + ".provider",
-                    shareFile
-            );
-            Intent intent = new Intent(Intent.ACTION_SEND);
-
-            intent.setType("application/vnd.android.package-archive");
-
-            intent.putExtra(Intent.EXTRA_STREAM, apkUri);
-
-            intent.putExtra(Intent.EXTRA_TEXT, "message");
-
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
-            startActivity(Intent.createChooser(intent, "Share App APK via"));
-        } catch (Exception ignored) {
-
-        }
-    }
 
     public void sendReferLink() {
         String appPackageName = getPackageName();

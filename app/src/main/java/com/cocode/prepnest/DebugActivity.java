@@ -38,19 +38,9 @@ public class DebugActivity extends AppCompatActivity {
 
     private void initialize(Bundle _savedInstanceState) {
 
-        binding.btnSendReport.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                sendErrorReport();
-            }
-        });
+        binding.btnSendReport.setOnClickListener(_view -> sendErrorReport());
 
-        binding.btnExitApp.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                finishAffinity();
-            }
-        });
+        binding.btnExitApp.setOnClickListener(_view -> finishAffinity());
     }
 
     private void initializeLogic() {
@@ -60,6 +50,7 @@ public class DebugActivity extends AppCompatActivity {
         ((ClipboardManager) getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("clipboard", getIntent().getStringExtra("error")));
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
 
@@ -87,12 +78,10 @@ public class DebugActivity extends AppCompatActivity {
             if (fileUri != null) {
                 StorageReference logRef = FirebaseStorage.getInstance().getReference("other").child("reports").child("error_reports").child(FirebaseAuth.getInstance().getCurrentUser().getUid()).child(System.currentTimeMillis() + ".txt");
                 PrepNestUtil.showLoadingDialog(this, true);
-                logRef.putFile(fileUri).addOnSuccessListener(taskSnapshot -> {
-                    taskSnapshot.getStorage().getDownloadUrl().addOnSuccessListener(uri -> {
-                        // upload data to fdb
-                        uploadDataToFDB(uri.toString());
-                    });
-                }).addOnFailureListener(error -> {
+                logRef.putFile(fileUri).addOnSuccessListener(taskSnapshot -> taskSnapshot.getStorage().getDownloadUrl().addOnSuccessListener(uri -> {
+                    // upload data to fdb
+                    uploadDataToFDB(uri.toString());
+                })).addOnFailureListener(error -> {
                     PrepNestUtil.showLoadingDialog(this, false);
                     PrepNestUtil.showToast(DebugActivity.this, "Failed to send request");
                 });
@@ -114,7 +103,7 @@ public class DebugActivity extends AppCompatActivity {
         if (!_url.equals("null")) {
             errorMap.put("log file", _url);
         }
-        errorMap.put("timestamp", String.valueOf((long) System.currentTimeMillis()));
+        errorMap.put("timestamp", String.valueOf(System.currentTimeMillis()));
         reports.child(reports.push().getKey()).setValue(errorMap).addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
                 PrepNestUtil.showLoadingDialog(this, false);

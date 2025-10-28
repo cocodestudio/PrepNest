@@ -2,7 +2,6 @@ package com.cocode.prepnest;
 
 import android.os.Bundle;
 import android.view.View;
-import android.view.View.OnClickListener;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
@@ -25,13 +24,10 @@ public class NoconnectionActivity extends AppCompatActivity {
     }
 
     private void initialize(Bundle _savedInstanceState) {
-        binding.retryBtn.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                if (PrepNestUtil.isConnected(NoconnectionActivity.this)) {
-                    finish();
-                    overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
-                }
+        binding.retryBtn.setOnClickListener(_view -> {
+            if (PrepNestUtil.isConnected(NoconnectionActivity.this)) {
+                finish();
+                overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
             }
         });
     }
@@ -45,5 +41,7 @@ public class NoconnectionActivity extends AppCompatActivity {
                 finishAffinity();
             }
         });
+
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 }

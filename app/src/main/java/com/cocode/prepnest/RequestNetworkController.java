@@ -38,10 +38,8 @@ public class RequestNetworkController {
 
     private static final int SOCKET_TIMEOUT = 15000;
     private static final int READ_TIMEOUT = 25000;
-
-    protected OkHttpClient client;
-
     private static RequestNetworkController mInstance;
+    protected OkHttpClient client;
 
     public static synchronized RequestNetworkController getInstance() {
         if (mInstance == null) {

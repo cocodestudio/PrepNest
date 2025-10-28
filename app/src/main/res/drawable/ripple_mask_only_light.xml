@@ -6,7 +6,7 @@
     <item android:id="@android:id/mask">
         <shape android:shape="rectangle">
             <corners android:radius="100dp" />
-            <solid android:color="#FFFFFF" /> <!-- Color is ignored, used only for shape -->
+            <solid android:color="@color/white" /> <!-- Color is ignored, used only for shape -->
         </shape>
     </item>
 

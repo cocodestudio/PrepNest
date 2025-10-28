@@ -13,10 +13,10 @@ import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.view.Display;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.WindowManager;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.cocode.prepnest.databinding.AddcashBinding;
@@ -28,13 +28,6 @@ import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
-import org.json.JSONObject;
-
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.HashMap;
 
 import androidmads.library.qrgenearator.QRGContents;
@@ -43,17 +36,11 @@ import androidmads.library.qrgenearator.QRGEncoder;
 
 public class AddcashActivity extends AppCompatActivity {
 
-    private AddcashBinding binding;
-    private Bitmap bitmap;
-    private QRGEncoder qrgEncode;
-    private String qrText = "";
-    private String QR_CODE_STRUCTURE = "";
-    private String UPI_ID = "";
     private static final int PICK_IMAGE_REQUEST = 100;
-    private String fileName = "";
     Uri screenshotUri;
-    private HashMap<String, Object> dataMap = new HashMap<>();
-    private String key = "";
+    private AddcashBinding binding;
+    private String qrText = "";
+    private String fileName = "";
     private FirebaseAuth auth;
     private LogUtils logFile;
     private NetworkMonitor networkMonitor;
@@ -71,51 +58,39 @@ public class AddcashActivity extends AppCompatActivity {
 
     private void initialize(Bundle _savedInstanceState) {
 
-        binding.backIcon.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                finish();
-                overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
-            }
+        binding.backIcon.setOnClickListener(_view -> {
+            finish();
+            overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
         });
 
-        binding.sendReqBtn.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                if (screenshotUri == null) {
-                    PrepNestUtil.showToast(AddcashActivity.this, "Please select the payment screenshot.");
-                } else {
-                    if (PrepNestUtil.isConnected(AddcashActivity.this)) {
-                        auth = FirebaseAuth.getInstance();
-                        if (auth.getCurrentUser() != null) {
-                            uploadPhotoToStorage(screenshotUri);
-                        } else {
-                            PrepNestUtil.showToast(AddcashActivity.this, "Please login again!");
-                            auth.signOut();
-                            finish();
-                        }
+        binding.sendReqBtn.setOnClickListener(_view -> {
+            if (screenshotUri == null) {
+                PrepNestUtil.showToast(AddcashActivity.this, "Please select the payment screenshot.");
+            } else {
+                if (PrepNestUtil.isConnected(AddcashActivity.this)) {
+                    auth = FirebaseAuth.getInstance();
+                    if (auth.getCurrentUser() != null) {
+                        uploadPhotoToStorage(screenshotUri);
                     } else {
-                        com.google.android.material.snackbar.Snackbar.make(binding.container, "No internet connection", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).setAction("", new OnClickListener() {
-                            @Override
-                            public void onClick(View _view) {
-
-                            }
-                        }).show();
+                        PrepNestUtil.showToast(AddcashActivity.this, "Please login again!");
+                        auth.signOut();
+                        finish();
                     }
+                } else {
+                    com.google.android.material.snackbar.Snackbar.make(binding.wrapperLayout, "No internet connection", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).setAction("", _view1 -> {
+
+                    }).show();
                 }
             }
         });
 
-        binding.ssFileNameContainer.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                intent.setType("image/*");
-                intent.addCategory(Intent.CATEGORY_OPENABLE);
+        binding.ssFileNameContainer.setOnClickListener(_view -> {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.setType("image/*");
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
 
-                startActivityForResult(intent, PICK_IMAGE_REQUEST);
+            startActivityForResult(intent, PICK_IMAGE_REQUEST);
 
-            }
         });
     }
 
@@ -143,7 +118,7 @@ public class AddcashActivity extends AppCompatActivity {
                         fileName = getFileNameFromURI(screenshotUri);
                         binding.ssFileName.setText(fileName);
                         if (fileName.length() > 25) {
-                            binding.ssFileName.setText(fileName.substring((int) (0), (int) (25)).concat("..."));
+                            binding.ssFileName.setText(fileName.substring(0, 25).concat("..."));
                         }
                     }
                 }
@@ -155,8 +130,8 @@ public class AddcashActivity extends AppCompatActivity {
     @Override
     protected void onPostCreate(Bundle _savedInstanceState) {
         super.onPostCreate(_savedInstanceState);
-        QR_CODE_STRUCTURE = "upi://pay?pa=upi-id&pn=XXXPGN%20KOTAK%20811%20WALLET%20PGN&mc=0000&mode=02&purpose=00";
-        UPI_ID = "7078031800@axl";
+        String QR_CODE_STRUCTURE = "upi://pay?pa=upi-id&pn=XXXPGN%20KOTAK%20811%20WALLET%20PGN&mc=0000&mode=02&purpose=00";
+        String UPI_ID = "7078031800@axl";
         qrText = QR_CODE_STRUCTURE.replace("upi-id", UPI_ID);
         generateQR();
     }
@@ -184,29 +159,13 @@ public class AddcashActivity extends AppCompatActivity {
         }.getIns((int) 30, 0xFFFAFAFA));
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
 
     public void generateQR() {
         WindowManager manager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        Display display = manager.getDefaultDisplay();
-        Point point = new Point();
-        display.getSize(point);
-        int width = point.x;
-        int height = point.y;
-        int smallerDimension = width < height ? width : height;
-        smallerDimension = smallerDimension * 3 / 4;
-
-        qrgEncode = new QRGEncoder(
-                qrText,
-                null,
-                QRGContents.Type.TEXT,
-                smallerDimension
-        );
-
-        // Force black QR squares + white background
-        qrgEncode.setColorBlack(Color.WHITE);  // QR pattern
-        qrgEncode.setColorWhite(Color.BLACK);  // Background
+        QRGEncoder qrgEncode = getQrgEncoder(manager);
 
         try {
             Bitmap qrBitmap = qrgEncode.getBitmap();
@@ -225,7 +184,7 @@ public class AddcashActivity extends AppCompatActivity {
             binding.qrCode.setBackgroundColor(Color.WHITE);
             binding.qrCode.setImageBitmap(finalBitmap);
 
-            PrepNestUtil.TransitionManager(binding.container, 150);
+            PrepNestUtil.TransitionManager(binding.wrapperLayout, 150);
             binding.qrCode.setVisibility(View.VISIBLE);
 
         } catch (Exception e) {
@@ -233,20 +192,36 @@ public class AddcashActivity extends AppCompatActivity {
         }
     }
 
+    @NonNull
+    private QRGEncoder getQrgEncoder(WindowManager manager) {
+        Display display = manager.getDefaultDisplay();
+        Point point = new Point();
+        display.getSize(point);
+        int width = point.x;
+        int height = point.y;
+        int smallerDimension = Math.min(width, height);
+        smallerDimension = smallerDimension * 3 / 4;
 
+        QRGEncoder qrgEncode = new QRGEncoder(
+                qrText,
+                null,
+                QRGContents.Type.TEXT,
+                smallerDimension
+        );
+
+        // Force black QR squares + white background
+        qrgEncode.setColorBlack(Color.WHITE);  // QR pattern
+        qrgEncode.setColorWhite(Color.BLACK);  // Background
+        return qrgEncode;
+    }
 
 
     public String getFileNameFromURI(final Uri _uri) {
         String result = null;
-        Cursor cursor = getContentResolver().query(_uri, null, null, null, null);
-        try {
+        try (Cursor cursor = getContentResolver().query(_uri, null, null, null, null)) {
             if (cursor != null && cursor.moveToFirst()) {
                 int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
                 result = cursor.getString(nameIndex);
-            }
-        } finally {
-            if (cursor != null) {
-                cursor.close();
             }
         }
 
@@ -262,9 +237,7 @@ public class AddcashActivity extends AppCompatActivity {
         UploadTask fileUpload = fileRef.putFile(_uri);
         fileUpload.addOnSuccessListener(taskSnapshot -> {
             logFile.addLog("ADD CASH", "SCREENSHOT UPLOADED");
-            fileRef.getDownloadUrl().addOnSuccessListener(uri -> {
-                sendRequest(uri.toString());
-            });
+            fileRef.getDownloadUrl().addOnSuccessListener(uri -> sendRequest(uri.toString()));
         });
         fileUpload.addOnFailureListener(exception -> {
             logFile.addLog("ADD CASH", "FAILED TO UPLOAD : ".concat(exception.toString()));
@@ -277,13 +250,12 @@ public class AddcashActivity extends AppCompatActivity {
     public void sendRequest(final String _url) {
         logFile.addLog("ADD CASH", "SENDING REQUEST");
         DatabaseReference addCashRef = FirebaseDatabase.getInstance().getReference("requests/add_cash_requests").child(auth.getCurrentUser().getUid());
-        key = addCashRef.push().getKey();
-        dataMap = new HashMap<>();
+        String key = addCashRef.push().getKey();
+        HashMap<String, Object> dataMap = new HashMap<>();
         dataMap.put("photo url", _url);
-        dataMap.put("timestamp", String.valueOf((long) (System.currentTimeMillis())));
+        dataMap.put("timestamp", String.valueOf(System.currentTimeMillis()));
         addCashRef.child(key).setValue(dataMap).addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
-                sendNotifications("admin", "Add cash request", "Add cash request from '".concat(getIntent().getStringExtra("name").concat("'")));
                 logFile.addLog("ADD CASH", "REQUEST SENT SUCCESSFULLY");
                 screenshotUri = null;
                 fileName = "";
@@ -297,67 +269,4 @@ public class AddcashActivity extends AppCompatActivity {
             }
         });
     }
-
-
-    public void sendNotifications(final String topic, final String title, final String message) {
-        new Thread(() -> {
-            try {
-                URL url = new URL("https://us-central1-prepnest-65133.cloudfunctions.net/sendNotification");
-
-                // Open Connection
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                conn.setDoOutput(true);
-                conn.setDoInput(true);
-
-                //Create JSON Object
-                JSONObject jsonParam = new JSONObject();
-                jsonParam.put("topic", topic);
-                jsonParam.put("title", title);
-                jsonParam.put("body", message);
-
-                // Write JSON to request body
-                try (OutputStream os = conn.getOutputStream()) {
-                    byte[] input = jsonParam.toString().getBytes("utf-8");
-                    os.write(input, 0, input.length);
-                }
-
-                // Get response
-                int responseCode = conn.getResponseCode();
-                BufferedReader br;
-                if (responseCode >= 200 && responseCode < 300) {
-                    br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
-                } else {
-                    br = new BufferedReader(new InputStreamReader(conn.getErrorStream(), "utf-8"));
-                }
-
-                StringBuilder response = new StringBuilder();
-                String responseLine;
-                while ((responseLine = br.readLine()) != null) {
-                    response.append(responseLine.trim());
-                }
-                br.close();
-
-                // Show result on UI Thread
-				        /*
-		runOnUiThread(() -> {
-            _loadingDialog(false);
-			Toast.makeText(AddcashActivity.this, "Response: " + response, Toast.LENGTH_SHORT).show();
-		});
-        */
-                conn.disconnect();
-            } catch (Exception e) {
-                e.printStackTrace();
-				        /*
-        _loadingDialog(false);
-		runOnUiThread(() -> {
-			Toast.makeText(AddcashActivity.this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-		});
-        */
-            }
-        }).start();
-
-    }
-
 }

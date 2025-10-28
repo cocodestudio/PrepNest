@@ -23,7 +23,7 @@
         android:id="@+id/selected_circle"
         android:layout_width="10dp"
         android:layout_height="10dp"
-        app:srcCompat="@drawable/ic_circle_black"
+        app:srcCompat="@drawable/circle_black"
         android:visibility="gone"/>
 
 </LinearLayout>

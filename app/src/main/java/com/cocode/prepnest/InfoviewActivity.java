@@ -4,11 +4,10 @@ import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.ViewGroup;
-import android.widget.LinearLayout;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -23,10 +22,8 @@ import java.util.HashMap;
 
 public class InfoviewActivity extends AppCompatActivity {
 
+    private final ArrayList<HashMap<String, Object>> list = new ArrayList<>();
     private InfoviewBinding binding;
-    private HashMap<String, Object> map = new HashMap<>();
-
-    private ArrayList<HashMap<String, Object>> list = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -40,12 +37,9 @@ public class InfoviewActivity extends AppCompatActivity {
 
     private void initialize(Bundle _savedInstanceState) {
 
-        binding.backIcon.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                finish();
-                overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
-            }
+        binding.backIcon.setOnClickListener(_view -> {
+            finish();
+            overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
         });
     }
 
@@ -61,11 +55,14 @@ public class InfoviewActivity extends AppCompatActivity {
                 binding.backIcon.performClick();
             }
         });
+
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
 
     public void data() {
         if (getIntent().hasExtra("type")) {
+            HashMap<String, Object> map;
             if (getIntent().getStringExtra("type").equals("terms")) {
                 binding.headerTitle.setText("Terms & Conditions");
                 map = new HashMap<>();
@@ -144,8 +141,9 @@ public class InfoviewActivity extends AppCompatActivity {
             _data = _arr;
         }
 
+        @NonNull
         @Override
-        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             LayoutInflater _inflater = getLayoutInflater();
             View _v = _inflater.inflate(R.layout.information_view_layout, null);
             RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -158,19 +156,22 @@ public class InfoviewActivity extends AppCompatActivity {
             View _view = _holder.itemView;
             InformationViewLayoutBinding binding = InformationViewLayoutBinding.bind(_view);
 
-            binding.title.setText(String.valueOf((long) (_position + 1)).concat(". ".concat(_data.get((int) _position).get("title").toString())));
-            binding.subtext.setText(_data.get((int) _position).get("info").toString());
-            LinearLayout.LayoutParams paramscontainer = (LinearLayout.LayoutParams) binding.container.getLayoutParams();
-            if (_position == 0) {
-                paramscontainer.setMargins((int) convertToDp(10), (int) convertToDp(8), (int) convertToDp(10), (int) 0);
-            } else {
-                if (_position == (_data.size() - 1)) {
-                    paramscontainer.setMargins((int) convertToDp(10), (int) 0, (int) convertToDp(10), (int) convertToDp(8));
+            binding.title.setText(String.valueOf((long) (_position + 1)).concat(". ".concat(_data.get(_position).get("title").toString())));
+            binding.subtext.setText(_data.get(_position).get("info").toString());
+
+            ViewGroup.LayoutParams params = binding.container.getLayoutParams();
+            if (params instanceof ViewGroup.MarginLayoutParams) {
+                ViewGroup.MarginLayoutParams marginParams = (ViewGroup.MarginLayoutParams) params;
+
+                if (_position == 0) {
+                    marginParams.setMargins((int) convertToDp(10), (int) convertToDp(8), (int) convertToDp(10), 0);
+                } else if (_position == (_data.size() - 1)) {
+                    marginParams.setMargins((int) convertToDp(10), 0, (int) convertToDp(10), (int) convertToDp(8));
                 } else {
-                    paramscontainer.setMargins((int) convertToDp(10), (int) convertToDp(8), (int) convertToDp(10), (int) convertToDp(8));
+                    marginParams.setMargins((int) convertToDp(10), (int) convertToDp(8), (int) convertToDp(10), (int) convertToDp(8));
                 }
+                binding.container.setLayoutParams(marginParams);
             }
-            binding.container.setLayoutParams(paramscontainer);
         }
 
         @Override

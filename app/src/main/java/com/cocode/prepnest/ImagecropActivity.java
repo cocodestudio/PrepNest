@@ -6,7 +6,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.view.View;
-import android.view.View.OnClickListener;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
@@ -37,32 +36,21 @@ public class ImagecropActivity extends AppCompatActivity {
 
     private void initialize(Bundle _savedInstanceState) {
 
-        binding.backIcon.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                finish();
-                overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
-            }
+        binding.backIcon.setOnClickListener(_view -> {
+            finish();
+            overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
         });
 
-        binding.cropBtn.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                Uri savedUri = saveCroppedImage(binding.cropImageView.getCroppedBitmap());
-                Intent resultIntent = new Intent();
-                resultIntent.putExtra("croppedImageUri", savedUri.toString());
-                setResult(RESULT_OK, resultIntent);
-                overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
-                finish();
-            }
+        binding.cropBtn.setOnClickListener(_view -> {
+            Uri savedUri = saveCroppedImage(binding.cropImageView.getCroppedBitmap());
+            Intent resultIntent = new Intent();
+            resultIntent.putExtra("croppedImageUri", savedUri.toString());
+            setResult(RESULT_OK, resultIntent);
+            overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
+            finish();
         });
 
-        binding.rotateIcon.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                binding.cropImageView.rotateImage(CropImageView.RotateDegrees.ROTATE_90D);
-            }
-        });
+        binding.rotateIcon.setOnClickListener(_view -> binding.cropImageView.rotateImage(CropImageView.RotateDegrees.ROTATE_90D));
     }
 
     private void initializeLogic() {
@@ -81,6 +69,7 @@ public class ImagecropActivity extends AppCompatActivity {
         PrepNestUtil.roundViewWithRipple(binding.cropBtn, "#000000", 360, 0, "#000000", "#212121");
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
 

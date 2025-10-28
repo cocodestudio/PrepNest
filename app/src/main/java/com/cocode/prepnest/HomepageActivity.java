@@ -3,7 +3,6 @@ package com.cocode.prepnest;
 import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
@@ -15,12 +14,14 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.View.OnClickListener;
-import android.view.View.OnLongClickListener;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.animation.DecelerateInterpolator;
+import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
@@ -38,7 +39,16 @@ import com.cocode.prepnest.databinding.InAppBannerLayoutBinding;
 import com.cocode.prepnest.databinding.ResourceItemShortBinding;
 import com.cocode.prepnest.databinding.ShimmerLayoutBinding;
 import com.cocode.prepnest.databinding.StatusViewBinding;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.MobileAds;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.snackbar.Snackbar;
+import com.google.android.play.core.appupdate.AppUpdateInfo;
+import com.google.android.play.core.appupdate.AppUpdateManager;
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory;
+import com.google.android.play.core.install.model.AppUpdateType;
+import com.google.android.play.core.install.model.InstallStatus;
+import com.google.android.play.core.install.model.UpdateAvailability;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
@@ -48,6 +58,10 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.gson.Gson;
+import com.takusemba.spotlight.OnSpotlightListener;
+import com.takusemba.spotlight.Spotlight;
+import com.takusemba.spotlight.Target;
+import com.takusemba.spotlight.shape.Circle;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -59,38 +73,38 @@ import java.util.stream.Collectors;
 
 public class HomepageActivity extends AppCompatActivity {
 
-    private Timer _timer = new Timer();
-
+    private static final int UPDATE_REQUEST_CODE = 123;
+    private final Timer _timer = new Timer();
+    private final HashMap<String, Object> userData = new HashMap<>();
+    private final FirebaseAuth auth = FirebaseAuth.getInstance();
+    private final FirebaseDatabase firebase_database = FirebaseDatabase.getInstance();
+    private final DatabaseReference users = firebase_database.getReference("users");
+    private final DatabaseReference requests = firebase_database.getReference("requests/provider_requests");
+    private final DatabaseReference resources = firebase_database.getReference("resources");
+    private final DatabaseReference banners = firebase_database.getReference("other/app_banners");
+    private final ArrayList<HashMap<String, Object>> bannersList = new ArrayList<>();
+    private final Intent toLogin = new Intent();
+    private final Intent toProfile = new Intent();
+    private final Intent toReferPage = new Intent();
+    private final Intent toCashManage = new Intent();
+    private final Intent toBecomeProvider = new Intent();
+    private final Intent toAddCash = new Intent();
+    private final Intent toManageResources = new Intent();
+    private final Intent toWishlist = new Intent();
+    private final Intent toResources = new Intent();
+    private final Intent toReport = new Intent();
+    private final Intent toFAQs = new Intent();
     private HomepageBinding binding;
-    private HashMap<String, Object> userData = new HashMap<>();
     private NetworkMonitor networkMonitor;
     private LogUtils logFile;
-    private FirebaseAuth auth = FirebaseAuth.getInstance();
-    private FirebaseDatabase firebase_database = FirebaseDatabase.getInstance();
-    private DatabaseReference users = firebase_database.getReference("users");
-    private DatabaseReference requests = firebase_database.getReference("requests/provider_requests");
-    private DatabaseReference resources = firebase_database.getReference("resources");
-    private DatabaseReference banners = firebase_database.getReference("other/app_banners");
     private ValueEventListener resourceListener;
-
     private ArrayList<HashMap<String, Object>> recentlyAddedList = new ArrayList<>();
     private ArrayList<HashMap<String, Object>> recommendedList = new ArrayList<>();
     private ArrayList<HashMap<String, Object>> bestList = new ArrayList<>();
-    private ArrayList<HashMap<String, Object>> bannersList = new ArrayList<>();
-
-    private TimerTask bannerTimer;
-    private Intent toLogin = new Intent();
-    private Intent toProfile = new Intent();
-    private Intent toReferPage = new Intent();
-    private Intent toCashManage = new Intent();
-    private Intent temp = new Intent();
     private com.google.android.material.bottomsheet.BottomSheetDialog provider_verification_status_sheet;
-    private Intent toBecomeProvider = new Intent();
-    private Intent toAddCash = new Intent();
-    private Intent toManageResources = new Intent();
-    private Intent toWishlist = new Intent();
-    private Intent toResources = new Intent();
-    private Intent toFAQs = new Intent();
+    private AppUpdateManager appUpdateManager;
+    private Spotlight spotlight;
+    private View overlay;
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -99,6 +113,7 @@ public class HomepageActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
         initialize(_savedInstanceState);
         FirebaseApp.initializeApp(this);
+
         initializeLogic();
     }
 
@@ -117,204 +132,147 @@ public class HomepageActivity extends AppCompatActivity {
 //        _toggle.syncState();
 
 
-        binding.menuIcon.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                binding.drawerLayout.openDrawer(GravityCompat.START);
-            }
+        binding.menuIcon.setOnClickListener(_view -> binding.drawerLayout.openDrawer(GravityCompat.START));
+
+        binding.cashContainer.setOnLongClickListener(_view -> {
+            toAddCash.setClass(HomepageActivity.this, AddcashActivity.class);
+            toAddCash.putExtra("name", userData.get("name").toString());
+            startActivity(toAddCash);
+            overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+            return true;
         });
 
-        binding.cashContainer.setOnLongClickListener(new OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View _view) {
-                toAddCash.setClass(HomepageActivity.this, AddcashActivity.class);
-                toAddCash.putExtra("name", userData.get("name").toString());
-                startActivity(toAddCash);
+        binding.cashContainer.setOnClickListener(_view -> {
+            if (binding.cashProgressbar.getVisibility() == View.GONE) {
+                toCashManage.setClass(HomepageActivity.this, CashmanageActivity.class);
+                toCashManage.putExtra("user", new Gson().toJson(userData));
+                startActivity(toCashManage);
                 overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                return true;
             }
         });
 
-        binding.cashContainer.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                if (binding.cashProgressbar.getVisibility() == View.GONE) {
-                    toCashManage.setClass(HomepageActivity.this, CashmanageActivity.class);
-                    toCashManage.putExtra("user", new Gson().toJson(userData));
-                    startActivity(toCashManage);
-                    overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+        binding.btnViewAll.setOnClickListener(_view -> {
+            if (binding.cashProgressbar.getVisibility() == View.GONE) {
+                toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
+                toResources.putExtra("user", new Gson().toJson(userData));
+                try {
+                    toResources.removeExtra("tag type");
+                } catch (Exception ignored) {
+
                 }
-            }
-        });
-
-        binding.btnViewAll.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                if (binding.cashProgressbar.getVisibility() == View.GONE) {
-                    toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
-                    toResources.putExtra("user", new Gson().toJson(userData));
-                    try {
-                        toResources.removeExtra("tag type");
-                    } catch (Exception ignored) {
-
-                    }
-                    startActivity(toResources);
-                    overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                }
-            }
-        });
-
-        binding.seeMoreIcon1.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                if (binding.cashProgressbar.getVisibility() == View.GONE) {
-                    toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
-                    toResources.putExtra("tag type", "recommended");
-                    toResources.putExtra("user", new Gson().toJson(userData));
-                    startActivity(toResources);
-                    overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                }
-            }
-        });
-
-        binding.seeMoreIcon2.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                if (binding.cashProgressbar.getVisibility() == View.GONE) {
-                    toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
-                    toResources.putExtra("tag type", "best");
-                    toResources.putExtra("user", new Gson().toJson(userData));
-                    startActivity(toResources);
-                    overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                }
-            }
-        });
-
-        binding.drawer.profileContainer.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                toProfile.setClass(HomepageActivity.this, UserprofileActivity.class);
-                startActivity(toProfile);
+                startActivity(toResources);
                 overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                binding.drawerLayout.closeDrawer(GravityCompat.START);
             }
         });
 
-        binding.drawer.profileOp.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                toProfile.setClass(HomepageActivity.this, UserprofileActivity.class);
-                startActivity(toProfile);
+        binding.seeMoreIcon1.setOnClickListener(_view -> {
+            if (binding.cashProgressbar.getVisibility() == View.GONE) {
+                toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
+                toResources.putExtra("tag type", "recommended");
+                toResources.putExtra("user", new Gson().toJson(userData));
+                startActivity(toResources);
                 overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                binding.drawerLayout.closeDrawer(GravityCompat.START);
             }
         });
 
-        binding.drawer.myResourcesOp.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                toManageResources.setClass(HomepageActivity.this, ManageresourcesActivity.class);
-                startActivity(toManageResources);
+        binding.seeMoreIcon2.setOnClickListener(_view -> {
+            if (binding.cashProgressbar.getVisibility() == View.GONE) {
+                toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
+                toResources.putExtra("tag type", "best");
+                toResources.putExtra("user", new Gson().toJson(userData));
+                startActivity(toResources);
                 overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                binding.drawerLayout.closeDrawer(GravityCompat.START);
             }
         });
 
-        binding.drawer.wishlistOp.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                toWishlist.setClass(HomepageActivity.this, UserWishlistActivity.class);
-                toWishlist.putExtra("user", new Gson().toJson(userData));
-                startActivity(toWishlist);
-                overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                binding.drawerLayout.closeDrawer(GravityCompat.START);
-            }
+        binding.drawer.profileContainer.setOnClickListener(_view -> {
+            toProfile.setClass(HomepageActivity.this, UserprofileActivity.class);
+            startActivity(toProfile);
+            overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+            binding.drawerLayout.closeDrawer(GravityCompat.START);
         });
 
-        binding.drawer.becomeProviderOp.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                if (userData.containsKey("provider verification status")) {
-                    if (userData.get("provider verification status").toString().equals("pending")) {
-                        showProviderVerificationStatusSheet(true);
-                    } else {
-                        if (userData.get("provider verification status").toString().equals("failed")) {
-                            showProviderVerificationStatusSheet(false);
-                        } else {
-                            PrepNestUtil.showToast(HomepageActivity.this, "Unknown error, try login again!");
-                        }
-                    }
+        binding.drawer.profileOp.setOnClickListener(_view -> {
+            toProfile.setClass(HomepageActivity.this, UserprofileActivity.class);
+            startActivity(toProfile);
+            overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+            binding.drawerLayout.closeDrawer(GravityCompat.START);
+        });
+
+        binding.drawer.myResourcesOp.setOnClickListener(_view -> {
+            toManageResources.setClass(HomepageActivity.this, ManageresourcesActivity.class);
+            startActivity(toManageResources);
+            overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+            binding.drawerLayout.closeDrawer(GravityCompat.START);
+        });
+
+        binding.drawer.wishlistOp.setOnClickListener(_view -> {
+            toWishlist.setClass(HomepageActivity.this, UserWishlistActivity.class);
+            toWishlist.putExtra("user", new Gson().toJson(userData));
+            startActivity(toWishlist);
+            overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+            binding.drawerLayout.closeDrawer(GravityCompat.START);
+        });
+
+        binding.drawer.becomeProviderOp.setOnClickListener(_view -> {
+            if (userData.containsKey("provider verification status")) {
+                if (userData.get("provider verification status").toString().equals("pending")) {
+                    showProviderVerificationStatusSheet(true);
                 } else {
-                    toBecomeProvider.setClass(HomepageActivity.this, BecomeproviderActivity.class);
-                    toBecomeProvider.putExtra("user", new Gson().toJson(userData));
-                    startActivity(toBecomeProvider);
-                    overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+                    if (userData.get("provider verification status").toString().equals("failed")) {
+                        showProviderVerificationStatusSheet(false);
+                    } else {
+                        PrepNestUtil.showToast(HomepageActivity.this, "Unknown error, try login again!");
+                    }
                 }
-                binding.drawerLayout.closeDrawer(GravityCompat.START);
-            }
-        });
-
-        binding.drawer.uploadResourceOp.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-
-            }
-        });
-
-        binding.drawer.myUploadedResourcesOp.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-
-            }
-        });
-
-        binding.drawer.referAndEarnOp.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                toReferPage.setClass(HomepageActivity.this, ReferpageActivity.class);
-                toReferPage.putExtra("user", new Gson().toJson(userData));
-                startActivity(toReferPage);
+            } else {
+                toBecomeProvider.setClass(HomepageActivity.this, BecomeproviderActivity.class);
+                toBecomeProvider.putExtra("user", new Gson().toJson(userData));
+                startActivity(toBecomeProvider);
                 overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                binding.drawerLayout.closeDrawer(GravityCompat.START);
             }
+            binding.drawerLayout.closeDrawer(GravityCompat.START);
         });
 
-        binding.drawer.reportOp.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-
-            }
+        binding.drawer.referAndEarnOp.setOnClickListener(_view -> {
+            toReferPage.setClass(HomepageActivity.this, ReferpageActivity.class);
+            toReferPage.putExtra("user", new Gson().toJson(userData));
+            startActivity(toReferPage);
+            overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+            binding.drawerLayout.closeDrawer(GravityCompat.START);
         });
 
-        binding.drawer.faqsOp.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                toFAQs.setClass(HomepageActivity.this, AppFaqsActivity.class);
-                startActivity(toFAQs);
-                overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                binding.drawerLayout.closeDrawer(GravityCompat.START);
-            }
+        binding.drawer.reportOp.setOnClickListener(_view -> {
+            toReport.setClass(HomepageActivity.this, ReportIssueActivity.class);
+            startActivity(toReport);
+            overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+            binding.drawerLayout.closeDrawer(GravityCompat.START);
         });
 
-        binding.drawer.logoutOp.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                FirebaseMessaging.getInstance().unsubscribeFromTopic("all");
-                FirebaseMessaging.getInstance().unsubscribeFromTopic(auth.getCurrentUser().getUid());
-                FirebaseAuth.getInstance().signOut();
-                toLogin.setClass(HomepageActivity.this, LoginActivity.class);
-                startActivity(toLogin);
-                overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                finish();
-            }
+        binding.drawer.faqsOp.setOnClickListener(_view -> {
+            toFAQs.setClass(HomepageActivity.this, AppFaqsActivity.class);
+            startActivity(toFAQs);
+            overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+            binding.drawerLayout.closeDrawer(GravityCompat.START);
         });
 
-//        binding.headerTitle.setOnClickListener(new OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                throw new RuntimeException("Test crash for DebugActivity!");
-//            }
+        binding.drawer.logoutOp.setOnClickListener(_view -> {
+            FirebaseMessaging.getInstance().unsubscribeFromTopic("all");
+            FirebaseMessaging.getInstance().unsubscribeFromTopic(auth.getCurrentUser().getUid());
+            FirebaseAuth.getInstance().signOut();
+            toLogin.setClass(HomepageActivity.this, LoginActivity.class);
+            startActivity(toLogin);
+            overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+            finish();
+        });
+
+//        binding.headerTitle.setOnClickListener(_view -> {
+//            startTutorialOnViewReady();
 //        });
+
+        binding.streakContainer.setOnClickListener(_view -> {
+
+        });
     }
 
     private void initializeLogic() {
@@ -336,13 +294,100 @@ public class HomepageActivity extends AppCompatActivity {
                 }
             }
         });
+
+        appUpdateManager = AppUpdateManagerFactory.create(this);
+        checkForAppUpdate();
+        loadBannerAd();
+    }
+
+    private void startTutorialOnViewReady() {
+        View rootView = binding.getRoot();
+        rootView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                rootView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                // Layout is now ready
+                createTutorial();
+            }
+        });
+    }
+
+    private void createTutorial() {
+        // --- Target 1: The Welcome Text ---
+        // 1. Inflate the custom overlay layout
+        LayoutInflater inflater = LayoutInflater.from(this);
+        View firstOverlay = inflater.inflate(R.layout.layout_spotlight, null);
+
+        // 2. Find views in the overlay and customize them
+        TextView title1 = firstOverlay.findViewById(R.id.spotlight_title);
+        TextView desc1 = firstOverlay.findViewById(R.id.spotlight_description);
+        Button nextButton1 = firstOverlay.findViewById(R.id.spotlight_next_button);
+
+        title1.setText("Welcome!");
+        desc1.setText("This is the main welcome message.");
+        nextButton1.setText("Got it");
+        nextButton1.setOnClickListener(v -> spotlight.next());
+
+        // 3. Create the Target
+        Target firstTarget = new Target.Builder()
+                .setAnchor(binding.cashContainer) // The view to highlight
+                .setShape(new Circle(200f)) // Radius of the circle
+                .setOverlay(firstOverlay) // Set the custom inflated view
+                .build();
+
+
+        // --- Target 2: The Profile Button ---
+        View secondOverlay = inflater.inflate(R.layout.layout_spotlight, null);
+
+        TextView title2 = secondOverlay.findViewById(R.id.spotlight_title);
+        TextView desc2 = secondOverlay.findViewById(R.id.spotlight_description);
+        Button nextButton2 = secondOverlay.findViewById(R.id.spotlight_next_button);
+
+        title2.setText("Your Profile");
+        desc2.setText("Click here to see your profile and settings.");
+        nextButton2.setText("Finish");
+        nextButton2.setOnClickListener(v -> spotlight.finish());
+
+        // 3. Create the Target
+        Target secondTarget = new Target.Builder()
+                .setAnchor(binding.menuIcon)
+                .setShape(new Circle(150f))
+                .setOverlay(secondOverlay)
+                .build();
+
+        // --- Build and Start Spotlight ---
+        ArrayList<Target> targets = new ArrayList<>();
+        targets.add(firstTarget);
+        targets.add(secondTarget);
+
+        spotlight = new Spotlight.Builder(this)
+                .setTargets(targets)
+                .setBackgroundColor(Color.parseColor("#80000000")) // e.g., #80000000
+                .setDuration(1000L)
+                .setAnimation(new DecelerateInterpolator(2f))
+                .setOnSpotlightListener(new com.takusemba.spotlight.OnSpotlightListener() {
+                    @Override
+                    public void onStarted() {
+                    }
+
+                    @Override
+                    public void onEnded() {
+                    }
+                })
+                .build();
+
+        spotlight.start();
+    }
+    private void loadBannerAd() {
+        MobileAds.initialize(this, initializationStatus -> {});
+        AdRequest adRequest = new AdRequest.Builder().build();
+        binding.adView.loadAd(adRequest);
     }
 
     @Override
     public void onStart() {
         super.onStart();
         logFile.addActivity();
-        checkNewVersion();
         checkAppMaintenance();
     }
 
@@ -351,6 +396,24 @@ public class HomepageActivity extends AppCompatActivity {
         super.onResume();
         networkMonitor.register();
         getUserData();
+
+        appUpdateManager.getAppUpdateInfo().addOnSuccessListener(appUpdateInfo -> {
+            if (appUpdateInfo.installStatus() == InstallStatus.DOWNLOADED) {
+                Snackbar.make(findViewById(android.R.id.content),
+                                "New update downloaded", Snackbar.LENGTH_INDEFINITE)
+                        .setAction("RESTART", view -> appUpdateManager.completeUpdate())
+                        .show();
+            }
+        });
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == UPDATE_REQUEST_CODE && resultCode != RESULT_OK) {
+            PrepNestUtil.showToast(getApplicationContext(), "Update failed, try again");
+            Log.d("InAppUpdate", "Update flow failed! Code: " + resultCode);
+        }
     }
 
     @Override
@@ -362,11 +425,13 @@ public class HomepageActivity extends AppCompatActivity {
 
     public void designUI() {
         PrepNestUtil.roundViewWithRipple(binding.cashContainer, "#FAFAFA", 360, 0, "#FFFFFF", "#E0E0E0");
+        PrepNestUtil.roundViewWithRipple(binding.streakContainer, "#FAFAFA", 360, 0, "#FFFFFF", "#E0E0E0");
         PrepNestUtil.roundViewWithRipple(binding.drawer.profileOp, "#FFFFFF", 0, 0, "#FFFFFF", "#EEEEEE");
         PrepNestUtil.roundViewWithRipple(binding.drawer.myResourcesOp, "#FFFFFF", 0, 0, "#FFFFFF", "#EEEEEE");
         PrepNestUtil.roundViewWithRipple(binding.drawer.wishlistOp, "#FFFFFF", 0, 0, "#FFFFFF", "#EEEEEE");
         PrepNestUtil.roundViewWithRipple(binding.drawer.becomeProviderOp, "#FFFFFF", 0, 0, "#FFFFFF", "#EEEEEE");
         PrepNestUtil.roundViewWithRipple(binding.drawer.referAndEarnOp, "#FFFFFF", 0, 0, "#FFFFFF", "#EEEEEE");
+        PrepNestUtil.roundViewWithRipple(binding.drawer.reportOp, "#FFFFFF", 0, 0, "#FFFFFF", "#EEEEEE");
         PrepNestUtil.roundViewWithRipple(binding.drawer.faqsOp, "#FFFFFF", 0, 0, "#FFFFFF", "#EEEEEE");
         PrepNestUtil.roundViewWithRipple(binding.drawer.logoutOp, "#FFFFFF", 0, 0, "#FFFFFF", "#EEEEEE");
         binding.drawer.profileContainer.setBackground(new GradientDrawable() {
@@ -388,6 +453,8 @@ public class HomepageActivity extends AppCompatActivity {
 
         binding.drawerLayout.setFitsSystemWindows(false);
         binding.drawerLayout.setStatusBarBackground(null);
+
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
 
@@ -400,18 +467,53 @@ public class HomepageActivity extends AppCompatActivity {
         }
     }
 
+    private void checkForAppUpdate() {
+        appUpdateManager.getAppUpdateInfo().addOnSuccessListener(appUpdateInfo -> {
+
+            // Check if update is available
+            if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE) {
+
+                // ✅ Use FLEXIBLE as default
+                if (appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)) {
+                    startUpdate(appUpdateInfo, AppUpdateType.FLEXIBLE);
+                }
+                // 🔒 Use IMMEDIATE only if FLEXIBLE not allowed (rare)
+                else if (appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
+                    startUpdate(appUpdateInfo, AppUpdateType.IMMEDIATE);
+                }
+            }
+        });
+    }
+
+    private void startUpdate(AppUpdateInfo appUpdateInfo, int updateType) {
+        try {
+            appUpdateManager.startUpdateFlowForResult(
+                    appUpdateInfo,
+                    updateType,
+                    this,
+                    UPDATE_REQUEST_CODE);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
 
     public void getUserData() {
         users.child(auth.getCurrentUser().getUid()).addValueEventListener(new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot snapshot) {
-
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                FirebaseMessaging.getInstance().subscribeToTopic("all");
+                FirebaseMessaging.getInstance().subscribeToTopic(auth.getCurrentUser().getUid());
                 if (snapshot.exists()) {
                     binding.cashAmountTxt.setVisibility(View.GONE);
                     binding.cashProgressbar.setVisibility(View.VISIBLE);
                     userData.clear();
                     for (DataSnapshot child : snapshot.getChildren()) {
                         userData.put(child.getKey(), child.getValue());
+                    }
+
+                    if (userData.containsKey("course id")) {
+                        FirebaseMessaging.getInstance().subscribeToTopic(userData.get("course id").toString());
                     }
 
                     if (userData.containsKey("profile")) {
@@ -436,7 +538,7 @@ public class HomepageActivity extends AppCompatActivity {
                     }
                     if (userData.containsKey("cash")) {
                         Object value = userData.get("cash");
-                        long money = 0;
+                        long money;
 
                         if (value instanceof Long) {
                             money = (Long) value;
@@ -447,7 +549,7 @@ public class HomepageActivity extends AppCompatActivity {
                         } else {
                             money = 0L;
                         }
-                        binding.cashAmountTxt.setText(String.valueOf((long) (money)));
+                        binding.cashAmountTxt.setText(String.valueOf(money));
                     } else {
                         binding.cashAmountTxt.setText("0");
                     }
@@ -483,7 +585,7 @@ public class HomepageActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onCancelled(DatabaseError error) {
+            public void onCancelled(@NonNull DatabaseError error) {
 
                 if (!isFinishing() && !isDestroyed()) {
                     FirebaseAuth.getInstance().signOut();
@@ -512,25 +614,25 @@ public class HomepageActivity extends AppCompatActivity {
         gd.setColor(Color.parseColor("#FFFFFF"));
         gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
         binding.bg.setBackground(gd);
-        binding.title.setTextSize((int) 16);
-        binding.subtext.setTextSize((int) 11);
-        binding.imageContainer.setBackground(new GradientDrawable() {
-            public GradientDrawable getIns(int a, int b) {
-                this.setCornerRadius(a);
-                this.setColor(b);
-                return this;
-            }
-        }.getIns((int) 360, 0xFFFAFAFA));
+        binding.title.setTextSize(16);
+        binding.subtext.setTextSize(11);
+//        binding.imageContainer.setBackground(new GradientDrawable() {
+//            public GradientDrawable getIns(int a, int b) {
+//                this.setCornerRadius(a);
+//                this.setColor(b);
+//                return this;
+//            }
+//        }.getIns((int) 360, 0xFFFAFAFA));
         if (isPending) {
             binding.btnOk.setVisibility(View.GONE);
-            binding.image.setImageResource(R.drawable.icon_pending);
+            binding.image.setImageResource(R.drawable.icon_hourglass);
             PrepNestUtil.roundViewWithRipple(binding.btnCancel, "#000000", 15, 0, "#000000", "#212121");
             binding.btnCancelTxt.setTextColor(0xFFFFFFFF);
             binding.title.setText("Pending Verification!");
             binding.subtext.setText(getString(R.string.pending_provider_verification_message));
             binding.btnCancelTxt.setText("Dismiss");
         } else {
-            binding.image.setImageResource(R.drawable.icon_error);
+            binding.image.setImageResource(R.drawable.icon_failed_error);
             PrepNestUtil.roundViewWithRipple(binding.btnOk, "#000000", 15, 0, "#000000", "#212121");
             PrepNestUtil.roundViewWithRipple(binding.btnCancel, "#F5F5F5", 15, 0, "#000000", "#E0E0E0");
             binding.title.setText("Verification Failed!");
@@ -538,26 +640,20 @@ public class HomepageActivity extends AppCompatActivity {
             binding.btnOkTxt.setText("Resend request");
             binding.btnCancelTxt.setText("Cancel request");
         }
-        binding.btnOk.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                if (!isPending) {
-                    toBecomeProvider.setClass(HomepageActivity.this, BecomeproviderActivity.class);
-                    startActivity(toBecomeProvider);
-                    overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                    provider_verification_status_sheet.dismiss();
-                }
+        binding.btnOk.setOnClickListener(_view -> {
+            if (!isPending) {
+                toBecomeProvider.setClass(HomepageActivity.this, BecomeproviderActivity.class);
+                startActivity(toBecomeProvider);
+                overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+                provider_verification_status_sheet.dismiss();
             }
         });
-        binding.btnCancel.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                if (isPending) {
-                    provider_verification_status_sheet.dismiss();
-                } else {
-                    cancelProviderRequest();
-                    provider_verification_status_sheet.dismiss();
-                }
+        binding.btnCancel.setOnClickListener(_view -> {
+            if (isPending) {
+                provider_verification_status_sheet.dismiss();
+            } else {
+                cancelProviderRequest();
+                provider_verification_status_sheet.dismiss();
             }
         });
         provider_verification_status_sheet.setCancelable(true);
@@ -606,134 +702,6 @@ public class HomepageActivity extends AppCompatActivity {
         });
     }
 
-
-    public class ShimmerAdapter extends RecyclerView.Adapter<ShimmerAdapter.ShimmerViewHolder> {
-        private final int itemCount;
-
-        public ShimmerAdapter(int itemCount) {
-            this.itemCount = itemCount;
-        }
-
-        public class ShimmerViewHolder extends RecyclerView.ViewHolder {
-            public ShimmerViewHolder(@NonNull View itemView) {
-                super(itemView);
-            }
-        }
-
-        @NonNull
-        @Override
-        public ShimmerViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.shimmer_layout, parent, false);
-            return new ShimmerViewHolder(view);
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull ShimmerViewHolder holder, int position) {
-            View _view = holder.itemView;
-            ShimmerLayoutBinding binding = ShimmerLayoutBinding.bind(_view);
-
-            binding.layout.setBackground(new GradientDrawable() {
-                public GradientDrawable getIns(int a, int b) {
-                    this.setCornerRadius(a);
-                    this.setColor(b);
-                    return this;
-                }
-            }.getIns((int) PrepNestUtil.getDip(HomepageActivity.this, (int) (10)), 0xFFEEEEEE));
-
-            LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) binding.layout.getLayoutParams();
-
-            int marginStart = (int) convertToDp(10);
-            int marginTop = (int) convertToDp(10);
-            int marginEnd = (int) convertToDp(0);
-            int marginBottom = (int) convertToDp(10);
-
-            if (position == 0) {
-                marginStart = (int) convertToDp(20);
-            } else if (position == itemCount - 1) {
-                marginEnd = (int) convertToDp(20);
-            }
-
-            params.setMargins(marginStart, marginTop, marginEnd, marginBottom);
-            binding.layout.setLayoutParams(params);
-        }
-
-        @Override
-        public int getItemCount() {
-            return itemCount;
-        }
-    }
-
-    public int compareVersions(String current, String latest) {
-        String[] currParts = current.replaceAll("[^0-9.]", "").split("\\.");
-        String[] latestParts = latest.replaceAll("[^0-9.]", "").split("\\.");
-
-        int length = Math.max(currParts.length, latestParts.length);
-
-        for (int i = 0; i < length; i++) {
-            int curr = i < currParts.length ? Integer.parseInt(currParts[i]) : 0;
-            int latestVal = i < latestParts.length ? Integer.parseInt(latestParts[i]) : 0;
-
-            if (curr != latestVal) {
-                return Integer.compare(curr, latestVal);
-            }
-        }
-        return 0;
-    }
-
-    public class Banner_viewpagerAdapter extends PagerAdapter {
-
-        Context _context;
-        ArrayList<HashMap<String, Object>> _data;
-
-        public Banner_viewpagerAdapter(Context _ctx, ArrayList<HashMap<String, Object>> _arr) {
-            _context = _ctx;
-            _data = _arr;
-        }
-
-        public Banner_viewpagerAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _context = HomepageActivity.this;
-            _data = _arr;
-        }
-
-        @Override
-        public int getCount() {
-            return _data.size();
-        }
-
-        @Override
-        public boolean isViewFromObject(View _view, Object _object) {
-            return _view == _object;
-        }
-
-        @Override
-        public void destroyItem(ViewGroup _container, int _position, Object _object) {
-            _container.removeView((View) _object);
-        }
-
-        @Override
-        public int getItemPosition(Object _object) {
-            return super.getItemPosition(_object);
-        }
-
-        @Override
-        public CharSequence getPageTitle(int pos) {
-            // Use the Activity Event (onTabLayoutNewTabAdded) in order to use this method
-            return "page " + String.valueOf(pos);
-        }
-
-        @Override
-        public Object instantiateItem(ViewGroup _container, final int _position) {
-            InAppBannerLayoutBinding binding = InAppBannerLayoutBinding.inflate(LayoutInflater.from(_context), _container, false);
-
-            Glide.with(getApplicationContext()).load(Uri.parse(_data.get((int) _position).get("image url").toString())).into(binding.image);
-
-            View _view = binding.getRoot();
-            _container.addView(_view);
-            return _view;
-        }
-    }
-
-
     public void createShimmerView() {
         binding.shimmerrecyclerview1.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         binding.shimmerrecyclerview2.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
@@ -746,7 +714,6 @@ public class HomepageActivity extends AppCompatActivity {
         binding.shimmerView3.startShimmer();
     }
 
-
     public void loadResources() {
         if (resourceListener != null) {
             resources.removeEventListener(resourceListener);
@@ -754,7 +721,7 @@ public class HomepageActivity extends AppCompatActivity {
         logFile.addLog("RESOURCES", "LOADING RESOURCES");
         resourceListener = new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 if (!dataSnapshot.exists() || !dataSnapshot.hasChildren()) {
                     toggleAllEmptyState();
                     return;
@@ -780,15 +747,14 @@ public class HomepageActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onCancelled(DatabaseError error) {
-                logFile.addLog("RESOURCES", "FAILED TO LOAD RESOURCES: " + error.toString());
+            public void onCancelled(@NonNull DatabaseError error) {
+                logFile.addLog("RESOURCES", "FAILED TO LOAD RESOURCES: " + error);
                 toggleAllEmptyState();
             }
         };
 
         resources.addValueEventListener(resourceListener);
     }
-
 
     public void toggleRecentListEmptyState(final boolean isVisible) {
         binding.shimmerView1.stopShimmer();
@@ -812,7 +778,6 @@ public class HomepageActivity extends AppCompatActivity {
         }
     }
 
-
     public void toggleRecommendedListEmptyState(final boolean isVisible) {
         binding.shimmerView2.stopShimmer();
         binding.recommendedRealItemsContainer.setVisibility(View.VISIBLE);
@@ -834,7 +799,6 @@ public class HomepageActivity extends AppCompatActivity {
 
         }
     }
-
 
     public void toggleBestListEmptyState(final boolean isVisible) {
         binding.shimmerView3.stopShimmer();
@@ -858,13 +822,11 @@ public class HomepageActivity extends AppCompatActivity {
         }
     }
 
-
     public void toggleAllEmptyState() {
         toggleRecentListEmptyState(false);
         toggleRecommendedListEmptyState(false);
         toggleBestListEmptyState(false);
     }
-
 
     public boolean getRequiredResources(final HashMap<String, Object> _item) {
         boolean matchesCourse = _item.get("course id").toString().equals(userData.get("course id").toString());
@@ -874,17 +836,12 @@ public class HomepageActivity extends AppCompatActivity {
         return data && isActive;
     }
 
-
     public void filterResources(final ArrayList<HashMap<String, Object>> _list) {
         ArrayList<HashMap<String, Object>> sortedList = new ArrayList<>(_list);
         ListMapUtils.sortListByKey(sortedList, "date of verification", true, ListMapUtils.SortType.TIMESTAMP_STRING);
         recentlyAddedList = new ArrayList<>(sortedList.stream().limit(3).collect(Collectors.toList()));
-        binding.recentlyAddedList.setAdapter(new Recently_added_listAdapter(recentlyAddedList));
-        if (recentlyAddedList.size() == 0) {
-            toggleRecentListEmptyState(false);
-        } else {
-            toggleRecentListEmptyState(true);
-        }
+        binding.recentlyAddedList.setAdapter(new RecentlyAddedListAdapter(recentlyAddedList));
+        toggleRecentListEmptyState(!recentlyAddedList.isEmpty());
         recommendedList = new ArrayList<>(
                 sortedList.stream()
                         .filter(item -> {
@@ -894,12 +851,8 @@ public class HomepageActivity extends AppCompatActivity {
                         .limit(3)
                         .collect(Collectors.toList())
         );
-        if (recommendedList.size() == 0) {
-            toggleRecommendedListEmptyState(false);
-        } else {
-            toggleRecommendedListEmptyState(true);
-        }
-        binding.recommendedList.setAdapter(new Recommended_listAdapter(recommendedList));
+        toggleRecommendedListEmptyState(!recommendedList.isEmpty());
+        binding.recommendedList.setAdapter(new RecommendedListAdapter(recommendedList));
         bestList = new ArrayList<>(
                 sortedList.stream()
                         .filter(item -> {
@@ -909,22 +862,16 @@ public class HomepageActivity extends AppCompatActivity {
                         .limit(3)
                         .collect(Collectors.toList())
         );
-        if (bestList.size() == 0) {
-            toggleBestListEmptyState(false);
-        } else {
-            toggleBestListEmptyState(true);
-        }
-        binding.bestList.setAdapter(new Best_listAdapter(bestList));
+        toggleBestListEmptyState(!bestList.isEmpty());
+        binding.bestList.setAdapter(new BestListAdapter(bestList));
         logFile.addLog("RESOURCES", "LOADED SUCCESSFULLY");
     }
-
 
     public void attachAdaptersToRecyclerViews() {
         binding.recentlyAddedList.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         binding.recommendedList.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         binding.bestList.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
     }
-
 
     public String getPrettyResourceTitle(final String title) {
         if (title == null || title.trim().isEmpty()) {
@@ -949,54 +896,12 @@ public class HomepageActivity extends AppCompatActivity {
 
     }
 
-
-    public void checkNewVersion() {
-        DatabaseReference newVersion = firebase_database.getReference("other/new_update");
-
-        newVersion.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                HashMap<String, Object> data = (HashMap<String, Object>) dataSnapshot.getValue();
-
-                String latestVersion = data.get("latest_version").toString();
-
-                try {
-                    PackageManager pm = getPackageManager();
-                    PackageInfo pInfo = pm.getPackageInfo(getPackageName(), 0);
-                    String currentVersion = pInfo.versionName;
-
-                    int result = compareVersions(currentVersion, latestVersion);
-
-                    if (result < 0) {
-                        Log.d("AppUpdateCheck", "Update available: " + latestVersion);
-                        // Prompt update here
-                        Intent toAppUpdate = new Intent();
-                        toAppUpdate.setClass(HomepageActivity.this, NewappupdateActivity.class);
-                        toAppUpdate.putExtra("data", new Gson().toJson(data));
-                        startActivity(toAppUpdate);
-                        overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                        finish();
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-
-            @Override
-            public void onCancelled(DatabaseError error) {
-
-            }
-        });
-
-    }
-
-
     public void checkAppMaintenance() {
         DatabaseReference appMaintenance = firebase_database.getReference("other/app_maintenance/closed");
 
         appMaintenance.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 boolean isAppClosed = dataSnapshot.getValue(Boolean.class);
 
                 if (isAppClosed) {
@@ -1009,17 +914,16 @@ public class HomepageActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onCancelled(DatabaseError error) {
+            public void onCancelled(@NonNull DatabaseError error) {
 
             }
         });
     }
 
-
     public void getInAppBanners() {
         banners.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 if (!dataSnapshot.exists() || !dataSnapshot.hasChildren()) {
                     binding.bannersContainer.setVisibility(View.INVISIBLE);
                     return;
@@ -1033,50 +937,160 @@ public class HomepageActivity extends AppCompatActivity {
                     bannersList.add(bannerMap);
                 }
 
-                binding.bannerViewpager.setAdapter(new Banner_viewpagerAdapter(bannersList));
+                binding.bannerViewpager.setAdapter(new InAppBannerAdapter(bannersList));
                 automateBanner();
                 binding.bannerViewpager.setVisibility(View.VISIBLE);
                 binding.bannersProgressbar.setVisibility(View.GONE);
             }
 
             @Override
-            public void onCancelled(DatabaseError error) {
+            public void onCancelled(@NonNull DatabaseError error) {
                 binding.bannersContainer.setVisibility(View.INVISIBLE);
             }
         });
 
     }
 
-
     public void automateBanner() {
-        bannerTimer = new TimerTask() {
+        TimerTask bannerTimer = new TimerTask() {
             @Override
             public void run() {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (binding.bannerViewpager.getCurrentItem() == (bannersList.size() - 1)) {
-                            binding.bannerViewpager.setCurrentItem((int) 0);
-                        } else {
-                            binding.bannerViewpager.setCurrentItem((int) binding.bannerViewpager.getCurrentItem() + 1);
-                        }
+                runOnUiThread(() -> {
+                    if (binding.bannerViewpager.getCurrentItem() == (bannersList.size() - 1)) {
+                        binding.bannerViewpager.setCurrentItem(0);
+                    } else {
+                        binding.bannerViewpager.setCurrentItem(binding.bannerViewpager.getCurrentItem() + 1);
                     }
                 });
             }
         };
-        _timer.scheduleAtFixedRate(bannerTimer, (int) (2000), (int) (5000));
+        _timer.scheduleAtFixedRate(bannerTimer, 2000, 5000);
     }
 
-    public class Recently_added_listAdapter extends RecyclerView.Adapter<Recently_added_listAdapter.ViewHolder> {
+    public class ShimmerAdapter extends RecyclerView.Adapter<ShimmerAdapter.ShimmerViewHolder> {
+        private final int itemCount;
 
+        public ShimmerAdapter(int itemCount) {
+            this.itemCount = itemCount;
+        }
+
+        @NonNull
+        @Override
+        public ShimmerViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.shimmer_layout, parent, false);
+            return new ShimmerViewHolder(view);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull ShimmerViewHolder holder, int position) {
+            View _view = holder.itemView;
+            ShimmerLayoutBinding binding = ShimmerLayoutBinding.bind(_view);
+
+            binding.layout.setBackground(new GradientDrawable() {
+                public GradientDrawable getIns(int a, int b) {
+                    this.setCornerRadius(a);
+                    this.setColor(b);
+                    return this;
+                }
+            }.getIns((int) PrepNestUtil.getDip(HomepageActivity.this, 10), 0xFFEEEEEE));
+
+            ViewGroup.LayoutParams params = binding.layout.getLayoutParams();
+            if (params instanceof ViewGroup.MarginLayoutParams) {
+                ViewGroup.MarginLayoutParams marginParams = (ViewGroup.MarginLayoutParams) params;
+
+                int marginStart = (int) convertToDp(10);
+                int marginTop = (int) convertToDp(10);
+                int marginEnd = (int) convertToDp(0);
+                int marginBottom = (int) convertToDp(10);
+
+                if (position == 0) {
+                    marginStart = (int) convertToDp(20);
+                } else if (position == itemCount - 1) {
+                    marginEnd = (int) convertToDp(20);
+                }
+
+                marginParams.setMargins(marginStart, marginTop, marginEnd, marginBottom);
+                binding.layout.setLayoutParams(marginParams);
+            }
+        }
+
+        @Override
+        public int getItemCount() {
+            return itemCount;
+        }
+
+        public class ShimmerViewHolder extends RecyclerView.ViewHolder {
+            public ShimmerViewHolder(@NonNull View itemView) {
+                super(itemView);
+            }
+        }
+    }
+
+    public class InAppBannerAdapter extends PagerAdapter {
+
+        Context _context;
         ArrayList<HashMap<String, Object>> _data;
 
-        public Recently_added_listAdapter(ArrayList<HashMap<String, Object>> _arr) {
+        public InAppBannerAdapter(Context _ctx, ArrayList<HashMap<String, Object>> _arr) {
+            _context = _ctx;
+            _data = _arr;
+        }
+
+        public InAppBannerAdapter(ArrayList<HashMap<String, Object>> _arr) {
+            _context = HomepageActivity.this;
             _data = _arr;
         }
 
         @Override
-        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+        public int getCount() {
+            return _data.size();
+        }
+
+        @Override
+        public boolean isViewFromObject(@NonNull View _view, @NonNull Object _object) {
+            return _view == _object;
+        }
+
+        @Override
+        public void destroyItem(ViewGroup _container, int _position, @NonNull Object _object) {
+            _container.removeView((View) _object);
+        }
+
+        @Override
+        public int getItemPosition(@NonNull Object _object) {
+            return super.getItemPosition(_object);
+        }
+
+        @Override
+        public CharSequence getPageTitle(int pos) {
+            // Use the Activity Event (onTabLayoutNewTabAdded) in order to use this method
+            return "page " + pos;
+        }
+
+        @NonNull
+        @Override
+        public Object instantiateItem(@NonNull ViewGroup _container, final int _position) {
+            InAppBannerLayoutBinding binding = InAppBannerLayoutBinding.inflate(LayoutInflater.from(_context), _container, false);
+
+            Glide.with(getApplicationContext()).load(Uri.parse(_data.get(_position).get("image url").toString())).into(binding.image);
+
+            View _view = binding.getRoot();
+            _container.addView(_view);
+            return _view;
+        }
+    }
+
+    public class RecentlyAddedListAdapter extends RecyclerView.Adapter<RecentlyAddedListAdapter.ViewHolder> {
+
+        ArrayList<HashMap<String, Object>> _data;
+
+        public RecentlyAddedListAdapter(ArrayList<HashMap<String, Object>> _arr) {
+            _data = _arr;
+        }
+
+        @NonNull
+        @Override
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             LayoutInflater _inflater = getLayoutInflater();
             View _v = _inflater.inflate(R.layout.resource_item_short, null);
             RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -1092,12 +1106,12 @@ public class HomepageActivity extends AppCompatActivity {
             RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             _view.setLayoutParams(_lp);
             PrepNestUtil.roundViewWithRipple(binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            if (_data.get((int) _position).containsKey("resource title")) {
-                binding.title.setText(getPrettyResourceTitle(_data.get((int) _position).get("resource title").toString()));
+            if (_data.get(_position).containsKey("resource title")) {
+                binding.title.setText(getPrettyResourceTitle(_data.get(_position).get("resource title").toString()));
             } else {
                 binding.title.setText("No title");
             }
-            if (_data.get((int) _position).containsKey("subject")) {
+            if (_data.get(_position).containsKey("subject")) {
                 binding.subjectNameTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
@@ -1105,12 +1119,12 @@ public class HomepageActivity extends AppCompatActivity {
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.subjectNameTxt.setText(_data.get((int) _position).get("subject").toString());
+                binding.subjectNameTxt.setText(_data.get(_position).get("subject").toString());
                 binding.subjectNameTxt.setVisibility(View.VISIBLE);
             } else {
                 binding.subjectNameTxt.setVisibility(View.GONE);
             }
-            if (_data.get((int) _position).containsKey("session")) {
+            if (_data.get(_position).containsKey("session")) {
                 binding.sessionTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
@@ -1118,16 +1132,16 @@ public class HomepageActivity extends AppCompatActivity {
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.sessionTxt.setText(_data.get((int) _position).get("session").toString());
+                binding.sessionTxt.setText(_data.get(_position).get("session").toString());
                 binding.sessionTxt.setVisibility(View.VISIBLE);
             } else {
                 binding.sessionTxt.setVisibility(View.GONE);
             }
-            if (_data.get((int) _position).containsKey("type")) {
-                if (_data.get((int) _position).get("type").toString().equals("paper")) {
+            if (_data.get(_position).containsKey("type")) {
+                if (_data.get(_position).get("type").toString().equals("paper")) {
                     binding.image.setImageResource(R.drawable.previous_paper);
                 } else {
-                    if (_data.get((int) _position).get("type").toString().equals("notes")) {
+                    if (_data.get(_position).get("type").toString().equals("notes")) {
                         binding.image.setImageResource(R.drawable.short_notes);
                     } else {
                         binding.image.setVisibility(View.INVISIBLE);
@@ -1136,32 +1150,31 @@ public class HomepageActivity extends AppCompatActivity {
             } else {
                 binding.image.setVisibility(View.INVISIBLE);
             }
-            LinearLayout.LayoutParams paramscontainer = (LinearLayout.LayoutParams) binding.container.getLayoutParams();
-            if (_position == 0) {
-                paramscontainer.setMargins((int) convertToDp(20), (int) convertToDp(10), (int) 0, (int) convertToDp(10));
-            } else {
-                if (_position == (_data.size() - 1)) {
-                    paramscontainer.setMargins((int) convertToDp(10), (int) convertToDp(10), (int) convertToDp(20), (int) convertToDp(10));
+//            LinearLayout.LayoutParams paramscontainer = (LinearLayout.LayoutParams) binding.container.getLayoutParams();
+            ViewGroup.LayoutParams params = binding.container.getLayoutParams();
+            if (params instanceof ViewGroup.MarginLayoutParams) {
+                ViewGroup.MarginLayoutParams marginParams = (ViewGroup.MarginLayoutParams) params;
+                if (_position == 0) {
+                    marginParams.setMargins((int) convertToDp(20), (int) convertToDp(10), 0, (int) convertToDp(10));
+                } else if (_position == (_data.size() - 1)) {
+                    marginParams.setMargins((int) convertToDp(10), (int) convertToDp(10), (int) convertToDp(20), (int) convertToDp(10));
                 } else {
-                    paramscontainer.setMargins((int) convertToDp(10), (int) convertToDp(10), (int) 0, (int) convertToDp(10));
+                    marginParams.setMargins((int) convertToDp(10), (int) convertToDp(10), 0, (int) convertToDp(10));
                 }
+                binding.container.setLayoutParams(marginParams);
             }
-            binding.container.setLayoutParams(paramscontainer);
 
-            binding.container.setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(View _view) {
-                    if (_data.get((int) _position).containsKey("type")) {
-                        toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
-                        toResources.putExtra("user", new Gson().toJson(userData));
-                        try {
-                            toResources.removeExtra("tag type");
-                        } catch (Exception ignored) {
+            binding.container.setOnClickListener(_view1 -> {
+                if (_data.get(_position).containsKey("type")) {
+                    toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
+                    toResources.putExtra("user", new Gson().toJson(userData));
+                    try {
+                        toResources.removeExtra("tag type");
+                    } catch (Exception ignored) {
 
-                        }
-                        startActivity(toResources);
-                        overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
                     }
+                    startActivity(toResources);
+                    overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
                 }
             });
         }
@@ -1178,16 +1191,17 @@ public class HomepageActivity extends AppCompatActivity {
         }
     }
 
-    public class Recommended_listAdapter extends RecyclerView.Adapter<Recommended_listAdapter.ViewHolder> {
+    public class RecommendedListAdapter extends RecyclerView.Adapter<RecommendedListAdapter.ViewHolder> {
 
         ArrayList<HashMap<String, Object>> _data;
 
-        public Recommended_listAdapter(ArrayList<HashMap<String, Object>> _arr) {
+        public RecommendedListAdapter(ArrayList<HashMap<String, Object>> _arr) {
             _data = _arr;
         }
 
+        @NonNull
         @Override
-        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             LayoutInflater _inflater = getLayoutInflater();
             View _v = _inflater.inflate(R.layout.resource_item_short, null);
             RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -1203,12 +1217,12 @@ public class HomepageActivity extends AppCompatActivity {
             RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             _view.setLayoutParams(_lp);
             PrepNestUtil.roundViewWithRipple(binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            if (_data.get((int) _position).containsKey("resource title")) {
-                binding.title.setText(getPrettyResourceTitle(_data.get((int) _position).get("resource title").toString()));
+            if (_data.get(_position).containsKey("resource title")) {
+                binding.title.setText(getPrettyResourceTitle(_data.get(_position).get("resource title").toString()));
             } else {
                 binding.title.setText("No title");
             }
-            if (_data.get((int) _position).containsKey("subject")) {
+            if (_data.get(_position).containsKey("subject")) {
                 binding.subjectNameTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
@@ -1216,12 +1230,12 @@ public class HomepageActivity extends AppCompatActivity {
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.subjectNameTxt.setText(_data.get((int) _position).get("subject").toString());
+                binding.subjectNameTxt.setText(_data.get(_position).get("subject").toString());
                 binding.subjectNameTxt.setVisibility(View.VISIBLE);
             } else {
                 binding.subjectNameTxt.setVisibility(View.GONE);
             }
-            if (_data.get((int) _position).containsKey("session")) {
+            if (_data.get(_position).containsKey("session")) {
                 binding.sessionTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
@@ -1229,16 +1243,16 @@ public class HomepageActivity extends AppCompatActivity {
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.sessionTxt.setText(_data.get((int) _position).get("session").toString());
+                binding.sessionTxt.setText(_data.get(_position).get("session").toString());
                 binding.sessionTxt.setVisibility(View.VISIBLE);
             } else {
                 binding.sessionTxt.setVisibility(View.GONE);
             }
-            if (_data.get((int) _position).containsKey("type")) {
-                if (_data.get((int) _position).get("type").toString().equals("paper")) {
+            if (_data.get(_position).containsKey("type")) {
+                if (_data.get(_position).get("type").toString().equals("paper")) {
                     binding.image.setImageResource(R.drawable.previous_paper);
                 } else {
-                    if (_data.get((int) _position).get("type").toString().equals("notes")) {
+                    if (_data.get(_position).get("type").toString().equals("notes")) {
                         binding.image.setImageResource(R.drawable.short_notes);
                     } else {
                         binding.image.setVisibility(View.INVISIBLE);
@@ -1247,31 +1261,29 @@ public class HomepageActivity extends AppCompatActivity {
             } else {
                 binding.image.setVisibility(View.INVISIBLE);
             }
-            LinearLayout.LayoutParams paramscontainer = (LinearLayout.LayoutParams) binding.container.getLayoutParams();
-            if (_position == 0) {
-                paramscontainer.setMargins((int) convertToDp(20), (int) convertToDp(10), (int) 0, (int) convertToDp(10));
-            } else {
-                if (_position == (_data.size() - 1)) {
-                    paramscontainer.setMargins((int) convertToDp(10), (int) convertToDp(10), (int) convertToDp(20), (int) convertToDp(10));
+            ViewGroup.LayoutParams params = binding.container.getLayoutParams();
+            if (params instanceof ViewGroup.MarginLayoutParams) {
+                ViewGroup.MarginLayoutParams marginParams = (ViewGroup.MarginLayoutParams) params;
+                if (_position == 0) {
+                    marginParams.setMargins((int) convertToDp(20), (int) convertToDp(10), 0, (int) convertToDp(10));
+                } else if (_position == (_data.size() - 1)) {
+                    marginParams.setMargins((int) convertToDp(10), (int) convertToDp(10), (int) convertToDp(20), (int) convertToDp(10));
                 } else {
-                    paramscontainer.setMargins((int) convertToDp(10), (int) convertToDp(10), (int) 0, (int) convertToDp(10));
+                    marginParams.setMargins((int) convertToDp(10), (int) convertToDp(10), 0, (int) convertToDp(10));
                 }
+                binding.container.setLayoutParams(marginParams);
             }
-            binding.container.setLayoutParams(paramscontainer);
-            binding.container.setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(View _view) {
-                    if (_data.get((int) _position).containsKey("type")) {
-                        toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
-                        toResources.putExtra("user", new Gson().toJson(userData));
-                        try {
-                            toResources.removeExtra("tag type");
-                        } catch (Exception ignored) {
+            binding.container.setOnClickListener(_view1 -> {
+                if (_data.get(_position).containsKey("type")) {
+                    toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
+                    toResources.putExtra("user", new Gson().toJson(userData));
+                    try {
+                        toResources.removeExtra("tag type");
+                    } catch (Exception ignored) {
 
-                        }
-                        startActivity(toResources);
-                        overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
                     }
+                    startActivity(toResources);
+                    overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
                 }
             });
         }
@@ -1288,16 +1300,17 @@ public class HomepageActivity extends AppCompatActivity {
         }
     }
 
-    public class Best_listAdapter extends RecyclerView.Adapter<Best_listAdapter.ViewHolder> {
+    public class BestListAdapter extends RecyclerView.Adapter<BestListAdapter.ViewHolder> {
 
         ArrayList<HashMap<String, Object>> _data;
 
-        public Best_listAdapter(ArrayList<HashMap<String, Object>> _arr) {
+        public BestListAdapter(ArrayList<HashMap<String, Object>> _arr) {
             _data = _arr;
         }
 
+        @NonNull
         @Override
-        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             LayoutInflater _inflater = getLayoutInflater();
             View _v = _inflater.inflate(R.layout.resource_item_short, null);
             RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -1313,12 +1326,12 @@ public class HomepageActivity extends AppCompatActivity {
             RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             _view.setLayoutParams(_lp);
             PrepNestUtil.roundViewWithRipple(binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            if (_data.get((int) _position).containsKey("resource title")) {
-                binding.title.setText(getPrettyResourceTitle(_data.get((int) _position).get("resource title").toString()));
+            if (_data.get(_position).containsKey("resource title")) {
+                binding.title.setText(getPrettyResourceTitle(_data.get(_position).get("resource title").toString()));
             } else {
                 binding.title.setText("No title");
             }
-            if (_data.get((int) _position).containsKey("subject")) {
+            if (_data.get(_position).containsKey("subject")) {
                 binding.subjectNameTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
@@ -1326,12 +1339,12 @@ public class HomepageActivity extends AppCompatActivity {
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.subjectNameTxt.setText(_data.get((int) _position).get("subject").toString());
+                binding.subjectNameTxt.setText(_data.get(_position).get("subject").toString());
                 binding.subjectNameTxt.setVisibility(View.VISIBLE);
             } else {
                 binding.subjectNameTxt.setVisibility(View.GONE);
             }
-            if (_data.get((int) _position).containsKey("session")) {
+            if (_data.get(_position).containsKey("session")) {
                 binding.sessionTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
@@ -1339,16 +1352,16 @@ public class HomepageActivity extends AppCompatActivity {
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.sessionTxt.setText(_data.get((int) _position).get("session").toString());
+                binding.sessionTxt.setText(_data.get(_position).get("session").toString());
                 binding.sessionTxt.setVisibility(View.VISIBLE);
             } else {
                 binding.sessionTxt.setVisibility(View.GONE);
             }
-            if (_data.get((int) _position).containsKey("type")) {
-                if (_data.get((int) _position).get("type").toString().equals("paper")) {
+            if (_data.get(_position).containsKey("type")) {
+                if (_data.get(_position).get("type").toString().equals("paper")) {
                     binding.image.setImageResource(R.drawable.previous_paper);
                 } else {
-                    if (_data.get((int) _position).get("type").toString().equals("notes")) {
+                    if (_data.get(_position).get("type").toString().equals("notes")) {
                         binding.image.setImageResource(R.drawable.short_notes);
                     } else {
                         binding.image.setVisibility(View.INVISIBLE);
@@ -1357,33 +1370,30 @@ public class HomepageActivity extends AppCompatActivity {
             } else {
                 binding.image.setVisibility(View.INVISIBLE);
             }
-            LinearLayout.LayoutParams paramscontainer = (LinearLayout.LayoutParams) binding.container.getLayoutParams();
-
-            if (_position == 0) {
-                paramscontainer.setMargins((int) convertToDp(20), (int) convertToDp(10), (int) 0, (int) convertToDp(10));
-            } else {
-                if (_position == (_data.size() - 1)) {
-                    paramscontainer.setMargins((int) convertToDp(10), (int) convertToDp(10), (int) convertToDp(20), (int) convertToDp(10));
+            ViewGroup.LayoutParams params = binding.container.getLayoutParams();
+            if (params instanceof ViewGroup.MarginLayoutParams) {
+                ViewGroup.MarginLayoutParams marginParams = (ViewGroup.MarginLayoutParams) params;
+                if (_position == 0) {
+                    marginParams.setMargins((int) convertToDp(20), (int) convertToDp(10), 0, (int) convertToDp(10));
+                } else if (_position == (_data.size() - 1)) {
+                    marginParams.setMargins((int) convertToDp(10), (int) convertToDp(10), (int) convertToDp(20), (int) convertToDp(10));
                 } else {
-                    paramscontainer.setMargins((int) convertToDp(10), (int) convertToDp(10), (int) 0, (int) convertToDp(10));
+                    marginParams.setMargins((int) convertToDp(10), (int) convertToDp(10), 0, (int) convertToDp(10));
                 }
+                binding.container.setLayoutParams(marginParams);
             }
-            binding.container.setLayoutParams(paramscontainer);
 
-            binding.container.setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(View _view) {
-                    if (_data.get((int) _position).containsKey("type")) {
-                        toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
-                        toResources.putExtra("user", new Gson().toJson(userData));
-                        try {
-                            toResources.removeExtra("tag type");
-                        } catch (Exception e) {
+            binding.container.setOnClickListener(_view1 -> {
+                if (_data.get(_position).containsKey("type")) {
+                    toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
+                    toResources.putExtra("user", new Gson().toJson(userData));
+                    try {
+                        toResources.removeExtra("tag type");
+                    } catch (Exception ignored) {
 
-                        }
-                        startActivity(toResources);
-                        overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
                     }
+                    startActivity(toResources);
+                    overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
                 }
             });
         }

@@ -4,16 +4,15 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.ViewGroup;
-import android.widget.LinearLayout;
-import android.widget.RadioGroup;
 import android.widget.TextView;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -22,9 +21,12 @@ import com.cocode.prepnest.databinding.ResourceItemCardFullBinding;
 import com.cocode.prepnest.databinding.ResourcePurchaseSheetLayoutBinding;
 import com.cocode.prepnest.databinding.ResourcesBinding;
 import com.cocode.prepnest.databinding.ResourcesFilterSheetBinding;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.MobileAds;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -35,36 +37,38 @@ import com.google.gson.reflect.TypeToken;
 
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+
 
 public class ResourcesActivity extends AppCompatActivity {
 
+    private final FirebaseDatabase firebase_database = FirebaseDatabase.getInstance();
+    private final FirebaseAuth auth = FirebaseAuth.getInstance();
+    private final DatabaseReference resources = firebase_database.getReference("resources");
+    private final DatabaseReference users = firebase_database.getReference("users");
+    private final ArrayList<HashMap<String, Object>> resourcesList = new ArrayList<>();
+    private final Intent toManageResources = new Intent();
     private ResourcesBinding binding;
     private HashMap<String, Object> filterMap = new HashMap<>();
-    private FirebaseDatabase firebase_database = FirebaseDatabase.getInstance();
-    private FirebaseAuth auth = FirebaseAuth.getInstance();
-    private DatabaseReference resources = firebase_database.getReference("resources");
-    private DatabaseReference users = firebase_database.getReference("users");
     private LogUtils logFile;
     private HashMap<String, Object> userData = new HashMap<>();
     private Items_listAdapter listAdapter;
     private NetworkMonitor networkMonitor;
-
-    private ArrayList<HashMap<String, Object>> resourcesList = new ArrayList<>();
     private ArrayList<String> wishlistedResources = new ArrayList<>();
     private ArrayList<String> purchasedResources = new ArrayList<>();
     private ArrayList<String> uploadedResources = new ArrayList<>();
-
-    private Intent toManageResources = new Intent();
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -78,20 +82,12 @@ public class ResourcesActivity extends AppCompatActivity {
 
     private void initialize(Bundle _savedInstanceState) {
 
-        binding.backIcon.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                finish();
-                overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
-            }
+        binding.backIcon.setOnClickListener(_view -> {
+            finish();
+            overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
         });
 
-        binding.filterIcon.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                showFilterSheet();
-            }
-        });
+        binding.filterIcon.setOnClickListener(_view -> showFilterSheet());
     }
 
     private void initializeLogic() {
@@ -109,8 +105,15 @@ public class ResourcesActivity extends AppCompatActivity {
                 binding.backIcon.performClick();
             }
         });
+        loadBannerAd();
     }
 
+    private void loadBannerAd() {
+        MobileAds.initialize(this, initializationStatus -> {
+        });
+        AdRequest adRequest = new AdRequest.Builder().build();
+        binding.adView.loadAd(adRequest);
+    }
 
     @Override
     public void onResume() {
@@ -129,6 +132,7 @@ public class ResourcesActivity extends AppCompatActivity {
         binding.itemsList.setVerticalScrollBarEnabled(false);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
 
@@ -213,40 +217,25 @@ setFilterOption(sheetbinding.ratingSortHighTxt, sheetbinding.ratingSortLowTxt, s
 */
         PrepNestUtil.roundViewWithRipple(sheetbinding.btnApply, "#000000", 15, 0, "#000000", "#212121");
         PrepNestUtil.roundViewWithRipple(sheetbinding.btnReset, "#F5F5F5", 15, 0, "#000000", "#E0E0E0");
-        sheetbinding.dateSortRecentTxt.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                filterMap.put("date", "recent");
-                setFilterOption(sheetbinding.dateSortRecentTxt, sheetbinding.dateSortOldTxt, null);
-            }
+        sheetbinding.dateSortRecentTxt.setOnClickListener(_view -> {
+            filterMap.put("date", "recent");
+            setFilterOption(sheetbinding.dateSortRecentTxt, sheetbinding.dateSortOldTxt, null);
         });
-        sheetbinding.dateSortOldTxt.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                filterMap.put("date", "old");
-                setFilterOption(sheetbinding.dateSortOldTxt, sheetbinding.dateSortRecentTxt, null);
-            }
+        sheetbinding.dateSortOldTxt.setOnClickListener(_view -> {
+            filterMap.put("date", "old");
+            setFilterOption(sheetbinding.dateSortOldTxt, sheetbinding.dateSortRecentTxt, null);
         });
-        sheetbinding.typeSortSemTxt.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                filterMap.put("type", "sem");
-                setFilterOption(sheetbinding.typeSortSemTxt, sheetbinding.typeSortMidTxt, sheetbinding.typeSortBothTxt);
-            }
+        sheetbinding.typeSortSemTxt.setOnClickListener(_view -> {
+            filterMap.put("type", "sem");
+            setFilterOption(sheetbinding.typeSortSemTxt, sheetbinding.typeSortMidTxt, sheetbinding.typeSortBothTxt);
         });
-        sheetbinding.typeSortMidTxt.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                filterMap.put("type", "mid");
-                setFilterOption(sheetbinding.typeSortMidTxt, sheetbinding.typeSortSemTxt, sheetbinding.typeSortBothTxt);
-            }
+        sheetbinding.typeSortMidTxt.setOnClickListener(_view -> {
+            filterMap.put("type", "mid");
+            setFilterOption(sheetbinding.typeSortMidTxt, sheetbinding.typeSortSemTxt, sheetbinding.typeSortBothTxt);
         });
-        sheetbinding.typeSortBothTxt.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                setFilterOption(sheetbinding.typeSortBothTxt, sheetbinding.typeSortSemTxt, sheetbinding.typeSortMidTxt);
-                filterMap.put("type", "both");
-            }
+        sheetbinding.typeSortBothTxt.setOnClickListener(_view -> {
+            setFilterOption(sheetbinding.typeSortBothTxt, sheetbinding.typeSortSemTxt, sheetbinding.typeSortMidTxt);
+            filterMap.put("type", "both");
         });
 		/*
 sheetbinding.ratingSortHighTxt.setOnClickListener(new View.OnClickListener() {
@@ -264,26 +253,20 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
 }
 });
 */
-        sheetbinding.btnApply.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                binding.progressLinear.setVisibility(View.VISIBLE);
-                binding.emptyStateLinear.setVisibility(View.GONE);
-                binding.itemsList.setVisibility(View.GONE);
-                loadResources();
-                filter_sheet.dismiss();
-            }
+        sheetbinding.btnApply.setOnClickListener(_view -> {
+            binding.progressLinear.setVisibility(View.VISIBLE);
+            binding.emptyStateLinear.setVisibility(View.GONE);
+            binding.itemsList.setVisibility(View.GONE);
+            loadResources();
+            filter_sheet.dismiss();
         });
-        sheetbinding.btnReset.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                setDefaultFilters();
-                binding.progressLinear.setVisibility(View.VISIBLE);
-                binding.emptyStateLinear.setVisibility(View.GONE);
-                binding.itemsList.setVisibility(View.GONE);
-                loadResources();
-                filter_sheet.dismiss();
-            }
+        sheetbinding.btnReset.setOnClickListener(_view -> {
+            setDefaultFilters();
+            binding.progressLinear.setVisibility(View.VISIBLE);
+            binding.emptyStateLinear.setVisibility(View.GONE);
+            binding.itemsList.setVisibility(View.GONE);
+            loadResources();
+            filter_sheet.dismiss();
         });
         filter_sheet.setCancelable(true);
         filter_sheet.show();
@@ -384,7 +367,7 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
 
 
     public void filterResources(final ArrayList<HashMap<String, Object>> list) {
-        if (list.size() == 0) {
+        if (list.isEmpty()) {
             toggleEmptyState(false);
         } else {
             for (HashMap<String, Object> resource : list) {
@@ -392,18 +375,15 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
                     if (resource.containsKey("type")) {
                         if (filterMap.get("type").toString().equals("both")) {
                             resourcesList.add(resource);
-                            continue;
                         } else {
                             if (filterMap.get("type").toString().equals("mid")) {
                                 if (resource.get("subtype").toString().equals("midterm")) {
                                     resourcesList.add(resource);
-                                    continue;
                                 }
                             } else {
                                 if (filterMap.get("type").toString().equals("sem")) {
                                     if (resource.get("subtype").toString().equals("semester")) {
                                         resourcesList.add(resource);
-                                        continue;
                                     }
                                 }
                             }
@@ -447,9 +427,9 @@ ListMapUtils.sortListByKey(resourcesList, "rating", true, ListMapUtils.SortType.
         boolean tagMatches = true;
         if (getIntent().hasExtra("tag type")) {
             if (getIntent().getStringExtra("tag type").equals("recommended")) {
-                tagMatches = _item.containsKey("recommended") ? Boolean.parseBoolean(_item.get("recommended").toString()) : false;
+                tagMatches = _item.containsKey("recommended") && Boolean.parseBoolean(_item.get("recommended").toString());
             } else if (getIntent().getStringExtra("tag type").equals("best")) {
-                tagMatches = _item.containsKey("best choice") ? Boolean.parseBoolean(_item.get("best choice").toString()) : false;
+                tagMatches = _item.containsKey("best choice") && Boolean.parseBoolean(_item.get("best choice").toString());
             }
         }
         return data && isActive && tagMatches;
@@ -475,7 +455,7 @@ ListMapUtils.sortListByKey(resourcesList, "rating", true, ListMapUtils.SortType.
     }
 
 
-    public void showPurchaseSheet(final HashMap<String, Object> _item) {
+    public void showPurchaseSheet(final HashMap<String, Object> resourceItem) {
         com.google.android.material.bottomsheet.BottomSheetDialog resource_purchase_sheet;
         resource_purchase_sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(ResourcesActivity.this);
         ResourcePurchaseSheetLayoutBinding sheetbinding = ResourcePurchaseSheetLayoutBinding.inflate(getLayoutInflater());
@@ -490,45 +470,46 @@ ListMapUtils.sortListByKey(resourcesList, "rating", true, ListMapUtils.SortType.
             }
         });
 
-        sheetbinding.radiogroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(RadioGroup group, int checkedId) {
-                PrepNestUtil.TransitionManager(sheetbinding.container, 150);
+        sheetbinding.radiogroup.setOnCheckedChangeListener((group, checkedId) -> {
+            PrepNestUtil.TransitionManager(sheetbinding.container, 150);
 
-                if (checkedId == sheetbinding.cashRadiobutton.getId()) {
-                    if (userData.containsKey("cash")) {
-                        sheetbinding.cashRadiobutton.setText("Cash (₹".concat(String.valueOf(((Number) userData.get("cash")).longValue()).concat(")")));
-                        if (_item.containsKey("price")) {
-                            sheetbinding.btnBuy.setText("Buy for ₹".concat(String.valueOf(((Number) _item.get("price")).longValue())));
-                        } else {
-                            resource_purchase_sheet.dismiss();
-                            PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred, please login again!");
-                            auth.signOut();
-                            finishAffinity();
-                        }
+            if (checkedId == sheetbinding.cashRadiobutton.getId()) {
+                if (userData.containsKey("cash")) {
+                    sheetbinding.cashRadiobutton.setText("Cash (₹".concat(String.valueOf(((Number) userData.get("cash")).longValue()).concat(")")));
+                    if (resourceItem.containsKey("price")) {
+                        sheetbinding.btnBuy.setText("Buy for ₹".concat(String.valueOf(((Number) resourceItem.get("price")).longValue())));
+                        sheetbinding.btnBuy.setEnabled(true);
+                        sheetbinding.btnBuy.setAlpha(1f);
                     } else {
                         resource_purchase_sheet.dismiss();
                         PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred, please login again!");
                         auth.signOut();
                         finishAffinity();
                     }
-                } else if (checkedId == sheetbinding.coinsRadiobutton.getId()) {
-                    if (userData.containsKey("coins")) {
-                        sheetbinding.coinsRadiobutton.setText("Coins (".concat(String.valueOf(((Number) userData.get("coins")).longValue()).concat(")")));
-                        if (_item.containsKey("price")) {
-                            sheetbinding.btnBuy.setText("Buy for ".concat(String.valueOf(((Number) _item.get("price")).longValue() * 5)).concat(" coins"));
-                        } else {
-                            resource_purchase_sheet.dismiss();
-                            PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred, please login again!");
-                            auth.signOut();
-                            finishAffinity();
-                        }
+                } else {
+                    sheetbinding.cashRadiobutton.setText("Cash (₹0)");
+                    sheetbinding.btnBuy.setText("Buy");
+                    sheetbinding.btnBuy.setEnabled(false);
+                    sheetbinding.btnBuy.setAlpha(0.7f);
+                }
+            } else if (checkedId == sheetbinding.coinsRadiobutton.getId()) {
+                if (userData.containsKey("coins")) {
+                    sheetbinding.coinsRadiobutton.setText("Coins (".concat(String.valueOf(((Number) userData.get("coins")).longValue()).concat(")")));
+                    if (resourceItem.containsKey("price")) {
+                        sheetbinding.btnBuy.setText("Buy for ".concat(String.valueOf(((Number) resourceItem.get("price")).longValue() * 5)).concat(" coins"));
+                        sheetbinding.btnBuy.setEnabled(true);
+                        sheetbinding.btnBuy.setAlpha(1f);
                     } else {
                         resource_purchase_sheet.dismiss();
                         PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred, please login again!");
                         auth.signOut();
                         finishAffinity();
                     }
+                } else {
+                    sheetbinding.coinsRadiobutton.setText("Coins (0)");
+                    sheetbinding.btnBuy.setText("Buy");
+                    sheetbinding.btnBuy.setEnabled(false);
+                    sheetbinding.btnBuy.setAlpha(0.7f);
                 }
             }
         });
@@ -540,8 +521,8 @@ ListMapUtils.sortListByKey(resourcesList, "rating", true, ListMapUtils.SortType.
         sheetbinding.container.setBackground(gd);
         PrepNestUtil.roundViewWithRipple(sheetbinding.btnWishlist, "#F5F5F5", 15, 0, "#000000", "#E0E0E0");
         PrepNestUtil.roundViewWithRipple(sheetbinding.btnBuy, "#000000", 15, 0, "#000000", "#212121");
-        if (_item.containsKey("resource title")) {
-            sheetbinding.resourceTitle.setText(_item.get("resource title").toString());
+        if (resourceItem.containsKey("resource title")) {
+            sheetbinding.resourceTitle.setText(resourceItem.get("resource title").toString());
         } else {
             sheetbinding.resourceTitle.setText("No title");
         }
@@ -554,8 +535,8 @@ sheetbinding.ratingContainer.setVisibility(View.VISIBLE);
 sheetbinding.ratingContainer.setVisibility(View.GONE);
 }
 */
-        if (_item.containsKey("subject")) {
-            sheetbinding.subjectNameTxt.setText(_item.get("subject").toString());
+        if (resourceItem.containsKey("subject")) {
+            sheetbinding.subjectNameTxt.setText(resourceItem.get("subject").toString());
             sheetbinding.subjectNameTxt.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
@@ -567,8 +548,8 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
         } else {
             sheetbinding.subjectNameTxt.setVisibility(View.GONE);
         }
-        if (_item.containsKey("session")) {
-            sheetbinding.sessionTxt.setText(_item.get("session").toString());
+        if (resourceItem.containsKey("session")) {
+            sheetbinding.sessionTxt.setText(resourceItem.get("session").toString());
             sheetbinding.sessionTxt.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
@@ -580,26 +561,28 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
         } else {
             sheetbinding.sessionTxt.setVisibility(View.GONE);
         }
+        if (resourceItem.containsKey("price")) {
+            sheetbinding.btnBuy.setText("Buy for ₹".concat(resourceItem.get("price").toString()));
+        } else {
+            resource_purchase_sheet.dismiss();
+            PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred, please login again!");
+            auth.signOut();
+            finishAffinity();
+        }
         if (userData.containsKey("cash")) {
             sheetbinding.cashRadiobutton.setText("Cash (₹".concat(String.valueOf(((Number) userData.get("cash")).longValue()).concat(")")));
-            if (_item.containsKey("price")) {
-                sheetbinding.btnBuy.setText("Buy for ₹".concat(_item.get("price").toString()));
-            } else {
-                resource_purchase_sheet.dismiss();
-                PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred, please login again!");
-                auth.signOut();
-                finishAffinity();
-            }
         } else {
+            userData.put("cash", 0);
             sheetbinding.cashRadiobutton.setText("Cash (₹0)");
         }
         if (userData.containsKey("coins")) {
             sheetbinding.coinsRadiobutton.setText("Coins (".concat(String.valueOf(((Number) userData.get("coins")).longValue()).concat(")")));
         } else {
+            userData.put("coins", 0);
             sheetbinding.coinsRadiobutton.setText("Coins (0)");
         }
-        if (_item.containsKey("id")) {
-            if (wishlistedResources.contains(_item.get("id").toString())) {
+        if (resourceItem.containsKey("id")) {
+            if (wishlistedResources.contains(resourceItem.get("id").toString())) {
                 sheetbinding.btnWishlistTxt.setText("Remove from wishlist");
                 sheetbinding.iconWishlist.setImageResource(R.drawable.icon_heart_filled);
             } else {
@@ -608,32 +591,22 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 wishlisted[0] = false;
             }
         }
-        sheetbinding.btnWishlist.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                if (wishlisted[0]) {
-                    updateUserWishlist(_item.get("id").toString(), true);
-                    sheetbinding.iconWishlist.setImageResource(R.drawable.icon_heart_hollow);
-                    sheetbinding.btnWishlistTxt.setText("Add to wishlist");
-                } else {
-                    updateUserWishlist(_item.get("id").toString(), false);
-                    sheetbinding.iconWishlist.setImageResource(R.drawable.icon_heart_filled);
-                    sheetbinding.btnWishlistTxt.setText("Remove from wishlist");
-                }
-                wishlisted[0] = !wishlisted[0];
+        sheetbinding.btnWishlist.setOnClickListener(_view -> {
+            if (wishlisted[0]) {
+                updateUserWishlist(resourceItem.get("id").toString(), true);
+                sheetbinding.iconWishlist.setImageResource(R.drawable.icon_heart_hollow);
+                sheetbinding.btnWishlistTxt.setText("Add to wishlist");
+            } else {
+                updateUserWishlist(resourceItem.get("id").toString(), false);
+                sheetbinding.iconWishlist.setImageResource(R.drawable.icon_heart_filled);
+                sheetbinding.btnWishlistTxt.setText("Remove from wishlist");
             }
+            wishlisted[0] = !wishlisted[0];
         });
-        sheetbinding.btnBuy.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                PrepNestUtil.showLoadingDialog(ResourcesActivity.this, true);
-                if (sheetbinding.cashRadiobutton.isChecked()) {
-                    purchaseResource(_item, true);
-                } else {
-                    purchaseResource(_item, false);
-                }
-                resource_purchase_sheet.dismiss();
-            }
+        sheetbinding.btnBuy.setOnClickListener(_view -> {
+            PrepNestUtil.showLoadingDialog(ResourcesActivity.this, true);
+            purchaseResourceCF(resourceItem, sheetbinding.cashRadiobutton.isChecked());
+            resource_purchase_sheet.dismiss();
         });
         resource_purchase_sheet.show();
     }
@@ -670,8 +643,8 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
         if (_remove) {
             message = "Removed from wishlist";
             for (int i = 0; i < wishlistedResources.size(); i++) {
-                if (_ID.equals(wishlistedResources.get((int) (i)))) {
-                    wishlistedResources.remove((int) (i));
+                if (_ID.equals(wishlistedResources.get(i))) {
+                    wishlistedResources.remove(i);
                     break;
                 }
             }
@@ -690,6 +663,78 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
         });
     }
 
+    public void purchaseResourceCF(final HashMap<String, Object> resourceItem, final boolean isCash) {
+        if (isCash) {
+            if ((((Number) userData.get("cash")).longValue()) < (((Number) resourceItem.get("price")).longValue())) {
+                PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
+                PrepNestUtil.showToast(ResourcesActivity.this, "Insufficient balance!");
+                return;
+            }
+        } else {
+            if ((((Number) userData.get("coins")).longValue()) >= (((Number) resourceItem.get("price")).longValue() * 5)) {
+                PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
+                PrepNestUtil.showToast(ResourcesActivity.this, "Insufficient balance!");
+                return;
+            }
+        }
+        FirebaseUser user = auth.getCurrentUser();
+
+        if (user != null) {
+            // Force refresh token to make sure it's valid
+            user.getIdToken(true).addOnSuccessListener(result -> {
+                String idToken = result.getToken();
+
+                // Prepare JSON payload
+                Map<String, Object> data = new HashMap<>();
+                data.put("buyerId", user.getUid());
+                data.put("ownerId", resourceItem.get("uploader uid").toString());
+                data.put("modeOfPayment", isCash ? "cash" : "coins");
+                data.put("resourceId", resourceItem.get("id").toString());
+                data.put("timestamp", String.valueOf(System.currentTimeMillis()));
+
+                // Convert to JSON string
+                JSONObject json = new JSONObject(data);
+                // Send HTTP POST request using OkHttp
+                OkHttpClient client = new OkHttpClient();
+                RequestBody requestBody = RequestBody.create(json.toString(), MediaType.parse("application/json; charset=utf-8"));
+                Request request = new Request.Builder().url("https://us-central1-prepnest-65133.cloudfunctions.net/purchaseResource").post(requestBody).addHeader("Authorization", "Bearer " + idToken) // <-- add token
+                        .build();
+
+                client.newCall(request).enqueue(new Callback() {
+                    @Override
+                    public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                        runOnUiThread(() -> {
+                            PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
+                            PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred");
+                        });
+                    }
+
+                    @Override
+                    public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                        final String resp = response.body() != null ? response.body().string() : "No response";
+                        if (response.isSuccessful()) {
+                            runOnUiThread(() -> {
+                                PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
+                                PrepNestUtil.showToast(ResourcesActivity.this, "Purchased successfully");
+                                purchasedResources.add(resourceItem.get("id").toString());
+                                if (wishlistedResources.contains(resourceItem.get("id").toString())) {
+                                    updateUserWishlist(resourceItem.get("id").toString(), true);
+                                }
+                            });
+                        } else {
+                            runOnUiThread(() -> {
+                                PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
+                                PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred");
+                            });
+                        }
+                    }
+                });
+
+            }).addOnFailureListener(e -> Log.e("FCM_CLIENT", "Failed to get token: " + e.getMessage()));
+        } else {
+            Log.e("FCM_CLIENT", "User not signed in");
+        }
+    }
 
     public void purchaseResource(final HashMap<String, Object> _item, final boolean _isCash) {
         // add to history after successful add
@@ -711,7 +756,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                                 history.put("type", "purchase");
                                 history.put("amount", ((Number) _item.get("price")).longValue());
                                 history.put("amount type", "cash");
-                                history.put("timestamp", String.valueOf((long) System.currentTimeMillis()));
+                                history.put("timestamp", String.valueOf(System.currentTimeMillis()));
                                 history_db.child(auth.getCurrentUser().getUid()).child(key).setValue(history).addOnCompleteListener(addHistory -> {
                                     if (addHistory.isSuccessful()) {
                                         PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
@@ -745,6 +790,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 });
 
             } else {
+                purchasedResources.remove(purchasedResources.size() - 1);
                 PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
                 PrepNestUtil.showToast(ResourcesActivity.this, "Insufficient balance!");
             }
@@ -762,7 +808,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                                 history.put("type", "purchase");
                                 history.put("amount", ((Number) _item.get("price")).longValue() * 5);
                                 history.put("amount type", "coins");
-                                history.put("timestamp", String.valueOf((long) System.currentTimeMillis()));
+                                history.put("timestamp", String.valueOf(System.currentTimeMillis()));
                                 history_db.child(auth.getCurrentUser().getUid()).child(key).setValue(history).addOnCompleteListener(addHistory -> {
                                     if (addHistory.isSuccessful()) {
                                         PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
@@ -797,6 +843,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 });
 
             } else {
+                purchasedResources.remove(purchasedResources.size() - 1);
                 PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
                 PrepNestUtil.showToast(ResourcesActivity.this, "Insufficient balance!");
             }
@@ -817,11 +864,11 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                                 AtomicReference<String> keyRef = new AtomicReference<>(_history_db.child(auth.getCurrentUser().getUid()).push().getKey());
                                 historyRef.get().put("type", "refer_reward");
                                 historyRef.get().put("amount", 10);
-                                historyRef.get().put("timestamp", String.valueOf((long) System.currentTimeMillis()));
+                                historyRef.get().put("timestamp", String.valueOf(System.currentTimeMillis()));
                                 _history_db.child(auth.getCurrentUser().getUid()).child(keyRef.get()).setValue(historyRef.get());
                                 users.child(_otherUserID).child("coins").addListenerForSingleValueEvent(new ValueEventListener() {
                                     @Override
-                                    public void onDataChange(DataSnapshot dataSnapshot) {
+                                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                                         if (dataSnapshot.exists()) {
                                             Long coinsAmount = dataSnapshot.getValue(Long.class);
 
@@ -833,7 +880,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
                                                     historyRef.get().put("type", "refer_success");
                                                     historyRef.get().put("amount", 50);
-                                                    historyRef.get().put("timestamp", String.valueOf((long) System.currentTimeMillis()));
+                                                    historyRef.get().put("timestamp", String.valueOf(System.currentTimeMillis()));
 
                                                     _history_db.child(_otherUserID).child(keyRef.get()).setValue(historyRef.get());
                                                 }
@@ -842,7 +889,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                                     }
 
                                     @Override
-                                    public void onCancelled(DatabaseError error) {
+                                    public void onCancelled(@NonNull DatabaseError error) {
 
                                     }
                                 });
@@ -868,7 +915,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
     public void checkFirstItem(final DatabaseReference _currentUser, final BooleanCallback _callback) {
         _currentUser.child("first purchase").addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 if (dataSnapshot.exists()) {
                     boolean value = Boolean.TRUE.equals(dataSnapshot.getValue(Boolean.class));
                     _callback.onResult(!value);
@@ -878,17 +925,12 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             }
 
             @Override
-            public void onCancelled(DatabaseError databaseError) {
+            public void onCancelled(@NonNull DatabaseError databaseError) {
                 _callback.onResult(false);
             }
         });
 
     }
-
-    public interface BooleanCallback {
-        void onResult(boolean result);
-    }
-
 
     public void addPurchaseReward(final HashMap<String, Object> _item, final DatabaseReference _currentUser, final DatabaseReference _history_db) {
         double resourcePrice = ((Number) _item.get("price")).doubleValue();
@@ -899,30 +941,26 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             String key = _history_db.child(auth.getCurrentUser().getUid()).push().getKey();
             history.put("amount", rewardedAmount[0]);
             history.put("type", "purchase_reward");
-            history.put("timestamp", String.valueOf((long) System.currentTimeMillis()));
+            history.put("timestamp", String.valueOf(System.currentTimeMillis()));
             _history_db.child(auth.getCurrentUser().getUid()).child(key).setValue(history);
         });
     }
 
-
     public void addResourceSoldData(final HashMap<String, Object> _item, final DatabaseReference _users, final DatabaseReference _history_db, final boolean _isCash) {
         final long[] amount = {((Number) _item.get("price")).longValue()};
-        if (_isCash) {
-            amount[0] *= 0.3;
-        } else {
-            amount[0] *= 1.5;
-        }
+        if (_isCash) amount[0] *= 0.3;
+        else amount[0] *= 1.5;
         DatabaseReference otherUser = _users.child(_item.get("uploader uid").toString()).child(_isCash ? "cash" : "coins");
 
         otherUser.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 Long userAmount = dataSnapshot.getValue(Long.class);
                 otherUser.setValue(userAmount + amount[0]).addOnSuccessListener(unused -> {
                     if (_isCash) {
-                        sendNotifications(_item.get("uploader uid").toString(), "New Purchase 💰", "₹".concat(String.valueOf((long) (amount[0])).concat(" has been credited to your account 💰.")));
+                        sendNotifications(_item.get("uploader uid").toString(), "New Purchase 💰", "₹".concat(String.valueOf(amount[0]).concat(" has been credited to your account 💰.")));
                     } else {
-                        sendNotifications(_item.get("uploader uid").toString(), "New Purchase 💰", String.valueOf((long) (amount[0])).concat(" coins has been successfully credited to your account 💰."));
+                        sendNotifications(_item.get("uploader uid").toString(), "New Purchase 💰", String.valueOf(amount[0]).concat(" coins has been successfully credited to your account 💰."));
                     }
                     HashMap<String, Object> history = new HashMap<>();
                     String key = _history_db.child(auth.getCurrentUser().getUid()).push().getKey();
@@ -930,7 +968,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                     history.put("type", "resource_sold");
                     history.put("amount type", _isCash ? "cash" : "coins");
                     history.put("amount", amount[0]);
-                    history.put("timestamp", String.valueOf((long) System.currentTimeMillis()));
+                    history.put("timestamp", String.valueOf(System.currentTimeMillis()));
                     _history_db.child(_item.get("uploader uid").toString()).child(key).setValue(history);
                 });
             }
@@ -942,66 +980,69 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
     }
 
+    public void sendNotifications(final String topic, final String title, final String message) {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
 
-    public void sendNotifications(final String _topic, final String _title, final String _message) {
-        new Thread(() -> {
-            try {
-                URL url = new URL("https://us-central1-prepnest-65133.cloudfunctions.net/sendNotification");
+        if (user != null) {
+            // Force refresh token to make sure it's valid
+            user.getIdToken(true).addOnSuccessListener(result -> {
+                String idToken = result.getToken();
 
-                // Open Connection
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                conn.setDoOutput(true);
-                conn.setDoInput(true);
+                // Prepare JSON payload
+                Map<String, Object> data = new HashMap<>();
+                data.put("topic", topic);
+                data.put("title", title);
+                data.put("body", message);
 
-                //Create JSON Object
-                JSONObject jsonParam = new JSONObject();
-                jsonParam.put("topic", _topic);
-                jsonParam.put("title", _title);
-                jsonParam.put("body", _message);
+                // Convert to JSON string
+                JSONObject json = new JSONObject(data);
 
-                // Write JSON to request body
-                try (OutputStream os = conn.getOutputStream()) {
-                    byte[] input = jsonParam.toString().getBytes("utf-8");
-                    os.write(input, 0, input.length);
-                }
+                // Send HTTP POST request using OkHttp
+                OkHttpClient client = new OkHttpClient();
 
-                // Get response
-                int responseCode = conn.getResponseCode();
-                BufferedReader br;
-                if (responseCode >= 200 && responseCode < 300) {
-                    br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
-                } else {
-                    br = new BufferedReader(new InputStreamReader(conn.getErrorStream(), "utf-8"));
-                }
+                RequestBody requestBody = RequestBody.create(json.toString(), MediaType.parse("application/json; charset=utf-8"));
 
-                StringBuilder response = new StringBuilder();
-                String responseLine;
-                while ((responseLine = br.readLine()) != null) {
-                    response.append(responseLine.trim());
-                }
-                br.close();
+                Request request = new Request.Builder().url("https://us-central1-prepnest-65133.cloudfunctions.net/sendNotification").post(requestBody).addHeader("Authorization", "Bearer " + idToken) // <-- add token
+                        .build();
 
-                // Show result on UI Thread
-				        /*
-		runOnUiThread(() -> {
-            PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
-			PrepNestUtil.showToast(ResourcesActivity.this, "Response: " + response);
-		});
-        */
-                conn.disconnect();
-            } catch (Exception e) {
-                e.printStackTrace();
-				        /*
-        PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
-		runOnUiThread(() -> {
-			PrepNestUtil.showToast(ResourcesActivity.this, "Error: " + e.getMessage());
-		});
-        */
-            }
-        }).start();
+                client.newCall(request).enqueue(new Callback() {
+                    @Override
+                    public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                        Log.e("FCM_CLIENT", "Failed to send notification: " + e.getMessage());
+                        runOnUiThread(() -> {
+                            PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
+                            PrepNestUtil.showToast(ResourcesActivity.this, "Failed to send notification");
+                        });
+                    }
 
+                    @Override
+                    public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                        final String resp = response.body() != null ? response.body().string() : "No response";
+                        Log.d("FCM_CLIENT", "Response: " + resp);
+
+                        if (response.isSuccessful()) {
+                            runOnUiThread(() -> {
+                                PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
+                                PrepNestUtil.showToast(ResourcesActivity.this, "Sent successfully");
+                            });
+                        } else {
+                            runOnUiThread(() -> {
+                                PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
+                                PrepNestUtil.showToast(ResourcesActivity.this, "Failed to send notification");
+                            });
+                        }
+                    }
+                });
+
+            }).addOnFailureListener(e -> Log.e("FCM_CLIENT", "Failed to get token: " + e.getMessage()));
+        } else {
+            Log.e("FCM_CLIENT", "User not signed in");
+        }
+    }
+
+
+    public interface BooleanCallback {
+        void onResult(boolean result);
     }
 
     public class Items_listAdapter extends RecyclerView.Adapter<Items_listAdapter.ViewHolder> {
@@ -1012,8 +1053,9 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             _data = _arr;
         }
 
+        @NonNull
         @Override
-        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             LayoutInflater _inflater = getLayoutInflater();
             View _v = _inflater.inflate(R.layout.resource_item_card_full, null);
             RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -1027,12 +1069,12 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             ResourceItemCardFullBinding binding = ResourceItemCardFullBinding.bind(_view);
 
             PrepNestUtil.roundViewWithRipple(binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            if (_data.get((int) _position).containsKey("resource title")) {
-                binding.title.setText(_data.get((int) _position).get("resource title").toString());
+            if (_data.get(_position).containsKey("resource title")) {
+                binding.title.setText(_data.get(_position).get("resource title").toString());
             } else {
                 binding.title.setText("No title");
             }
-            if (_data.get((int) _position).containsKey("subject")) {
+            if (_data.get(_position).containsKey("subject")) {
                 binding.subjectNameTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
@@ -1040,12 +1082,12 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.subjectNameTxt.setText(_data.get((int) _position).get("subject").toString());
+                binding.subjectNameTxt.setText(_data.get(_position).get("subject").toString());
                 binding.subjectNameTxt.setVisibility(View.VISIBLE);
             } else {
                 binding.subjectNameTxt.setVisibility(View.GONE);
             }
-            if (_data.get((int) _position).containsKey("session")) {
+            if (_data.get(_position).containsKey("session")) {
                 binding.sessionTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
@@ -1053,13 +1095,13 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.sessionTxt.setText(_data.get((int) _position).get("session").toString());
+                binding.sessionTxt.setText(_data.get(_position).get("session").toString());
                 binding.sessionTxt.setVisibility(View.VISIBLE);
             } else {
                 binding.sessionTxt.setVisibility(View.GONE);
             }
-            if (_data.get((int) _position).containsKey("best choice")) {
-                if (_data.get((int) _position).get("best choice").toString().equals("true")) {
+            if (_data.get(_position).containsKey("best choice")) {
+                if (_data.get(_position).get("best choice").toString().equals("true")) {
                     binding.bestChoiceTag.setBackground(new GradientDrawable() {
                         public GradientDrawable getIns(int a, int b) {
                             this.setCornerRadius(a);
@@ -1074,8 +1116,8 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             } else {
                 binding.bestChoiceTag.setVisibility(View.GONE);
             }
-            if (_data.get((int) _position).containsKey("recommended")) {
-                if (_data.get((int) _position).get("recommended").toString().equals("true")) {
+            if (_data.get(_position).containsKey("recommended")) {
+                if (_data.get(_position).get("recommended").toString().equals("true")) {
                     binding.recommendedTag.setBackground(new GradientDrawable() {
                         public GradientDrawable getIns(int a, int b) {
                             this.setCornerRadius(a);
@@ -1090,11 +1132,11 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             } else {
                 binding.recommendedTag.setVisibility(View.GONE);
             }
-            if (_data.get((int) _position).containsKey("type")) {
-                if (_data.get((int) _position).get("type").toString().equals("paper")) {
+            if (_data.get(_position).containsKey("type")) {
+                if (_data.get(_position).get("type").toString().equals("paper")) {
                     binding.image.setImageResource(R.drawable.previous_paper);
                 } else {
-                    if (_data.get((int) _position).get("type").toString().equals("notes")) {
+                    if (_data.get(_position).get("type").toString().equals("notes")) {
                         binding.image.setImageResource(R.drawable.short_notes);
                     } else {
                         binding.image.setVisibility(View.INVISIBLE);
@@ -1103,24 +1145,45 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             } else {
                 binding.image.setVisibility(View.INVISIBLE);
             }
-            LinearLayout.LayoutParams paramscontainer = (LinearLayout.LayoutParams) binding.container.getLayoutParams();
-            if (_position == (_data.size() - 1)) {
-                paramscontainer.setMargins((int) convertToDp(20), (int) convertToDp(10), (int) convertToDp(20), (int) convertToDp(10));
+            ViewGroup.LayoutParams rawParams = binding.container.getLayoutParams();
+            ViewGroup.MarginLayoutParams paramscontainer;
+
+            if (rawParams instanceof ViewGroup.MarginLayoutParams) {
+                paramscontainer = (ViewGroup.MarginLayoutParams) rawParams;
             } else {
-                paramscontainer.setMargins((int) convertToDp(20), (int) convertToDp(10), (int) convertToDp(20), (int) 0);
+                // Fallback if getLayoutParams() is null or not a MarginLayoutParams
+                paramscontainer = new ViewGroup.MarginLayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                );
             }
-            paramscontainer.width = LinearLayout.LayoutParams.MATCH_PARENT;
-            paramscontainer.height = LinearLayout.LayoutParams.WRAP_CONTENT;
+
+            if (_position == (_data.size() - 1)) {
+                paramscontainer.setMargins(
+                        (int) convertToDp(20),
+                        (int) convertToDp(10),
+                        (int) convertToDp(20),
+                        (int) convertToDp(10)
+                );
+            } else {
+                paramscontainer.setMargins(
+                        (int) convertToDp(20),
+                        (int) convertToDp(10),
+                        (int) convertToDp(20),
+                        0
+                );
+            }
+
+            paramscontainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            paramscontainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
 
             binding.container.setLayoutParams(paramscontainer);
 
-            binding.container.setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(View _view) {
-                    int pos = _holder.getAdapterPosition();
-                    if (pos != RecyclerView.NO_POSITION) {
-                        checkResource(_data.get(pos));
-                    }
+
+            binding.container.setOnClickListener(_view1 -> {
+                int pos = _holder.getAdapterPosition();
+                if (pos != RecyclerView.NO_POSITION) {
+                    checkResource(_data.get(pos));
                 }
             });
         }

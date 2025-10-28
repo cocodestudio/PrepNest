@@ -1,80 +1,74 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/container"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#FFFFFF"
     android:orientation="vertical">
 
     <LinearLayout
-        android:id="@+id/container"
+        android:id="@+id/ques_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#FFFFFF"
-        android:orientation="vertical">
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingLeft="20dp"
+        android:paddingRight="20dp">
 
-        <LinearLayout
-            android:id="@+id/ques_container"
+        <TextView
+            android:id="@+id/question_txt"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:focusable="false"
+            android:fontFamily="@font/semibold"
+            android:paddingTop="12dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="12dp"
+            android:textColor="#000000"
+            android:textSize="12sp"
+            tools:ignore="RtlSymmetry" />
+
+        <ImageView
+            android:id="@+id/icon_drop_down"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:focusable="false"
+            android:padding="3dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/icon_down_arrow" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/line"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginLeft="20dp"
+        android:layout_marginRight="20dp"
+        android:background="#757575"
+        android:orientation="horizontal"
+        android:padding="8dp" />
+
+    <LinearLayout
+        android:id="@+id/extra_content_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/extra_text"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingLeft="20dp"
-            android:paddingRight="20dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/question_txt"
-                android:focusable="false"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingTop="12dp"
-                android:paddingRight="8dp"
-                android:paddingBottom="12dp"
-                android:text="TextView"
-                android:textSize="12sp"
-                android:textColor="#000000"
-                android:layout_weight="1"
-                android:fontFamily="@font/semibold" />
-
-            <ImageView
-                android:id="@+id/icon_drop_down"
-                android:focusable="false"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:padding="3dp"
-                android:src="@drawable/icon_down_arrow"
-                android:scaleType="fitCenter" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/line"
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginLeft="20dp"
-            android:layout_marginRight="20dp"
-            android:padding="8dp"
-            android:background="#757575"
-            android:orientation="horizontal" />
-
-        <LinearLayout
-            android:id="@+id/extra_content_container"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:visibility="gone">
-
-            <TextView
-                android:id="@+id/extra_text"
-                android:focusable="false"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingLeft="20dp"
-                android:paddingTop="8dp"
-                android:paddingRight="10dp"
-                android:paddingBottom="8dp"
-                android:text="TextView"
-                android:textSize="12sp"
-                android:fontFamily="@font/medium"
-                android:autoLink="web|email"
-                android:linksClickable="true"
-                android:textColorLink="#000000" />
-        </LinearLayout>
+            android:autoLink="web|email"
+            android:focusable="false"
+            android:fontFamily="@font/medium"
+            android:linksClickable="true"
+            android:paddingStart="20dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="8dp"
+            android:textColorLink="#000000"
+            android:textSize="12sp" />
     </LinearLayout>
 </LinearLayout>

@@ -10,12 +10,10 @@ import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
-import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -64,31 +62,43 @@ import java.util.regex.Pattern;
 
 public class UseruploadedresourcesFragmentActivity extends Fragment {
 
-    private UseruploadedresourcesFragmentBinding binding;
-    private FirebaseAuth auth = FirebaseAuth.getInstance();
-    private HashMap<String, Object> userData = new HashMap<>();
+    private final FirebaseAuth auth = FirebaseAuth.getInstance();
     private final AtomicBoolean requestedResourcesLoaded = new AtomicBoolean(false);
     private final AtomicBoolean verifiedResourcesLoaded = new AtomicBoolean(false);
     private final Map<String, ValueEventListener> listeners = new HashMap<>();
-    private FirebaseDatabase firebase_database = FirebaseDatabase.getInstance();
-    private DatabaseReference users = firebase_database.getReference("users");
+    private final FirebaseDatabase firebase_database = FirebaseDatabase.getInstance();
+    private final DatabaseReference users = firebase_database.getReference("users");
+    private final DatabaseReference requests = firebase_database.getReference("requests/new_resources_requests");
+    private final DatabaseReference resources = firebase_database.getReference("resources");
+    private final ArrayList<HashMap<String, Object>> requestedResources = new ArrayList<>();
+    private final ArrayList<HashMap<String, Object>> verifiedResources = new ArrayList<>();
+    private final ArrayList<HashMap<String, Object>> allResources = new ArrayList<>();
+    private final Intent toBecomeProvider = new Intent();
+    private final Intent toUploadResource = new Intent();
+    private final Intent toImageView = new Intent();
+    private final Intent toPDFView = new Intent();
+    private UseruploadedresourcesFragmentBinding binding;
+    private HashMap<String, Object> userData = new HashMap<>();
     private resourcesAdapter listAdapter;
-    private DatabaseReference requests = firebase_database.getReference("requests/new_resources_requests");
-    private DatabaseReference resources = firebase_database.getReference("resources");
     private DatabaseReference userRequestedResources;
     private LogUtils logFile;
     private String jsonCourseData = "";
-
     private ArrayList<String> resourceIDs = new ArrayList<>();
-    private ArrayList<HashMap<String, Object>> requestedResources = new ArrayList<>();
-    private ArrayList<HashMap<String, Object>> verifiedResources = new ArrayList<>();
-    private ArrayList<HashMap<String, Object>> allResources = new ArrayList<>();
-
-    private Intent toBecomeProvider = new Intent();
-    private Intent toUploadResource = new Intent();
-    private Intent toImageView = new Intent();
-    private Intent toPDFView = new Intent();
     private ProgressDialog progress_dialog;
+
+    public static String extractStoragePathFromURL(String url) {
+        try {
+            Pattern pattern = Pattern.compile("/o/(.+?)\\?");
+            Matcher matcher = pattern.matcher(url);
+            if (matcher.find()) {
+                String encodedPath = matcher.group(1);
+                return URLDecoder.decode(encodedPath, "UTF-8");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 
     @NonNull
     @Override
@@ -102,26 +112,20 @@ public class UseruploadedresourcesFragmentActivity extends Fragment {
 
     private void initialize(Bundle _savedInstanceState, View _view) {
 
-        binding.btnFab.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-				/*
+        binding.btnFab.setOnClickListener(_view1 -> {
+            /*
 toUploadResource.setClass(requireContext(), UploadActivity.class);
 */
-                toUploadResource.setClass(requireContext(), UploadresourceActivity.class);
-                startActivity(toUploadResource);
-                requireActivity().overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-            }
+            toUploadResource.setClass(requireContext(), UploadresourceActivity.class);
+            startActivity(toUploadResource);
+            requireActivity().overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
         });
 
-        binding.btnProvider.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                toBecomeProvider.setClass(requireActivity(), BecomeproviderActivity.class);
-                startActivity(toBecomeProvider);
-                requireActivity().finish();
-                requireActivity().overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-            }
+        binding.btnProvider.setOnClickListener(_view2 -> {
+            toBecomeProvider.setClass(requireActivity(), BecomeproviderActivity.class);
+            startActivity(toBecomeProvider);
+            requireActivity().finish();
+            requireActivity().overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
         });
     }
 
@@ -135,8 +139,9 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         verifiedResourcesLoaded.set(false);
         getUploadedResources();
         loadCourses();
-    }
 
+        PrepNestUtil.changeNavBarColor(requireActivity(), true);
+    }
 
     @Override
     public void onDestroy() {
@@ -163,14 +168,13 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         }
     }
 
-
     public void getUploadedResources() {
         DatabaseReference dataRef = users.child(auth.getCurrentUser().getUid());
         logFile.addLog("RESOURCES", "GETTING UPLOADED RESOURCES");
         dataRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                userData = dataSnapshot.getValue(new GenericTypeIndicator<HashMap<String, Object>>() {
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                userData = dataSnapshot.getValue(new GenericTypeIndicator<>() {
                 });
 
                 if (dataSnapshot.exists()) {
@@ -179,15 +183,15 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                             binding.btnFab.setVisibility(View.VISIBLE);
                             resourceIDs = new ArrayList<>();
                             if (userData.containsKey("uploaded resources")) {
-                                if ((userData.get("uploaded resources") == null) || userData.get("uploaded resources").toString().equals("")) {
-                                    toggleState(R.drawable.empty_box_illus, getString(R.string.no_uploaded_resource_message), true, false);
+                                if ((userData.get("uploaded resources") == null) || userData.get("uploaded resources").toString().isEmpty()) {
+                                    toggleState(R.drawable.icon_empty_box, getString(R.string.no_uploaded_resource_message), true, false);
                                 } else {
                                     resourceIDs = new Gson().fromJson(userData.get("uploaded resources").toString(), new TypeToken<ArrayList<String>>() {
                                     }.getType());
-                                    toggleState(R.drawable.empty_box_illus, getString(R.string.no_uploaded_resource_message), false, false);
+                                    toggleState(R.drawable.icon_empty_box, getString(R.string.no_uploaded_resource_message), false, false);
                                 }
                             } else {
-                                toggleState(R.drawable.empty_box_illus, getString(R.string.no_uploaded_resource_message), true, false);
+                                toggleState(R.drawable.icon_empty_box, getString(R.string.no_uploaded_resource_message), true, false);
                             }
                             logFile.addLog("RESOURCES", "LOADING VERIFIED RESOURCES");
                             getVerifiedResources(resourceIDs);
@@ -197,23 +201,23 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                             binding.btnFab.setVisibility(View.GONE);
                             if (userData.containsKey("provider verification status")) {
                                 if (userData.get("provider verification status").toString().equals("pending")) {
-                                    toggleState(R.drawable.pending_illus, getString(R.string.pending_provider_verification_message), true, false);
+                                    toggleState(R.drawable.icon_hourglass, getString(R.string.pending_provider_verification_message), true, false);
                                     binding.progressBarLayout.setVisibility(View.GONE);
                                 } else {
                                     if (userData.get("provider verification status").toString().equals("failed")) {
-                                        toggleState(R.drawable.failed_illus, getString(R.string.resend_provider_verification_message), true, false);
+                                        toggleState(R.drawable.icon_failed_error, getString(R.string.resend_provider_verification_message), true, false);
                                         binding.progressBarLayout.setVisibility(View.GONE);
                                     } else {
                                         binding.progressBarLayout.setVisibility(View.GONE);
                                     }
                                 }
                             } else {
-                                toggleState(R.drawable.locked_illus, getString(R.string.no_upload_access_message), true, true);
+                                toggleState(R.drawable.icon_locked_3d, getString(R.string.no_upload_access_message), true, true);
                                 binding.progressBarLayout.setVisibility(View.GONE);
                             }
                         }
                     } else {
-                        toggleState(R.drawable.locked_illus, getString(R.string.no_upload_access_message), true, true);
+                        toggleState(R.drawable.icon_locked_3d, getString(R.string.no_upload_access_message), true, true);
                         binding.btnFab.setVisibility(View.GONE);
                         binding.progressBarLayout.setVisibility(View.GONE);
                     }
@@ -227,7 +231,7 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
             }
 
             @Override
-            public void onCancelled(DatabaseError databaseError) {
+            public void onCancelled(@NonNull DatabaseError databaseError) {
                 logFile.addLog("RESOURCES", "FAILED LOADING DATA : ".concat(databaseError.toString()));
                 PrepNestUtil.showToast(requireContext(), "An unknown error occurred : ".concat(databaseError.toString()));
                 binding.progressBarLayout.setVisibility(View.GONE);
@@ -235,19 +239,13 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         });
     }
 
-
     public void attachAdapterToRecyclerView() {
         binding.itemsList.setLayoutManager(new LinearLayoutManager(getContext()));
-        listAdapter = new resourcesAdapter(new onResourceActionListener() {
-            @Override
-            public void showOptions(HashMap<String, Object> item) {
-                showResourceOptionsSheet(item);
-            }
-        });
+        listAdapter = new resourcesAdapter(this::showResourceOptionsSheet);
         binding.itemsList.setAdapter(listAdapter);
         binding.itemsList.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
-            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
                 if (dy > 0) {
                     // Scrolling down: Hide FAB
                     binding.btnFab.animate()
@@ -267,7 +265,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         });
     }
 
-
     public void checkIfBothLoaded() {
         if (requestedResourcesLoaded.get() && verifiedResourcesLoaded.get()) {
             logFile.addLog("RESOURCES", "DATA FROM BOTH DB LOADED");
@@ -282,7 +279,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
             }
         }
     }
-
 
     public void updateCombinedList() {
         if (getActivity() == null) return;
@@ -307,7 +303,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
             }
         });
     }
-
 
     public void getRequestedResources() {
         ValueEventListener otherListener = new ValueEventListener() {
@@ -341,7 +336,7 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
             }
 
             @Override
-            public void onCancelled(DatabaseError error) {
+            public void onCancelled(@NonNull DatabaseError error) {
                 if (isAdded()) {
                     logFile.addLog("RESOURCES", "FAILED LOADING REQUESTED RESOURCES");
                     PrepNestUtil.showToast(requireActivity(), "An unknown error occurred: " + error.getMessage());
@@ -350,7 +345,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         };
         userRequestedResources.addValueEventListener(otherListener);
     }
-
 
     public void getVerifiedResources(final ArrayList<String> _childNodes) {
         if (_childNodes != null && !_childNodes.isEmpty()) {
@@ -387,7 +381,7 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                     }
 
                     @Override
-                    public void onCancelled(DatabaseError error) {
+                    public void onCancelled(@NonNull DatabaseError error) {
                         if (isAdded()) {
                             logFile.addLog("RESOURCES", "FAILED TO LOAD DATA, ID : " + id);
                             PrepNestUtil.showToast(requireActivity(), "An unknown error occurred: " + error.getMessage());
@@ -403,301 +397,12 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         }
     }
 
-
-    public interface onResourceActionListener {
-        void showOptions(HashMap<String, Object> item);
-    }
-
-    public class resourcesAdapter extends RecyclerView.Adapter<resourcesAdapter.ViewHolder> {
-
-        private final ArrayList<HashMap<String, Object>> _data = new ArrayList<>();
-        private final onResourceActionListener listener;
-        private int _lastPosition = -1; // Used to track animations
-
-
-        public resourcesAdapter(onResourceActionListener listener) {
-            this.listener = listener;
-            setHasStableIds(true);
-        }
-
-        public void updateData(List<HashMap<String, Object>> newData) {
-            DiffUtil.DiffResult result = DiffUtil.calculateDiff(new ResourceDiffCallback(_data, newData));
-            _data.clear();
-            _data.addAll(newData);
-            result.dispatchUpdatesTo(this);
-        }
-
-        @Override
-        public long getItemId(int position) {
-            Object id = _data.get(position).get("id");
-            return id != null ? id.toString().hashCode() : position;
-        }
-
-        @Override
-        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            LayoutInflater _inflater = LayoutInflater.from(parent.getContext());
-            View _v = _inflater.inflate(R.layout.resource_item_card_full, parent, false);
-
-            return new ViewHolder(_v);
-        }
-
-        @Override
-        public void onBindViewHolder(ViewHolder _holder, final int _position) {
-            View _view = _holder.itemView;
-            ResourceItemCardFullBinding binding = ResourceItemCardFullBinding.bind(_view);
-            RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            _view.setLayoutParams(_lp);
-
-            // UI design
-            binding.iconMoreOptions.setVisibility(View.VISIBLE);
-            PrepNestUtil.roundViewWithRipple(binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            binding.uploadDateTxt.setBackground(new GradientDrawable() {
-                public GradientDrawable getIns(int a, int b) {
-                    this.setCornerRadius(a);
-                    this.setColor(b);
-                    return this;
-                }
-            }.getIns((int) 360, 0xFFF5F5F5));
-            binding.bestChoiceTag.setBackground(new GradientDrawable() {
-                public GradientDrawable getIns(int a, int b) {
-                    this.setCornerRadius(a);
-                    this.setColor(b);
-                    return this;
-                }
-            }.getIns((int) 360, 0xFF000000));
-            binding.recommendedTag.setBackground(new GradientDrawable() {
-                public GradientDrawable getIns(int a, int b) {
-                    this.setCornerRadius(a);
-                    this.setColor(b);
-                    return this;
-                }
-            }.getIns((int) 360, 0xFF000000));
-            // UI End
-
-
-            HashMap<String, Object> item = _data.get((int) _position);
-
-            if (item.containsKey("status")) {
-                binding.statusTxt.setText(item.get("status").toString());
-                binding.statusTxt.setVisibility(View.VISIBLE);
-                switch (item.get("status").toString()) {
-                    case "pending":
-                        binding.statusTxt.setTextColor(0xFFF57C00);
-                        binding.statusTxt.setBackground(new GradientDrawable() {
-                            public GradientDrawable getIns(int a, int b) {
-                                this.setCornerRadius(a);
-                                this.setColor(b);
-                                return this;
-                            }
-                        }.getIns((int) 360, 0xFFFFF3E0));
-                        break;
-
-                    case "failed":
-                        binding.statusTxt.setTextColor(0xFFE53935);
-                        binding.statusTxt.setBackground(new GradientDrawable() {
-                            public GradientDrawable getIns(int a, int b) {
-                                this.setCornerRadius(a);
-                                this.setColor(b);
-                                return this;
-                            }
-                        }.getIns((int) 360, 0xFFFFEBEE));
-                        break;
-
-                    case "verified":
-                        if (item.containsKey("discontinue")) {
-                            if (item.get("discontinue").toString().equals("true")) {
-                                binding.statusTxt.setBackground(new GradientDrawable() {
-                                    public GradientDrawable getIns(int a, int b) {
-                                        this.setCornerRadius(a);
-                                        this.setColor(b);
-                                        return this;
-                                    }
-                                }.getIns((int) 360, 0xFFF5F5F5));
-                                binding.statusTxt.setTextColor(0xFF757575);
-                                binding.statusTxt.setText("discontinue");
-                                binding.statusTxt.setVisibility(View.VISIBLE);
-                            } else {
-                                binding.statusTxt.setVisibility(View.GONE);
-                            }
-                        } else {
-                            binding.statusTxt.setVisibility(View.GONE);
-                        }
-                        break;
-
-                    default:
-                        binding.statusTxt.setTextColor(0xFF757575);
-                        binding.statusTxt.setVisibility(View.VISIBLE);
-                }
-            } else {
-                binding.statusTxt.setVisibility(View.VISIBLE);
-                binding.statusTxt.setText("pending");
-                binding.statusTxt.setTextColor(0xFFF57C00);
-                binding.statusTxt.setBackground(new GradientDrawable() {
-                    public GradientDrawable getIns(int a, int b) {
-                        this.setCornerRadius(a);
-                        this.setColor(b);
-                        return this;
-                    }
-                }.getIns((int) 360, 0xFFFFF3E0));
-            }
-
-            if (item.containsKey("subject")) {
-                binding.subjectNameTxt.setText(item.get("subject").toString());
-                binding.subjectNameTxt.setBackground(new GradientDrawable() {
-                    public GradientDrawable getIns(int a, int b) {
-                        this.setCornerRadius(a);
-                        this.setColor(b);
-                        return this;
-                    }
-                }.getIns((int) 360, 0xFFF5F5F5));
-                binding.subjectNameTxt.setVisibility(View.VISIBLE);
-            } else {
-                binding.subjectNameTxt.setText("None");
-                binding.subjectNameTxt.setVisibility(View.VISIBLE);
-            }
-
-
-            if (item.containsKey("resource title")) {
-                binding.title.setText(item.get("resource title").toString());
-            } else {
-                binding.title.setText("No name");
-            }
-
-            if (item.containsKey("type")) {
-                if (item.get("type").toString().equals("paper")) {
-                    binding.image.setImageResource(R.drawable.previous_paper);
-                } else {
-                    binding.image.setImageResource(R.drawable.short_notes);
-                }
-            } else {
-                binding.image.setVisibility(View.INVISIBLE);
-            }
-            if (item.containsKey("best choice")) {
-                if (item.get("best choice").toString().equals("true")) {
-                    binding.bestChoiceTag.setVisibility(View.VISIBLE);
-                } else {
-                    binding.bestChoiceTag.setVisibility(View.GONE);
-                }
-            } else {
-                binding.bestChoiceTag.setVisibility(View.GONE);
-            }
-            if (item.containsKey("recommended")) {
-                if (item.get("recommended").toString().equals("true")) {
-                    binding.recommendedTag.setVisibility(View.VISIBLE);
-                } else {
-                    binding.recommendedTag.setVisibility(View.GONE);
-                }
-            } else {
-                binding.recommendedTag.setVisibility(View.GONE);
-            }
-            if (item.containsKey("date of upload")) {
-                binding.uploadDateTxt.setText(formatTimeDifference(item.get("date of upload").toString()));
-                binding.uploadDateTxt.setVisibility(View.VISIBLE);
-            } else {
-                binding.uploadDateTxt.setVisibility(View.GONE);
-            }
-
-
-            LinearLayout.LayoutParams paramscontainer = (LinearLayout.LayoutParams) binding.container.getLayoutParams();
-            if (_position == (_data.size() - 1)) {
-                paramscontainer.setMargins((int) convertToDp(20), (int) convertToDp(10), (int) convertToDp(20), (int) convertToDp(10));
-            } else {
-                paramscontainer.setMargins((int) convertToDp(20), (int) convertToDp(10), (int) convertToDp(20), (int) 0);
-            }
-            paramscontainer.width = LinearLayout.LayoutParams.MATCH_PARENT;
-            paramscontainer.height = LinearLayout.LayoutParams.WRAP_CONTENT;
-            binding.container.setLayoutParams(paramscontainer);
-
-
-            binding.iconMoreOptions.setOnClickListener(v -> {
-                int pos = _holder.getAdapterPosition();
-                if (pos != RecyclerView.NO_POSITION && listener != null) {
-                    listener.showOptions(_data.get(pos));
-                }
-            });
-
-
-            binding.container.setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(View _view) {
-                    int pos = _holder.getAdapterPosition();
-                    if (pos != RecyclerView.NO_POSITION) {
-                        logFile.addLog("RESOURCE OPEN", "OPENING RESOURCE ITEM");
-                        openResource(_data.get((int) pos));
-                    }
-                }
-            });
-        }
-
-        @Override
-        public int getItemCount() {
-            return _data.size();
-        }
-
-        // Custom animation method
-        private void setAnimation(View viewToAnimate, int position) {
-            if (position > _lastPosition) {
-                Animation animation = AnimationUtils.loadAnimation(viewToAnimate.getContext(), android.R.anim.fade_in);
-                viewToAnimate.startAnimation(animation);
-                _lastPosition = position;
-            }
-        }
-
-        // Optional: clear animation on view detached (prevents flickering)
-        @Override
-        public void onViewDetachedFromWindow(ViewHolder holder) {
-            holder.itemView.clearAnimation();
-        }
-
-        public class ViewHolder extends RecyclerView.ViewHolder {
-            public ViewHolder(View v) {
-                super(v);
-            }
-        }
-    }
-
-    public class ResourceDiffCallback extends DiffUtil.Callback {
-
-        private final List<HashMap<String, Object>> oldList;
-        private final List<HashMap<String, Object>> newList;
-
-        public ResourceDiffCallback(List<HashMap<String, Object>> oldList, List<HashMap<String, Object>> newList) {
-            this.oldList = oldList;
-            this.newList = newList;
-        }
-
-        @Override
-        public int getOldListSize() {
-            return oldList.size();
-        }
-
-        @Override
-        public int getNewListSize() {
-            return newList.size();
-        }
-
-        @Override
-        public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
-            String oldId = String.valueOf(oldList.get(oldItemPosition).get("id"));
-            String newId = String.valueOf(newList.get(newItemPosition).get("id"));
-            return oldId.equals(newId);
-        }
-
-        @Override
-        public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
-            return oldList.get(oldItemPosition).equals(newList.get(newItemPosition));
-        }
-
-    }
-
-
     public double convertToDp(final double _pixels) {
         return TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_DIP,
                 (float) _pixels,
                 getResources().getDisplayMetrics());
     }
-
 
     public String formatTimeDifference(final String _time) {
         long timeStampMS = Long.parseLong(_time);
@@ -708,124 +413,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
 
         return timestamp.format(formatter);
     }
-
-
-    public static class FirebaseFileDeleter {
-        public interface DeletionCallback {
-            void onAllDeleted();
-
-            void onError(Exception e);
-        }
-
-        public static void deleteFilesFromStorage(List<String> urlList, Context context, DeletionCallback callback) {
-            FirebaseStorage firebase_storage = FirebaseStorage.getInstance();
-            AtomicInteger deleteCount = new AtomicInteger(0);
-
-            if (urlList.isEmpty()) {
-                callback.onAllDeleted();
-                return;
-            }
-
-            LogUtils staticLog = new LogUtils(context);
-
-            for (String url : urlList) {
-                try {
-                    StorageReference fileRef = firebase_storage.getReference().child(extractStoragePathFromURL(url));
-                    staticLog.addLog("RESOURCE DELETE", "DELETING : ".concat(fileRef.getPath()));
-                    fileRef.delete().addOnSuccessListener(unused -> {
-                        if (deleteCount.incrementAndGet() == urlList.size()) {
-                            callback.onAllDeleted();
-                        }
-                    }).addOnFailureListener(callback::onError);
-                } catch (Exception e) {
-                    callback.onError(e);
-                    return;
-                }
-            }
-        }
-    }
-
-    public static class FilesDownloader {
-        public interface DownloadCallback {
-            void onDownloadComplete();
-
-            void onDownloadFailed(Exception e);
-        }
-
-        public static void downloadFiles(Context context, List<String> fileURLsList, String folderName, DownloadCallback callback) {
-            File internalDir = new File(context.getFilesDir(), folderName);
-
-            FirebaseStorage storage = FirebaseStorage.getInstance();
-            int totalFiles = fileURLsList.size();
-            AtomicInteger downloadedCount = new AtomicInteger(0);
-
-            LogUtils staticLog = new LogUtils(context);
-
-
-            for (String url : fileURLsList) {
-                String storagePath = extractStoragePathFromURL(url);
-                StorageReference fileRef = storage.getReference().child(storagePath);
-
-                staticLog.addLog("RESOURCE DOWNLOAD", "DOWNLOADING RESOURCE : ".concat(storagePath));
-
-                String fileName = storagePath.substring((int) (storagePath.indexOf("/")));
-
-                if (!internalDir.exists()) {
-                    internalDir.mkdirs();
-                }
-
-                File localFile = new File(internalDir, fileName);
-
-                fileRef.getFile(localFile).addOnSuccessListener(aVoid -> {
-                    staticLog.addLog("RESOURCE DOWNLOAD", "FILE DOWNLOADED SUCCESSFULLY");
-                    if (downloadedCount.incrementAndGet() == totalFiles) {
-                        callback.onDownloadComplete();
-                    }
-                }).addOnFailureListener(callback::onDownloadFailed);
-            }
-        }
-    }
-
-    public static class FolderUtils {
-
-        public static boolean deleteFolder(Context context, String folderName) {
-            File internalDir = new File(context.getFilesDir(), folderName);
-            return deleteRecursively(internalDir);
-        }
-
-        private static boolean deleteRecursively(File fileOrDirectory) {
-            if (fileOrDirectory != null && fileOrDirectory.exists()) {
-                if (fileOrDirectory.isDirectory()) {
-                    File[] children = fileOrDirectory.listFiles();
-                    if (children != null) {
-                        for (File child : children) {
-                            deleteRecursively(child);
-                        }
-                    }
-                }
-                return fileOrDirectory.delete();
-            }
-            return false;
-        }
-    }
-
-    public static String extractStoragePathFromURL(String url) {
-        try {
-            Pattern pattern = Pattern.compile("/o/(.+?)\\?");
-            Matcher matcher = pattern.matcher(url);
-            if (matcher.find()) {
-                String encodedPath = matcher.group(1);
-                return URLDecoder.decode(encodedPath, "UTF-8");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    {
-    }
-
 
     public void showLoadingDialog(final boolean isShowing) {
         if (isShowing) {
@@ -845,21 +432,12 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
 
             progress_dialog.show();
             progress_dialog.setContentView(R.layout.progress_bar);
-            LinearLayout container = (LinearLayout) progress_dialog.findViewById(R.id.container);
-            container.setBackground(new GradientDrawable() {
-                public GradientDrawable getIns(int a, int b) {
-                    this.setCornerRadius(a);
-                    this.setColor(b);
-                    return this;
-                }
-            }.getIns((int) 70, 0xFFFFFFFF));
         } else {
             if (progress_dialog != null) {
                 progress_dialog.dismiss();
             }
         }
     }
-
 
     public void showResourceOptionsSheet(final HashMap<String, Object> _item) {
         com.google.android.material.bottomsheet.BottomSheetDialog resource_options;
@@ -904,35 +482,25 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         } else {
             sheetbinding.discontinueTxt.setText("Discontinue");
         }
-        sheetbinding.deleteOption.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                logFile.addLog("ITEM DELETE", "ITEM DELETION START");
-                showLoadingDialog(true);
-                resource_options.dismiss();
-                deleteItemFromFirebase(_item);
-            }
+        sheetbinding.deleteOption.setOnClickListener(_view -> {
+            logFile.addLog("ITEM DELETE", "ITEM DELETION START");
+            showLoadingDialog(true);
+            resource_options.dismiss();
+            deleteItemFromFirebase(_item);
         });
-        sheetbinding.discontinueOption.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                logFile.addLog("RESOURCE STATUS", "RESOURCE IS CONTINUING/DISCONTINUING");
-                showLoadingDialog(true);
-                changeResourceStatus(_item);
-                resource_options.dismiss();
-            }
+        sheetbinding.discontinueOption.setOnClickListener(_view -> {
+            logFile.addLog("RESOURCE STATUS", "RESOURCE IS CONTINUING/DISCONTINUING");
+            showLoadingDialog(true);
+            changeResourceStatus(_item);
+            resource_options.dismiss();
         });
-        sheetbinding.showDetailsOption.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                showResourceDetailsSheet(_item);
-                resource_options.dismiss();
-            }
+        sheetbinding.showDetailsOption.setOnClickListener(_view -> {
+            showResourceDetailsSheet(_item);
+            resource_options.dismiss();
         });
         resource_options.setCancelable(true);
         resource_options.show();
     }
-
 
     public void deleteItemFromFirebase(final HashMap<String, Object> _item) {
         String id = String.valueOf(_item.get("id"));
@@ -942,7 +510,7 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
             userRequestedResources.child(id).removeValue().addOnCompleteListener(aVoid -> {
                 logFile.addLog("RESOURCE ITEM", "DELETED FROM DATABASE");
                 logFile.addLog("RESOURCE ITEM", "DELETING FROM STORAGE");
-                List<String> fileURLs = new ArrayList<>();
+                List<String> fileURLs;
                 fileURLs = new Gson().fromJson(_item.get("resource urls").toString(), new TypeToken<ArrayList<String>>() {
                 }.getType());
                 FirebaseFileDeleter.deleteFilesFromStorage(fileURLs, requireActivity(), new FirebaseFileDeleter.DeletionCallback() {
@@ -974,7 +542,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         }
     }
 
-
     public void openResource(final HashMap<String, Object> _item) {
         File internalDir = getContext().getFilesDir();
         String folderName = _item.get("id").toString();
@@ -991,7 +558,7 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
             if (created) {
 
                 logFile.addLog("RESOURCE DOWNLOAD", "FOLDER CREATED SUCCESSFULLY");
-                List<String> fileURLs = new ArrayList<>();
+                List<String> fileURLs;
                 fileURLs = new Gson().fromJson(_item.get("resource urls").toString(), new TypeToken<ArrayList<String>>() {
                 }.getType());
                 FilesDownloader.downloadFiles(getContext(), fileURLs, folderName, new FilesDownloader.DownloadCallback() {
@@ -1007,7 +574,7 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                         logFile.addLog("RESOURCE DOWNLOAD", "FAILED TO DOWNLOAD RESOURCES : " + e.toString());
                         showLoadingDialog(false);
                         boolean success = FolderUtils.deleteFolder(getContext(), folderName);
-                        logFile.addLog("RESOURCE DOWNLOAD", "FOLDER DELETION STATUS : " + Boolean.toString(success));
+                        logFile.addLog("RESOURCE DOWNLOAD", "FOLDER DELETION STATUS : " + success);
                         PrepNestUtil.showToast(getContext(), e.getCause().toString());
                     }
                 });
@@ -1015,12 +582,10 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                 logFile.addLog("RESOURCE DOWNLOAD", "FAILED TO CREATE FOLDER");
                 showLoadingDialog(false);
                 PrepNestUtil.showToast(getContext(), "An unknown error occurred !");
-                return;
             }
 
         }
     }
-
 
     public void changeResourceStatus(final HashMap<String, Object> _item) {
         String id = _item.get("id").toString();
@@ -1028,7 +593,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         boolean status = false;
         if (_item.containsKey("discontinue")) {
             status = (Boolean) _item.get("discontinue");
-        } else {
         }
         logFile.addLog("RESOURCE STATUS", "CURRENT STATUS : ".concat(Boolean.toString(status)));
         resourceItem.child("discontinue").setValue(!status).addOnCompleteListener(task -> {
@@ -1043,7 +607,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
             }
         });
     }
-
 
     public void showResourceDetailsSheet(final HashMap<String, Object> _item) {
         com.google.android.material.bottomsheet.BottomSheetDialog resource_details_sheet;
@@ -1199,8 +762,8 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            sheetbinding.cashValue.setText("₹".concat(String.valueOf((long) (((Number) _item.get("price")).longValue()))));
-            sheetbinding.coinsValue.setText(String.valueOf((long) (((Number) _item.get("price")).longValue() * 5)).concat(" coins"));
+            sheetbinding.cashValue.setText("₹".concat(String.valueOf(((Number) _item.get("price")).longValue())));
+            sheetbinding.coinsValue.setText(String.valueOf(((Number) _item.get("price")).longValue() * 5).concat(" coins"));
         } else {
             sheetbinding.priceTitle.setVisibility(View.GONE);
             sheetbinding.cashValue.setVisibility(View.GONE);
@@ -1210,9 +773,8 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
         resource_details_sheet.show();
     }
 
-
     public void loadCourses() {
-        if (jsonCourseData.equals("")) {
+        if (jsonCourseData.isEmpty()) {
             try {
                 InputStream is = getContext().getAssets().open("courses.json");
                 int size = is.available();
@@ -1226,7 +788,6 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
         }
     }
 
-
     public String getCourseName(final String _courseID) {
         try {
             JSONObject allCourses = new JSONObject(jsonCourseData);
@@ -1237,7 +798,6 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
         }
         return "None";
     }
-
 
     public void navigateToResourceView(final HashMap<String, Object> _item) {
         if (_item.containsKey("type")) {
@@ -1254,7 +814,6 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
         }
     }
 
-
     public String getFormattedNumber(final double _value) {
         if (_value == 1) {
             return "1st";
@@ -1266,5 +825,403 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             return "3rd";
         }
         return String.valueOf((long) _value).concat("th");
+    }
+
+
+    public interface onResourceActionListener {
+        void showOptions(HashMap<String, Object> item);
+    }
+
+    public static class FirebaseFileDeleter {
+        public static void deleteFilesFromStorage(List<String> urlList, Context context, DeletionCallback callback) {
+            FirebaseStorage firebase_storage = FirebaseStorage.getInstance();
+            AtomicInteger deleteCount = new AtomicInteger(0);
+
+            if (urlList.isEmpty()) {
+                callback.onAllDeleted();
+                return;
+            }
+
+            LogUtils staticLog = new LogUtils(context);
+
+            for (String url : urlList) {
+                try {
+                    StorageReference fileRef = firebase_storage.getReference().child(extractStoragePathFromURL(url));
+                    staticLog.addLog("RESOURCE DELETE", "DELETING : ".concat(fileRef.getPath()));
+                    fileRef.delete().addOnSuccessListener(unused -> {
+                        if (deleteCount.incrementAndGet() == urlList.size()) {
+                            callback.onAllDeleted();
+                        }
+                    }).addOnFailureListener(callback::onError);
+                } catch (Exception e) {
+                    callback.onError(e);
+                    return;
+                }
+            }
+        }
+
+        public interface DeletionCallback {
+            void onAllDeleted();
+
+            void onError(Exception e);
+        }
+    }
+
+    public static class FilesDownloader {
+        public static void downloadFiles(Context context, List<String> fileURLsList, String folderName, DownloadCallback callback) {
+            File internalDir = new File(context.getFilesDir(), folderName);
+
+            FirebaseStorage storage = FirebaseStorage.getInstance();
+            int totalFiles = fileURLsList.size();
+            AtomicInteger downloadedCount = new AtomicInteger(0);
+
+            LogUtils staticLog = new LogUtils(context);
+
+
+            for (String url : fileURLsList) {
+                String storagePath = extractStoragePathFromURL(url);
+                StorageReference fileRef = storage.getReference().child(storagePath);
+
+                staticLog.addLog("RESOURCE DOWNLOAD", "DOWNLOADING RESOURCE : ".concat(storagePath));
+
+                String fileName = storagePath.substring(storagePath.indexOf("/"));
+
+                if (!internalDir.exists()) {
+                    internalDir.mkdirs();
+                }
+
+                File localFile = new File(internalDir, fileName);
+
+                fileRef.getFile(localFile).addOnSuccessListener(aVoid -> {
+                    staticLog.addLog("RESOURCE DOWNLOAD", "FILE DOWNLOADED SUCCESSFULLY");
+                    if (downloadedCount.incrementAndGet() == totalFiles) {
+                        callback.onDownloadComplete();
+                    }
+                }).addOnFailureListener(callback::onDownloadFailed);
+            }
+        }
+
+        public interface DownloadCallback {
+            void onDownloadComplete();
+
+            void onDownloadFailed(Exception e);
+        }
+    }
+
+    public static class FolderUtils {
+
+        public static boolean deleteFolder(Context context, String folderName) {
+            File internalDir = new File(context.getFilesDir(), folderName);
+            return deleteRecursively(internalDir);
+        }
+
+        private static boolean deleteRecursively(File fileOrDirectory) {
+            if (fileOrDirectory != null && fileOrDirectory.exists()) {
+                if (fileOrDirectory.isDirectory()) {
+                    File[] children = fileOrDirectory.listFiles();
+                    if (children != null) {
+                        for (File child : children) {
+                            deleteRecursively(child);
+                        }
+                    }
+                }
+                return fileOrDirectory.delete();
+            }
+            return false;
+        }
+    }
+
+    public class resourcesAdapter extends RecyclerView.Adapter<resourcesAdapter.ViewHolder> {
+
+        private final ArrayList<HashMap<String, Object>> _data = new ArrayList<>();
+        private final onResourceActionListener listener;
+        private int _lastPosition = -1; // Used to track animations
+
+
+        public resourcesAdapter(onResourceActionListener listener) {
+            this.listener = listener;
+            setHasStableIds(true);
+        }
+
+        public void updateData(List<HashMap<String, Object>> newData) {
+            DiffUtil.DiffResult result = DiffUtil.calculateDiff(new ResourceDiffCallback(_data, newData));
+            _data.clear();
+            _data.addAll(newData);
+            result.dispatchUpdatesTo(this);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            Object id = _data.get(position).get("id");
+            return id != null ? id.toString().hashCode() : position;
+        }
+
+        @NonNull
+        @Override
+        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            LayoutInflater _inflater = LayoutInflater.from(parent.getContext());
+            View _v = _inflater.inflate(R.layout.resource_item_card_full, parent, false);
+
+            return new ViewHolder(_v);
+        }
+
+        @Override
+        public void onBindViewHolder(ViewHolder _holder, final int _position) {
+            View _view = _holder.itemView;
+            ResourceItemCardFullBinding binding = ResourceItemCardFullBinding.bind(_view);
+            RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            _view.setLayoutParams(_lp);
+
+            // UI design
+            binding.iconMoreOptions.setVisibility(View.VISIBLE);
+            PrepNestUtil.roundViewWithRipple(binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
+            binding.uploadDateTxt.setBackground(new GradientDrawable() {
+                public GradientDrawable getIns(int a, int b) {
+                    this.setCornerRadius(a);
+                    this.setColor(b);
+                    return this;
+                }
+            }.getIns((int) 360, 0xFFF5F5F5));
+            binding.bestChoiceTag.setBackground(new GradientDrawable() {
+                public GradientDrawable getIns(int a, int b) {
+                    this.setCornerRadius(a);
+                    this.setColor(b);
+                    return this;
+                }
+            }.getIns((int) 360, 0xFF000000));
+            binding.recommendedTag.setBackground(new GradientDrawable() {
+                public GradientDrawable getIns(int a, int b) {
+                    this.setCornerRadius(a);
+                    this.setColor(b);
+                    return this;
+                }
+            }.getIns((int) 360, 0xFF000000));
+            // UI End
+
+
+            HashMap<String, Object> item = _data.get(_position);
+
+            if (item.containsKey("status")) {
+                binding.statusTxt.setText(item.get("status").toString());
+                binding.statusTxt.setVisibility(View.VISIBLE);
+                switch (item.get("status").toString()) {
+                    case "pending":
+                        binding.statusTxt.setTextColor(0xFFF57C00);
+                        binding.statusTxt.setBackground(new GradientDrawable() {
+                            public GradientDrawable getIns(int a, int b) {
+                                this.setCornerRadius(a);
+                                this.setColor(b);
+                                return this;
+                            }
+                        }.getIns((int) 360, 0xFFFFF3E0));
+                        break;
+
+                    case "failed":
+                        binding.statusTxt.setTextColor(0xFFE53935);
+                        binding.statusTxt.setBackground(new GradientDrawable() {
+                            public GradientDrawable getIns(int a, int b) {
+                                this.setCornerRadius(a);
+                                this.setColor(b);
+                                return this;
+                            }
+                        }.getIns((int) 360, 0xFFFFEBEE));
+                        break;
+
+                    case "verified":
+                        if (item.containsKey("discontinue")) {
+                            if (item.get("discontinue").toString().equals("true")) {
+                                binding.statusTxt.setBackground(new GradientDrawable() {
+                                    public GradientDrawable getIns(int a, int b) {
+                                        this.setCornerRadius(a);
+                                        this.setColor(b);
+                                        return this;
+                                    }
+                                }.getIns((int) 360, 0xFFF5F5F5));
+                                binding.statusTxt.setTextColor(0xFF757575);
+                                binding.statusTxt.setText("discontinue");
+                                binding.statusTxt.setVisibility(View.VISIBLE);
+                            } else {
+                                binding.statusTxt.setVisibility(View.GONE);
+                            }
+                        } else {
+                            binding.statusTxt.setVisibility(View.GONE);
+                        }
+                        break;
+
+                    default:
+                        binding.statusTxt.setTextColor(0xFF757575);
+                        binding.statusTxt.setVisibility(View.VISIBLE);
+                }
+            } else {
+                binding.statusTxt.setVisibility(View.VISIBLE);
+                binding.statusTxt.setText("pending");
+                binding.statusTxt.setTextColor(0xFFF57C00);
+                binding.statusTxt.setBackground(new GradientDrawable() {
+                    public GradientDrawable getIns(int a, int b) {
+                        this.setCornerRadius(a);
+                        this.setColor(b);
+                        return this;
+                    }
+                }.getIns((int) 360, 0xFFFFF3E0));
+            }
+
+            if (item.containsKey("subject")) {
+                binding.subjectNameTxt.setText(item.get("subject").toString());
+                binding.subjectNameTxt.setBackground(new GradientDrawable() {
+                    public GradientDrawable getIns(int a, int b) {
+                        this.setCornerRadius(a);
+                        this.setColor(b);
+                        return this;
+                    }
+                }.getIns((int) 360, 0xFFF5F5F5));
+                binding.subjectNameTxt.setVisibility(View.VISIBLE);
+            } else {
+                binding.subjectNameTxt.setText("None");
+                binding.subjectNameTxt.setVisibility(View.VISIBLE);
+            }
+
+
+            if (item.containsKey("resource title")) {
+                binding.title.setText(item.get("resource title").toString());
+            } else {
+                binding.title.setText("No name");
+            }
+
+            if (item.containsKey("type")) {
+                if (item.get("type").toString().equals("paper")) {
+                    binding.image.setImageResource(R.drawable.previous_paper);
+                } else {
+                    binding.image.setImageResource(R.drawable.short_notes);
+                }
+            } else {
+                binding.image.setVisibility(View.INVISIBLE);
+            }
+            if (item.containsKey("best choice")) {
+                if (item.get("best choice").toString().equals("true")) {
+                    binding.bestChoiceTag.setVisibility(View.VISIBLE);
+                } else {
+                    binding.bestChoiceTag.setVisibility(View.GONE);
+                }
+            } else {
+                binding.bestChoiceTag.setVisibility(View.GONE);
+            }
+            if (item.containsKey("recommended")) {
+                if (item.get("recommended").toString().equals("true")) {
+                    binding.recommendedTag.setVisibility(View.VISIBLE);
+                } else {
+                    binding.recommendedTag.setVisibility(View.GONE);
+                }
+            } else {
+                binding.recommendedTag.setVisibility(View.GONE);
+            }
+            if (item.containsKey("date of upload")) {
+                binding.uploadDateTxt.setText(formatTimeDifference(item.get("date of upload").toString()));
+                binding.uploadDateTxt.setVisibility(View.VISIBLE);
+            } else {
+                binding.uploadDateTxt.setVisibility(View.GONE);
+            }
+
+
+            ViewGroup.MarginLayoutParams paramscontainer =
+                    (ViewGroup.MarginLayoutParams) binding.container.getLayoutParams();
+
+            if (_position == (_data.size() - 1)) {
+                paramscontainer.setMargins(
+                        (int) convertToDp(20),
+                        (int) convertToDp(10),
+                        (int) convertToDp(20),
+                        (int) convertToDp(10)
+                );
+            } else {
+                paramscontainer.setMargins(
+                        (int) convertToDp(20),
+                        (int) convertToDp(10),
+                        (int) convertToDp(20),
+                        0
+                );
+            }
+
+            paramscontainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            paramscontainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+
+            binding.container.setLayoutParams(paramscontainer);
+
+
+            binding.iconMoreOptions.setOnClickListener(v -> {
+                int pos = _holder.getAdapterPosition();
+                if (pos != RecyclerView.NO_POSITION && listener != null) {
+                    listener.showOptions(_data.get(pos));
+                }
+            });
+
+
+            binding.container.setOnClickListener(_view1 -> {
+                int pos = _holder.getAdapterPosition();
+                if (pos != RecyclerView.NO_POSITION) {
+                    logFile.addLog("RESOURCE OPEN", "OPENING RESOURCE ITEM");
+                    openResource(_data.get(pos));
+                }
+            });
+        }
+
+        @Override
+        public int getItemCount() {
+            return _data.size();
+        }
+
+        // Custom animation method
+        private void setAnimation(View viewToAnimate, int position) {
+            if (position > _lastPosition) {
+                Animation animation = AnimationUtils.loadAnimation(viewToAnimate.getContext(), android.R.anim.fade_in);
+                viewToAnimate.startAnimation(animation);
+                _lastPosition = position;
+            }
+        }
+
+        // Optional: clear animation on view detached (prevents flickering)
+        @Override
+        public void onViewDetachedFromWindow(ViewHolder holder) {
+            holder.itemView.clearAnimation();
+        }
+
+        public class ViewHolder extends RecyclerView.ViewHolder {
+            public ViewHolder(View v) {
+                super(v);
+            }
+        }
+    }
+
+    public class ResourceDiffCallback extends DiffUtil.Callback {
+
+        private final List<HashMap<String, Object>> oldList;
+        private final List<HashMap<String, Object>> newList;
+
+        public ResourceDiffCallback(List<HashMap<String, Object>> oldList, List<HashMap<String, Object>> newList) {
+            this.oldList = oldList;
+            this.newList = newList;
+        }
+
+        @Override
+        public int getOldListSize() {
+            return oldList.size();
+        }
+
+        @Override
+        public int getNewListSize() {
+            return newList.size();
+        }
+
+        @Override
+        public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
+            String oldId = String.valueOf(oldList.get(oldItemPosition).get("id"));
+            String newId = String.valueOf(newList.get(newItemPosition).get("id"));
+            return oldId.equals(newId);
+        }
+
+        @Override
+        public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
+            return oldList.get(oldItemPosition).equals(newList.get(newItemPosition));
+        }
+
     }
 }

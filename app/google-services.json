@@ -8,13 +8,16 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:575800512668:android:22cbe82e32ce56236e5d59",
+        "mobilesdk_app_id": "1:575800512668:android:cad38d3a668ae45f6e5d59",
         "android_client_info": {
-          "package_name": "com.cocode.prepnest"
+          "package_name": "com.app.prepnest.admin"
         }
       },
       "oauth_client": [],
       "api_key": [
+        {
+          "current_key": "AIzaSyDTz1fQSvorCOlzbBwkLopxicwsrghopkQ"
+        },
         {
           "current_key": "AIzaSyCWNFAtPMthaJ4JgSlSDm427cEqVTeRkJ4"
         }
@@ -27,13 +30,16 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:575800512668:android:cad38d3a668ae45f6e5d59",
+        "mobilesdk_app_id": "1:575800512668:android:4d8563ff2a53ebdb6e5d59",
         "android_client_info": {
-          "package_name": "com.app.prepnest.admin"
+          "package_name": "com.cocode.prepnest"
         }
       },
       "oauth_client": [],
       "api_key": [
+        {
+          "current_key": "AIzaSyDTz1fQSvorCOlzbBwkLopxicwsrghopkQ"
+        },
         {
           "current_key": "AIzaSyCWNFAtPMthaJ4JgSlSDm427cEqVTeRkJ4"
         }

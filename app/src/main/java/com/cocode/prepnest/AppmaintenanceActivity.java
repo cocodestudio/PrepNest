@@ -10,12 +10,10 @@ import com.google.firebase.FirebaseApp;
 
 public class AppmaintenanceActivity extends AppCompatActivity {
 
-    private AppmaintenanceBinding binding;
-
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
         super.onCreate(_savedInstanceState);
-        binding = AppmaintenanceBinding.inflate(getLayoutInflater());
+        AppmaintenanceBinding binding = AppmaintenanceBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         initialize(_savedInstanceState);
         FirebaseApp.initializeApp(this);
@@ -28,6 +26,7 @@ public class AppmaintenanceActivity extends AppCompatActivity {
     private void initializeLogic() {
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
 }

@@ -1,120 +1,108 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/wrapper_layout"
+    android:background="@color/white"
     android:fitsSystemWindows="true">
 
-    <LinearLayout
-        android:id="@+id/background"
+    <TextView
+        android:id="@+id/title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="40dp"
+        android:fontFamily="@font/bold"
+        android:paddingStart="30dp"
+        android:paddingEnd="0dp"
+        android:text="@string/referral"
+        android:textColor="#000000"
+        android:textSize="30sp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/skip_txt"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="20dp"
+        android:background="@drawable/ripple_mask_only_light"
+        android:fontFamily="@font/medium"
+        android:paddingLeft="10dp"
+        android:paddingTop="5dp"
+        android:paddingRight="10dp"
+        android:paddingBottom="5dp"
+        android:text="@string/skip"
+        android:textColor="#9E9E9E"
+        android:textSize="12sp"
+        app:layout_constraintBottom_toBottomOf="@+id/title"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/title" />
+
+    <EditText
+        android:id="@+id/edittext"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#FFFFFF"
-        android:orientation="vertical">
+        android:layout_height="wrap_content"
+        android:layout_marginStart="30dp"
+        android:layout_marginEnd="30dp"
+        android:background="@drawable/rounded_shape_gray"
+        android:fontFamily="@font/semibold"
+        android:gravity="center_vertical"
+        android:hint="@string/enter_referral_code"
+        android:imeOptions="actionDone"
+        android:importantForAutofill="no"
+        android:inputType="text"
+        android:paddingLeft="10dp"
+        android:paddingTop="12dp"
+        android:paddingRight="10dp"
+        android:paddingBottom="12dp"
+        android:singleLine="true"
+        android:textColor="#000000"
+        android:textColorHint="#9E9E9E"
+        android:textSize="12sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
-        <LinearLayout
-            android:id="@+id/upper_container"
-            android:layout_width="match_parent"
+    <TextView
+        android:id="@+id/error_txt"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:text="@string/invalid_referral_code"
+        android:textSize="10sp"
+        android:textColor="#000000"
+        android:fontFamily="@font/medium"
+        android:visibility="invisible"
+        tools:ignore="SmallSp"
+        app:layout_constraintTop_toBottomOf="@id/edittext"
+        android:layout_marginStart="30dp"
+        app:layout_constraintLeft_toLeftOf="parent"/>
+
+    <LinearLayout
+        android:id="@+id/add_btn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="30dp"
+        android:layout_marginTop="30dp"
+        android:layout_marginEnd="30dp"
+        android:background="@drawable/ripple_bg_black"
+        android:gravity="center"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toBottomOf="@id/edittext">
+
+        <TextView
+            android:id="@+id/add_btn_text"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingLeft="30dp"
-            android:paddingRight="20dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:layout_weight="1">
-
-            <TextView
-                android:id="@+id/title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Referral"
-                android:textSize="30sp"
-                android:textColor="#000000"
-                android:layout_weight="1"
-                android:fontFamily="@font/bold" />
-
-            <TextView
-                android:id="@+id/skip_txt"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingLeft="10dp"
-                android:paddingTop="5dp"
-                android:paddingRight="10dp"
-                android:paddingBottom="5dp"
-                android:text="Skip"
-                android:textSize="12sp"
-                android:textColor="#9E9E9E"
-                android:fontFamily="@font/medium"
-                android:background="@drawable/ripple_mask_only_light" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/edittext_container"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingLeft="30dp"
-            android:paddingRight="30dp"
-            android:gravity="center_vertical"
-            android:orientation="vertical"
-            android:layout_weight="4">
-
-            <LinearLayout
-                android:id="@+id/et_container"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:background="@drawable/rounded_shape_gray">
-
-                <EditText
-                    android:id="@+id/edittext"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingLeft="10dp"
-                    android:paddingTop="12dp"
-                    android:paddingRight="10dp"
-                    android:paddingBottom="12dp"
-                    android:background="@android:color/transparent"
-                    android:gravity="center_vertical"
-                    android:textSize="12sp"
-                    android:textColor="#000000"
-                    android:hint="Enter referral code"
-                    android:textColorHint="#9E9E9E"
-                    android:singleLine="true"
-                    android:imeOptions="actionDone"
-                    android:fontFamily="@font/semibold" />
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/error_txt"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="Invalid referral code"
-                android:textSize="10sp"
-                android:textColor="#000000"
-                android:fontFamily="@font/medium"
-                android:visibility="gone" />
-
-            <LinearLayout
-                android:id="@+id/add_btn"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="40dp"
-                android:layout_marginBottom="10dp"
-                android:gravity="center_horizontal|center_vertical"
-                android:orientation="horizontal"
-                android:background="@drawable/ripple_bg_black">
-
-                <TextView
-                    android:id="@+id/add_btn_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="15dp"
-                    android:layout_marginBottom="15dp"
-                    android:text="Add referral"
-                    android:textSize="14sp"
-                    android:textColor="#FFFFFF"
-                    android:fontFamily="@font/semibold" />
-            </LinearLayout>
-        </LinearLayout>
+            android:layout_marginTop="15dp"
+            android:layout_marginBottom="15dp"
+            android:fontFamily="@font/semibold"
+            android:text="@string/add_referral"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
     </LinearLayout>
-</LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

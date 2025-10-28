@@ -7,9 +7,9 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.viewpager.widget.PagerAdapter;
 import androidx.viewpager.widget.ViewPager.OnPageChangeListener;
@@ -26,14 +26,11 @@ import java.util.HashMap;
 
 public class OnboardingActivity extends AppCompatActivity {
 
+    private final ArrayList<HashMap<String, Object>> datalist = new ArrayList<>();
+    private final Intent toLogin = new Intent();
+    private final Intent toSignup = new Intent();
     private OnboardingBinding binding;
-    private HashMap<String, Object> datamap = new HashMap<>();
     private HashMap<String, Object> features_visit_map = new HashMap<>();
-
-    private ArrayList<HashMap<String, Object>> datalist = new ArrayList<>();
-
-    private Intent toLogin = new Intent();
-    private Intent toSignup = new Intent();
     private SharedPreferences features_visit;
 
     @Override
@@ -61,7 +58,7 @@ public class OnboardingActivity extends AppCompatActivity {
                     features_visit_map = new Gson().fromJson(features_visit.getString("features visit", ""), new TypeToken<HashMap<String, Object>>() {
                     }.getType());
                     features_visit_map.put("onboarding", "true");
-                    features_visit.edit().putString("features visit", new Gson().toJson(features_visit_map)).commit();
+                    features_visit.edit().putString("features visit", new Gson().toJson(features_visit_map)).apply();
                     PrepNestUtil.TransitionManager(binding.btnsContainer, 200);
                     binding.moveToNextBtn.setVisibility(View.GONE);
                     binding.accountBtnsContainer.setVisibility(View.VISIBLE);
@@ -74,31 +71,20 @@ public class OnboardingActivity extends AppCompatActivity {
             }
         });
 
-        binding.moveToNextBtn.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                binding.viewpager.setCurrentItem((int) binding.viewpager.getCurrentItem() + 1);
-            }
+        binding.moveToNextBtn.setOnClickListener(_view -> binding.viewpager.setCurrentItem(binding.viewpager.getCurrentItem() + 1));
+
+        binding.loginBtn.setOnClickListener(_view -> {
+            toLogin.setClass(OnboardingActivity.this, LoginActivity.class);
+            startActivity(toLogin);
+            overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+            finish();
         });
 
-        binding.loginBtn.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                toLogin.setClass(OnboardingActivity.this, LoginActivity.class);
-                startActivity(toLogin);
-                overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                finish();
-            }
-        });
-
-        binding.signUpBtn.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                toSignup.setClass(OnboardingActivity.this, SignupActivity.class);
-                startActivity(toSignup);
-                overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                finish();
-            }
+        binding.signUpBtn.setOnClickListener(_view -> {
+            toSignup.setClass(OnboardingActivity.this, SignupActivity.class);
+            startActivity(toSignup);
+            overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+            finish();
         });
     }
 
@@ -107,7 +93,7 @@ public class OnboardingActivity extends AppCompatActivity {
     }
 
     public void initializeViewPager() {
-        datamap = new HashMap<>();
+        HashMap<String, Object> datamap = new HashMap<>();
         datamap.put("title", "Welcome");
         datamap.put("subtext", getString(R.string.app_introduction_msg));
         datalist.add(datamap);
@@ -120,7 +106,7 @@ public class OnboardingActivity extends AppCompatActivity {
         datamap.put("subtext", getString(R.string.app_earn_coins_msg));
         datalist.add(datamap);
         binding.viewpager.setAdapter(new ViewpagerAdapter(datalist));
-        ((PagerAdapter) binding.viewpager.getAdapter()).notifyDataSetChanged();
+        binding.viewpager.getAdapter().notifyDataSetChanged();
     }
 
 
@@ -130,6 +116,7 @@ public class OnboardingActivity extends AppCompatActivity {
         PrepNestUtil.roundViewWithRipple(binding.signUpBtn, "#FAFAFA", 15, 0, "#000000", "#E0E0E0");
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
     public class ViewpagerAdapter extends PagerAdapter {
@@ -153,32 +140,33 @@ public class OnboardingActivity extends AppCompatActivity {
         }
 
         @Override
-        public boolean isViewFromObject(View _view, Object _object) {
+        public boolean isViewFromObject(@NonNull View _view, @NonNull Object _object) {
             return _view == _object;
         }
 
         @Override
-        public void destroyItem(ViewGroup _container, int _position, Object _object) {
+        public void destroyItem(ViewGroup _container, int _position, @NonNull Object _object) {
             _container.removeView((View) _object);
         }
 
         @Override
-        public int getItemPosition(Object _object) {
+        public int getItemPosition(@NonNull Object _object) {
             return super.getItemPosition(_object);
         }
 
         @Override
         public CharSequence getPageTitle(int pos) {
             // Use the Activity Event (onTabLayoutNewTabAdded) in order to use this method
-            return "page " + String.valueOf(pos);
+            return "page " + pos;
         }
 
+        @NonNull
         @Override
-        public Object instantiateItem(ViewGroup _container, final int _position) {
+        public Object instantiateItem(@NonNull ViewGroup _container, final int _position) {
             OnboardingItemBinding binding = OnboardingItemBinding.inflate(LayoutInflater.from(_context), _container, false);
 
-            binding.title.setText(_data.get((int) _position).get("title").toString());
-            binding.subtext.setText(_data.get((int) _position).get("subtext").toString());
+            binding.title.setText(_data.get(_position).get("title").toString());
+            binding.subtext.setText(_data.get(_position).get("subtext").toString());
             if (_position == 0) {
                 binding.image.setImageResource(R.drawable.welcome_illus);
             }

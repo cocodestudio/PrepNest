@@ -16,10 +16,6 @@ public class RequestNetwork {
         this.activity = activity;
     }
 
-    public void setHeaders(HashMap<String, Object> headers) {
-        this.headers = headers;
-    }
-
     public void setParams(HashMap<String, Object> params, int requestType) {
         this.params = params;
         this.requestType = requestType;
@@ -31,6 +27,10 @@ public class RequestNetwork {
 
     public HashMap<String, Object> getHeaders() {
         return headers;
+    }
+
+    public void setHeaders(HashMap<String, Object> headers) {
+        this.headers = headers;
     }
 
     public Activity getActivity() {

@@ -4,18 +4,26 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
-import android.view.View.OnClickListener;
-import android.widget.EditText;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.cocode.prepnest.databinding.CashmanageBinding;
 import com.cocode.prepnest.databinding.RequestPayoutBinding;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.LoadAdError;
+import com.google.android.gms.ads.MobileAds;
+import com.google.android.gms.ads.OnUserEarnedRewardListener;
+import com.google.android.gms.ads.rewarded.RewardItem;
+import com.google.android.gms.ads.rewarded.RewardedAd;
+import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.gson.Gson;
@@ -23,31 +31,36 @@ import com.google.gson.reflect.TypeToken;
 
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.Map;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 
 public class CashmanageActivity extends AppCompatActivity {
 
+    private RewardedAd rewardedAd;
+    private final FirebaseAuth auth = FirebaseAuth.getInstance();
+    private final DatabaseReference users = FirebaseDatabase.getInstance().getReference("users");
+    private final DatabaseReference requests = FirebaseDatabase.getInstance().getReference("requests/payout_requests");
+    private final DatabaseReference transaction_history = FirebaseDatabase.getInstance().getReference("transactions_history");
+    private final Intent toTransactionHistory = new Intent();
+    private final Intent toAddCash = new Intent();
     private CashmanageBinding binding;
     private HashMap<String, Object> userData = new HashMap<>();
     private HashMap<String, Object> dataMap = new HashMap<>();
-    private FirebaseAuth auth = FirebaseAuth.getInstance();
-    private DatabaseReference users = FirebaseDatabase.getInstance().getReference("users");
-    private DatabaseReference requests = FirebaseDatabase.getInstance().getReference("requests/payout_requests");
-    private DatabaseReference transaction_history = FirebaseDatabase.getInstance().getReference("transactions_history");
     private double newAmount = 0;
     private LogUtils logFile;
     private String keyRequest = "";
     private String keyHistory = "";
     private NetworkMonitor networkMonitor;
-
-    private Intent toTransactionHistory = new Intent();
-    private Intent toAddCash = new Intent();
     private com.google.android.material.bottomsheet.BottomSheetDialog request_payout_sheet;
 
     @Override
@@ -62,56 +75,40 @@ public class CashmanageActivity extends AppCompatActivity {
 
     private void initialize(Bundle _savedInstanceState) {
 
-        binding.coinContainer.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
+        binding.coinContainer.setOnClickListener(_view -> {
 
+        });
+
+        binding.cashContainer.setOnClickListener(_view -> binding.addCashOp.performClick());
+
+        binding.addCashOp.setOnClickListener(_view -> {
+            toAddCash.setClass(CashmanageActivity.this, AddcashActivity.class);
+            toAddCash.putExtra("name", userData.get("name").toString());
+            startActivity(toAddCash);
+            overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
+        });
+
+        binding.payoutOp.setOnClickListener(_view -> {
+            if (userData.containsKey("cash")) {
+                showRequestPayoutSheet();
+            } else {
+                PrepNestUtil.showToast(CashmanageActivity.this, "Insufficient balance to payout!");
             }
         });
 
-        binding.cashContainer.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                binding.addCashOp.performClick();
-            }
+        binding.historyOp.setOnClickListener(_view -> {
+            toTransactionHistory.setClass(CashmanageActivity.this, TransactionhistoryActivity.class);
+            startActivity(toTransactionHistory);
+            overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
         });
 
-        binding.addCashOp.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                toAddCash.setClass(CashmanageActivity.this, AddcashActivity.class);
-                toAddCash.putExtra("name", userData.get("name").toString());
-                startActivity(toAddCash);
-                overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-            }
+        binding.earnCoinsOp.setOnClickListener(_view -> {
+            showRewardedAds();
         });
 
-        binding.payoutOp.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                if (userData.containsKey("cash")) {
-                    showRequestPayoutSheet();
-                } else {
-                    PrepNestUtil.showToast(CashmanageActivity.this, "Insufficient balance to payout!");
-                }
-            }
-        });
-
-        binding.historyOp.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                toTransactionHistory.setClass(CashmanageActivity.this, TransactionhistoryActivity.class);
-                startActivity(toTransactionHistory);
-                overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-            }
-        });
-
-        binding.backIcon.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                finish();
-                overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
-            }
+        binding.backIcon.setOnClickListener(_view -> {
+            finish();
+            overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
         });
     }
 
@@ -127,8 +124,135 @@ public class CashmanageActivity extends AppCompatActivity {
                 binding.backIcon.performClick();
             }
         });
+        loadBannerAd();
+        loadRewardedAd();
     }
 
+    private void loadBannerAd() {
+        MobileAds.initialize(this, initializationStatus -> {
+        });
+        AdRequest adRequest = new AdRequest.Builder().build();
+        binding.adView.loadAd(adRequest);
+    }
+
+    private void loadRewardedAd() {
+        AdRequest adRequest = new AdRequest.Builder().build();
+        RewardedAd.load(
+                this,
+                "ca-app-pub-3940256099942544/5224354917",
+                adRequest,
+                new RewardedAdLoadCallback() {
+                    @Override
+                    public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
+                        super.onAdFailedToLoad(loadAdError);
+                        rewardedAd = null;
+                        PrepNestUtil.showToast(CashmanageActivity.this, "Failed to load ad");
+                    }
+
+                    @Override
+                    public void onAdLoaded(@NonNull RewardedAd ad) {
+                        super.onAdLoaded(ad);
+                        rewardedAd = ad;
+                    }
+                }
+        );
+    }
+
+    private void showRewardedAds() {
+        if (rewardedAd != null) {
+            rewardedAd.show(
+                    this,
+                    new OnUserEarnedRewardListener() {
+                        @Override
+                        public void onUserEarnedReward(@NonNull RewardItem rewardItem) {
+                            PrepNestUtil.showLoadingDialog(CashmanageActivity.this, true);
+                            addRewardToUser();
+                            loadRewardedAd();
+                        }
+                    }
+            );
+        } else {
+            PrepNestUtil.showToast(CashmanageActivity.this, "Ad is not loaded, try again later");
+            loadRewardedAd();
+        }
+    }
+
+    public void addRewardToUser() {
+        FirebaseUser user = auth.getCurrentUser();
+
+        if (user != null) {
+            // Force refresh token to make sure it's valid
+            user.getIdToken(true).addOnSuccessListener(result -> {
+                String idToken = result.getToken();
+
+                // Prepare JSON payload
+                Map<String, Object> data = new HashMap<>();
+                data.put("userId", user.getUid());
+                data.put("timestamp", String.valueOf(System.currentTimeMillis()));
+
+                // Convert to JSON string
+                JSONObject json = new JSONObject(data);
+
+                // Send HTTP POST request using OkHttp
+                OkHttpClient client = new OkHttpClient();
+
+                RequestBody requestBody = RequestBody.create(json.toString(), MediaType.parse("application/json; charset=utf-8"));
+
+                Request request = new Request.Builder().url("https://us-central1-prepnest-65133.cloudfunctions.net/rewardUserWithCoins").post(requestBody).addHeader("Authorization", "Bearer " + idToken) // <-- add token
+                        .build();
+
+                client.newCall(request).enqueue(new Callback() {
+                    @Override
+                    public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                        Log.e("ADD_REWARD", "Failed to add reward: " + e.getMessage());
+                        runOnUiThread(() -> {
+                            PrepNestUtil.showLoadingDialog(CashmanageActivity.this, false);
+                            PrepNestUtil.showToast(CashmanageActivity.this, "An unknown error occurred");
+                        });
+                    }
+
+                    @Override
+                    public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                        final String resp = response.body() != null ? response.body().string() : "No response";
+                        Log.d("ADD_REWARD", "Response: " + resp);
+                        if (response.isSuccessful()) {
+                            runOnUiThread(() -> {
+                                PrepNestUtil.showLoadingDialog(CashmanageActivity.this, false);
+                                PrepNestUtil.showToast(CashmanageActivity.this, "Reward added successfully");
+                                if (userData.containsKey("coins")) {
+                                    Object value = userData.get("coins");
+                                    long money;
+
+                                    if (value instanceof Long) {
+                                        money = (Long) value + 5;
+                                    } else if (value instanceof Double) {
+                                        money = ((Double) value).longValue() + 5;
+                                    } else if (value instanceof Integer) {
+                                        money = ((Integer) value).longValue() + 5;
+                                    } else {
+                                        money = 0L; // Or handle error
+                                    }
+                                    userData.put("coins", money);
+                                    binding.coinAmountTxt.setText(String.valueOf(money).concat(" coins"));
+                                } else {
+                                    binding.coinAmountTxt.setText("0 coins");
+                                }
+
+                            });
+                        } else {
+                            runOnUiThread(() -> {
+                                PrepNestUtil.showLoadingDialog(CashmanageActivity.this, false);
+                                PrepNestUtil.showToast(CashmanageActivity.this, "An unknown error occurred");
+                            });
+                        }
+                    }
+                });
+
+            }).addOnFailureListener(e -> Log.e("FCM_CLIENT", "Failed to get token: " + e.getMessage()));
+        } else {
+            Log.e("FCM_CLIENT", "User not signed in");
+        }
+    }
 
     @Override
     public void onResume() {
@@ -148,8 +272,10 @@ public class CashmanageActivity extends AppCompatActivity {
         PrepNestUtil.roundViewWithRipple(binding.addCashOp, "#FAFAFA", 30, 0, "#9E9E9E", "#E0E0E0");
         PrepNestUtil.roundViewWithRipple(binding.payoutOp, "#FAFAFA", 30, 0, "#9E9E9E", "#E0E0E0");
         PrepNestUtil.roundViewWithRipple(binding.historyOp, "#FAFAFA", 30, 0, "#9E9E9E", "#E0E0E0");
+        PrepNestUtil.roundViewWithRipple(binding.earnCoinsOp, "#FAFAFA", 30, 0, "#9E9E9E", "#E0E0E0");
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.changeNavBarColor(this, true);
     }
 
 
@@ -173,7 +299,7 @@ public class CashmanageActivity extends AppCompatActivity {
                 } else {
                     money = 0L; // Or handle error
                 }
-                binding.coinAmountTxt.setText(String.valueOf((long) (money)).concat(" coins"));
+                binding.coinAmountTxt.setText(String.valueOf(money).concat(" coins"));
             } else {
                 binding.coinAmountTxt.setText("0 coins");
             }
@@ -190,7 +316,7 @@ public class CashmanageActivity extends AppCompatActivity {
                 } else {
                     money = 0L; // Or handle error
                 }
-                binding.cashAmountTxt.setText("₹ ".concat(String.valueOf((long) (money))));
+                binding.cashAmountTxt.setText("₹ ".concat(String.valueOf(money)));
             } else {
                 binding.cashAmountTxt.setText("₹ 0");
             }
@@ -229,46 +355,34 @@ public class CashmanageActivity extends AppCompatActivity {
         PrepNestUtil.roundViewWithRipple(sheetbinding.amount2Container, "#FAFAFA", 15, 0, "#000000", "#E0E0E0");
         PrepNestUtil.roundViewWithRipple(sheetbinding.amount3Container, "#FAFAFA", 15, 0, "#000000", "#E0E0E0");
         sheetbinding.amountEdittext.setFocusableInTouchMode(true);
-        sheetbinding.amount1Container.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                sheetbinding.amountEdittext.setText(sheetbinding.amountTxt1.getText().toString());
-                ((EditText) sheetbinding.amountEdittext).setSelection((int) sheetbinding.amountEdittext.getText().toString().length());
-            }
+        sheetbinding.amount1Container.setOnClickListener(_view -> {
+            sheetbinding.amountEdittext.setText(sheetbinding.amountTxt1.getText().toString());
+            sheetbinding.amountEdittext.setSelection(sheetbinding.amountEdittext.getText().toString().length());
         });
-        sheetbinding.amount2Container.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                sheetbinding.amountEdittext.setText(sheetbinding.amountTxt2.getText().toString());
-                ((EditText) sheetbinding.amountEdittext).setSelection((int) sheetbinding.amountEdittext.getText().toString().length());
-            }
+        sheetbinding.amount2Container.setOnClickListener(_view -> {
+            sheetbinding.amountEdittext.setText(sheetbinding.amountTxt2.getText().toString());
+            sheetbinding.amountEdittext.setSelection(sheetbinding.amountEdittext.getText().toString().length());
         });
-        sheetbinding.amount3Container.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                sheetbinding.amountEdittext.setText(sheetbinding.amountTxt3.getText().toString());
-                ((EditText) sheetbinding.amountEdittext).setSelection((int) sheetbinding.amountEdittext.getText().toString().length());
-            }
+        sheetbinding.amount3Container.setOnClickListener(_view -> {
+            sheetbinding.amountEdittext.setText(sheetbinding.amountTxt3.getText().toString());
+            sheetbinding.amountEdittext.setSelection(sheetbinding.amountEdittext.getText().toString().length());
         });
-        sheetbinding.sendReqBtn.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View _view) {
-                PrepNestUtil.TransitionManager(sheetbinding.container, 150);
-                if (sheetbinding.amountEdittext.getText().toString().trim().equals("")) {
-                    PrepNestUtil.showToast(CashmanageActivity.this, "Enter amount");
+        sheetbinding.sendReqBtn.setOnClickListener(_view -> {
+            PrepNestUtil.TransitionManager(sheetbinding.container, 150);
+            if (sheetbinding.amountEdittext.getText().toString().trim().isEmpty()) {
+                PrepNestUtil.showToast(CashmanageActivity.this, "Enter amount");
+            } else {
+                if ((Double.parseDouble(sheetbinding.amountEdittext.getText().toString().trim()) > Double.parseDouble(userData.get("cash").toString())) || (Double.parseDouble(sheetbinding.amountEdittext.getText().toString().trim()) < 0)) {
+                    PrepNestUtil.showToast(CashmanageActivity.this, "Insufficient balance");
                 } else {
-                    if ((Double.parseDouble(sheetbinding.amountEdittext.getText().toString().trim()) > Double.parseDouble(userData.get("cash").toString())) || (Double.parseDouble(sheetbinding.amountEdittext.getText().toString().trim()) < 0)) {
-                        PrepNestUtil.showToast(CashmanageActivity.this, "Insufficient balance");
+                    if (Double.parseDouble(sheetbinding.amountEdittext.getText().toString().trim()) < 10) {
+                        PrepNestUtil.showToast(CashmanageActivity.this, "Enter atleast ₹10");
                     } else {
-                        if (Double.parseDouble(sheetbinding.amountEdittext.getText().toString().trim()) < 10) {
-                            PrepNestUtil.showToast(CashmanageActivity.this, "Enter atleast ₹10");
+                        if (userData.containsKey("phone number")) {
+                            sendPayoutRequest(Double.parseDouble(sheetbinding.amountEdittext.getText().toString().trim()));
                         } else {
-                            if (userData.containsKey("phone number")) {
-                                sendPayoutRequest(Double.parseDouble(sheetbinding.amountEdittext.getText().toString().trim()));
-                            } else {
-                                PrepNestUtil.showToast(CashmanageActivity.this, "Link your phone number first!");
-                                request_payout_sheet.dismiss();
-                            }
+                            PrepNestUtil.showToast(CashmanageActivity.this, "Link your phone number first!");
+                            request_payout_sheet.dismiss();
                         }
                     }
                 }
@@ -290,16 +404,15 @@ public class CashmanageActivity extends AppCompatActivity {
                 keyRequest = requestRef.push().getKey();
                 dataMap = new HashMap<>();
                 dataMap.put("amount", _amount);
-                dataMap.put("timestamp", String.valueOf((long) (currentTimeInMS)));
+                dataMap.put("timestamp", String.valueOf(currentTimeInMS));
                 requestRef.child(keyRequest).setValue(dataMap).addOnCompleteListener(requestTask -> {
                     if (requestTask.isSuccessful()) {
-                        sendNotifications("admin", "Payout Request", "Payout request from '".concat(userData.get("name").toString().concat("'")));
                         DatabaseReference historyRef = transaction_history.child(auth.getCurrentUser().getUid());
                         keyHistory = historyRef.push().getKey();
                         dataMap = new HashMap<>();
                         dataMap.put("type", "cash_deduct");
                         dataMap.put("amount", _amount);
-                        dataMap.put("timestamp", String.valueOf((long) (currentTimeInMS)));
+                        dataMap.put("timestamp", String.valueOf(currentTimeInMS));
                         dataMap.put("status", "pending");
                         historyRef.child(keyHistory).setValue(dataMap).addOnCompleteListener(historyTask -> {
                             if (historyTask.isSuccessful()) {
@@ -326,67 +439,4 @@ public class CashmanageActivity extends AppCompatActivity {
             }
         });
     }
-
-
-    public void sendNotifications(final String topic, final String title, final String message) {
-        new Thread(() -> {
-            try {
-                URL url = new URL("https://us-central1-prepnest-65133.cloudfunctions.net/sendNotification");
-
-                // Open Connection
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                conn.setDoOutput(true);
-                conn.setDoInput(true);
-
-                //Create JSON Object
-                JSONObject jsonParam = new JSONObject();
-                jsonParam.put("topic", topic);
-                jsonParam.put("title", title);
-                jsonParam.put("body", message);
-
-                // Write JSON to request body
-                try (OutputStream os = conn.getOutputStream()) {
-                    byte[] input = jsonParam.toString().getBytes("utf-8");
-                    os.write(input, 0, input.length);
-                }
-
-                // Get response
-                int responseCode = conn.getResponseCode();
-                BufferedReader br;
-                if (responseCode >= 200 && responseCode < 300) {
-                    br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
-                } else {
-                    br = new BufferedReader(new InputStreamReader(conn.getErrorStream(), "utf-8"));
-                }
-
-                StringBuilder response = new StringBuilder();
-                String responseLine;
-                while ((responseLine = br.readLine()) != null) {
-                    response.append(responseLine.trim());
-                }
-                br.close();
-
-                // Show result on UI Thread
-				        /*
-		runOnUiThread(() -> {
-            _loadingDialog(false);
-			Toast.makeText(CashmanageActivity.this, "Response: " + response, Toast.LENGTH_SHORT).show();
-		});
-        */
-                conn.disconnect();
-            } catch (Exception e) {
-                e.printStackTrace();
-				        /*
-        _loadingDialog(false);
-		runOnUiThread(() -> {
-			Toast.makeText(CashmanageActivity.this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-		});
-        */
-            }
-        }).start();
-
-    }
-
 }

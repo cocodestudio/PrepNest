@@ -7,12 +7,6 @@ import java.util.List;
 
 public class ListMapUtils {
 
-    public enum SortType {
-        NUMBER,
-        STRING,
-        TIMESTAMP_STRING // timestamp stored as string in ms
-    }
-
     /**
      * Sorts a List<HashMap<String, Object>> by key with specified type.
      *
@@ -72,5 +66,11 @@ public class ListMapUtils {
         } catch (Exception e) {
             return 0L;
         }
+    }
+
+    public enum SortType {
+        NUMBER,
+        STRING,
+        TIMESTAMP_STRING // timestamp stored as string in ms
     }
 }

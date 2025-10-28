@@ -1,26 +1,24 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
-
     <LinearLayout
         android:id="@+id/container"
         android:layout_width="match_parent"
         android:layout_height="180dp"
         android:gravity="center_horizontal|center_vertical"
         android:orientation="vertical">
-
         <TextView
             android:id="@+id/title"
             android:focusable="false"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="25dp"
-            android:text="Accounts"
+            android:text=""
             android:textSize="14sp"
             android:textColor="#000000"
             android:fontFamily="@font/semibold" />
-
         <TextView
             android:id="@+id/subtext"
             android:focusable="false"
@@ -29,7 +27,7 @@
             android:paddingLeft="50dp"
             android:paddingRight="50dp"
             android:gravity="center_horizontal|center_vertical"
-            android:text="You can view and manage your account balance, recent transactions and new campaigns here."
+            android:text=""
             android:textSize="12sp"
             android:textColor="#9E9E9E"
             android:fontFamily="@font/medium" />
