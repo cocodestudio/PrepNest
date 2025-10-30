@@ -118,7 +118,7 @@ public class UserprofileActivity extends AppCompatActivity {
                 PrepNestUtil.TransitionManager(binding.container, 150);
                 PrepNestUtil.showLoadingDialog(UserprofileActivity.this, true);
                 editMode = false;
-                binding.editIcon.setImageResource(R.drawable.icon_edit_2);
+                binding.editIcon.setImageResource(R.drawable.icon_edit);
                 binding.nameEdittext.setEnabled(false);
                 binding.phnNumberEdittext.setEnabled(false);
                 binding.semesterSelectContainer.setEnabled(false);
@@ -153,7 +153,7 @@ public class UserprofileActivity extends AppCompatActivity {
                             binding.phnNmberErrorTxt.setText("Enter your phone number");
                             binding.phnNmberErrorTxt.setVisibility(View.VISIBLE);
                         } else {
-                            binding.editIcon.setImageResource(R.drawable.icon_edit_2);
+                            binding.editIcon.setImageResource(R.drawable.icon_edit);
                             binding.nameEdittext.setEnabled(false);
                             binding.phnNumberEdittext.setEnabled(false);
                             binding.semesterSelectContainer.setEnabled(false);
@@ -182,7 +182,7 @@ public class UserprofileActivity extends AppCompatActivity {
                             binding.phnNmberErrorTxt.setText("Enter a valid phone number");
                             binding.phnNmberErrorTxt.setVisibility(View.VISIBLE);
                         } else {
-                            binding.editIcon.setImageResource(R.drawable.icon_edit_2);
+                            binding.editIcon.setImageResource(R.drawable.icon_edit);
                             binding.nameEdittext.setEnabled(false);
                             binding.phnNumberEdittext.setEnabled(false);
                             binding.semesterSelectContainer.setEnabled(false);
@@ -677,7 +677,7 @@ btn_phone_verification.setText("VERIFY");
 //        }.getIns((int) 360, 0xFFFAFAFA));
         PrepNestUtil.roundViewWithRipple(sheetbinding.btnCancel, "#000000", 15, 0, "#000000", "#212121");
         sheetbinding.btnCancelTxt.setTextColor(0xFFFFFFFF);
-        sheetbinding.image.setImageResource(R.drawable.icon_email_3d);
+        sheetbinding.image.setImageResource(R.drawable.icon_email);
         sheetbinding.subtext.setText("We have sent you a mail on ".concat(FirebaseAuth.getInstance().getCurrentUser().getEmail().concat(" with a account verification link, click on the link to verify your email. If you didn't find the email, check spam folder.")));
         sheetbinding.btnCancelTxt.setText("Dismiss");
         sheetbinding.btnCancel.setOnClickListener(_view -> email_verification_sheet.dismiss());

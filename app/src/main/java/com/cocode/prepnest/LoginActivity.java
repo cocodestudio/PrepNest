@@ -249,7 +249,7 @@ public class LoginActivity extends AppCompatActivity {
 
         dialogbinding.btnOk.setVisibility(View.GONE);
         dialogbinding.btnCancel.setVisibility(View.GONE);
-        dialogbinding.image.setImageResource(R.drawable.icon_email_3d);
+        dialogbinding.image.setImageResource(R.drawable.icon_email);
         dialogbinding.bg.setBackground(new GradientDrawable() {
             public GradientDrawable getIns(int a, int b) {
                 this.setCornerRadius(a);

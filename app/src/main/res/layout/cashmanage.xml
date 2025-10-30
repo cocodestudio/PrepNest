@@ -55,7 +55,7 @@
             android:layout_marginEnd="10dp"
             android:layout_marginBottom="20dp"
             android:scaleType="fitCenter"
-            android:src="@drawable/icon_coins_3d" />
+            android:src="@drawable/icon_coins" />
 
         <TextView
             android:id="@+id/coins_title"

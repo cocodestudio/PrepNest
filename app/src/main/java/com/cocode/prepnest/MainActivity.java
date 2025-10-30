@@ -66,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
         createUI();
         networkMonitor = new NetworkMonitor(this);
         PrepNestUtil.changeNavBarColor(this, true);
+        getUserData();
     }
 
 
@@ -81,9 +82,7 @@ public class MainActivity extends AppCompatActivity {
         networkMonitor.unregister();
     }
 
-    @Override
-    public void onStart() {
-        super.onStart();
+    private void getUserData() {
         if (PrepNestUtil.isConnected(MainActivity.this)) {
             initializeFirstVisit();
             if ((FirebaseAuth.getInstance().getCurrentUser() != null)) {
