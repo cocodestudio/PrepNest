@@ -93,7 +93,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:adSize="BANNER"
-            app:adUnitId="ca-app-pub-3940256099942544/6300978111"
+            app:adUnitId="ca-app-pub-6822640863224398/6145918205"
             android:layout_marginTop="10dp"
             android:layout_marginBottom="10dp"/>
     </LinearLayout>

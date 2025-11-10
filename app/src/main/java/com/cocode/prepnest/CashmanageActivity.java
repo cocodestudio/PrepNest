@@ -139,7 +139,7 @@ public class CashmanageActivity extends AppCompatActivity {
         AdRequest adRequest = new AdRequest.Builder().build();
         RewardedAd.load(
                 this,
-                "ca-app-pub-3940256099942544/5224354917",
+                "ca-app-pub-6822640863224398/1252684179",
                 adRequest,
                 new RewardedAdLoadCallback() {
                     @Override
