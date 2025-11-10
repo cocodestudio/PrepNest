@@ -42,8 +42,6 @@ import com.cocode.prepnest.databinding.ProfileViewBinding;
 import com.cocode.prepnest.databinding.SheetSingleItemSelectBinding;
 import com.cocode.prepnest.databinding.StatusViewBinding;
 import com.cocode.prepnest.databinding.UserprofileBinding;
-import com.google.android.gms.ads.AdRequest;
-import com.google.android.gms.ads.MobileAds;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
@@ -413,14 +411,6 @@ btn_phone_verification.setText("VERIFY");
                 binding.backIcon.performClick();
             }
         });
-        loadBannerAd();
-    }
-
-    private void loadBannerAd() {
-        MobileAds.initialize(this, initializationStatus -> {
-        });
-        AdRequest adRequest = new AdRequest.Builder().build();
-        binding.adView.loadAd(adRequest);
     }
 
     @Override

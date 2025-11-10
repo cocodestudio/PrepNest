@@ -30,14 +30,11 @@ import java.util.TimerTask;
 public class MainActivity extends AppCompatActivity {
 
     private final Timer _timer = new Timer();
-    private final FirebaseAuth auth = FirebaseAuth.getInstance();
-    private final DatabaseReference users = FirebaseDatabase.getInstance().getReference("users");
     private final Intent toHomePage = new Intent();
     private final Intent toOnboarding = new Intent();
     private final Intent toLogin = new Intent();
     private final Intent toNoConnection = new Intent();
     private MainBinding binding;
-    private HashMap<String, Object> userData = new HashMap<>();
     private NetworkMonitor networkMonitor;
     private HashMap<String, Object> features_visit_map = new HashMap<>();
     private LogUtils logFile;
@@ -86,50 +83,19 @@ public class MainActivity extends AppCompatActivity {
         if (PrepNestUtil.isConnected(MainActivity.this)) {
             initializeFirstVisit();
             if ((FirebaseAuth.getInstance().getCurrentUser() != null)) {
-                logFile.addLog("USER", "USER IS LOGGED IN");
-                logFile.addLog("USER", "USER DATA IS LOADING");
-                users.child(auth.getCurrentUser().getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
+                timer = new TimerTask() {
                     @Override
-                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-
-                        userData = dataSnapshot.getValue(new GenericTypeIndicator<>() {
-                        });
-
-                        if (userData != null) {
-                            if (userData.containsKey("banned")) {
-                                if ((Boolean) userData.get("banned")) {
-                                    PrepNestUtil.showToast(MainActivity.this, "Your account has been banned");
-                                    finish();
-                                } else {
-                                    toHomePage.setClass(MainActivity.this, HomepageActivity.class);
-                                    startActivity(toHomePage);
-                                    overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
-
-                                    finish();
-                                }
-                            } else {
-                                toHomePage.setClass(MainActivity.this, HomepageActivity.class);
-                                startActivity(toHomePage);
-                                overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
-
-                                finish();
-                            }
-                        } else {
-                            PrepNestUtil.showToast(MainActivity.this, "User data not found, please login again");
-                            FirebaseAuth.getInstance().signOut();
+                    public void run() {
+                        runOnUiThread(() -> {
+                            toHomePage.setClass(MainActivity.this, HomepageActivity.class);
+                            startActivity(toHomePage);
+                            overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+                            timer.cancel();
                             finish();
-                        }
-
+                        });
                     }
-
-                    @Override
-                    public void onCancelled(@NonNull DatabaseError databaseError) {
-
-                        PrepNestUtil.showToast(MainActivity.this, databaseError.toString());
-
-                    }
-                });
-
+                };
+                _timer.schedule(timer, 2000);
             } else {
                 logFile.addLog("USER", "USER IS NOT LOGGED IN");
                 timer = new TimerTask() {

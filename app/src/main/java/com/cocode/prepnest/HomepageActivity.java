@@ -283,7 +283,7 @@ public class HomepageActivity extends AppCompatActivity {
         createShimmerView();
         requestPermissions();
         getInAppBanners();
-        getUserData();
+//        getUserData();
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
@@ -398,11 +398,8 @@ public class HomepageActivity extends AppCompatActivity {
         getUserData();
 
         appUpdateManager.getAppUpdateInfo().addOnSuccessListener(appUpdateInfo -> {
-            if (appUpdateInfo.installStatus() == InstallStatus.DOWNLOADED) {
-                Snackbar.make(findViewById(android.R.id.content),
-                                "New update downloaded", Snackbar.LENGTH_INDEFINITE)
-                        .setAction("RESTART", view -> appUpdateManager.completeUpdate())
-                        .show();
+            if (appUpdateInfo.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
+                startUpdate(appUpdateInfo, AppUpdateType.IMMEDIATE);
             }
         });
     }
@@ -471,16 +468,8 @@ public class HomepageActivity extends AppCompatActivity {
         appUpdateManager.getAppUpdateInfo().addOnSuccessListener(appUpdateInfo -> {
 
             // Check if update is available
-            if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE) {
-
-                // ✅ Use FLEXIBLE as default
-                if (appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)) {
-                    startUpdate(appUpdateInfo, AppUpdateType.FLEXIBLE);
-                }
-                // 🔒 Use IMMEDIATE only if FLEXIBLE not allowed (rare)
-                else if (appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
-                    startUpdate(appUpdateInfo, AppUpdateType.IMMEDIATE);
-                }
+            if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
+                startUpdate(appUpdateInfo, AppUpdateType.IMMEDIATE);
             }
         });
     }
@@ -512,6 +501,10 @@ public class HomepageActivity extends AppCompatActivity {
                         userData.put(child.getKey(), child.getValue());
                     }
 
+                    if ((Boolean)userData.getOrDefault("banned", false)) {
+                        PrepNestUtil.showToast(HomepageActivity.this, "Your account has been banned.");
+                        finishAffinity();
+                    }
                     if (userData.containsKey("course id")) {
                         FirebaseMessaging.getInstance().subscribeToTopic(userData.get("course id").toString());
                     }
