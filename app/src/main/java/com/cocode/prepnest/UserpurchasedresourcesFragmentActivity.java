@@ -12,6 +12,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -766,6 +767,18 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             if (item.containsKey("subject")) {
                 binding.subjectNameTxt.setText(item.get("subject").toString());
                 binding.subjectNameTxt.setVisibility(View.VISIBLE);
+
+                ViewGroup.MarginLayoutParams sessionTxtParams =
+                        (ViewGroup.MarginLayoutParams) binding.sessionTxt.getLayoutParams();
+
+                if (item.get("subject").toString().length() >= 20) {
+                    binding.subAndSessionContainer.setOrientation(LinearLayout.VERTICAL);
+                    sessionTxtParams.setMargins(0, (int)convertToDp(8), 0, 0);
+                } else {
+                    sessionTxtParams.setMargins(0, 0, 0, 0);
+                    binding.subAndSessionContainer.setOrientation(LinearLayout.HORIZONTAL);
+                }
+                binding.subAndSessionContainer.setLayoutParams(sessionTxtParams);
             } else {
                 binding.subjectNameTxt.setVisibility(View.GONE);
             }

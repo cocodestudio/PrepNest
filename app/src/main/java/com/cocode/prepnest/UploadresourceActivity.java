@@ -896,12 +896,12 @@ binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheck
                         }
                     }
                 }
-//                String resourceTitle = capitalizeString(addResource.get("subtype").toString()).concat(" ");
-//                if (addResource.get("subtype").toString().equals("midterm")) {
-//                    resourceTitle += midtermType + " ";
-//                }
-//                resourceTitle += "Paper";
-//                addResource.put("resource title", resourceTitle);
+                String resourceTitle = capitalizeString(addResource.get("subtype").toString()).concat(" ");
+                if (addResource.get("subtype").toString().equals("midterm")) {
+                    resourceTitle += midtermType + " ";
+                }
+                resourceTitle += "Paper";
+                addResource.put("resource title", resourceTitle);
                 requestRef.child(resourceID).setValue(addResource).addOnCompleteListener(uploadTask -> {
                     if (uploadTask.isSuccessful()) {
                         PrepNestUtil.showLoadingDialog(UploadresourceActivity.this, false);

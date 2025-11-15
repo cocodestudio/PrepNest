@@ -8,6 +8,7 @@ import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
@@ -521,6 +522,18 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 }.getIns((int) 360, 0xFFF5F5F5));
                 binding.sessionTxt.setText(_data.get(_position).get("session").toString());
                 binding.sessionTxt.setVisibility(View.VISIBLE);
+
+                ViewGroup.MarginLayoutParams sessionTxtParams =
+                        (ViewGroup.MarginLayoutParams) binding.sessionTxt.getLayoutParams();
+
+                if (_data.get(_position).get("subject").toString().length() >= 20) {
+                    binding.subAndSessionContainer.setOrientation(LinearLayout.VERTICAL);
+                    sessionTxtParams.setMargins(0, (int)convertToDp(8), 0, 0);
+                } else {
+                    sessionTxtParams.setMargins(0, 0, 0, 0);
+                    binding.subAndSessionContainer.setOrientation(LinearLayout.HORIZONTAL);
+                }
+                binding.subAndSessionContainer.setLayoutParams(sessionTxtParams);
             } else {
                 binding.sessionTxt.setVisibility(View.GONE);
             }

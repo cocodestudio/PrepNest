@@ -14,6 +14,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
+import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -1075,6 +1076,18 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
                 binding.subjectNameTxt.setVisibility(View.VISIBLE);
+
+                ViewGroup.MarginLayoutParams bottomContainerParams =
+                        (ViewGroup.MarginLayoutParams) binding.statusAndDateContainer.getLayoutParams();
+
+                if (item.get("subject").toString().length() >= 20) {
+                    binding.metaDataContainer.setOrientation(LinearLayout.VERTICAL);
+                    bottomContainerParams.setMargins(0, (int)convertToDp(8), 0, 0);
+                } else {
+                    bottomContainerParams.setMargins(0, 0, 0, 0);
+                    binding.metaDataContainer.setOrientation(LinearLayout.HORIZONTAL);
+                }
+                binding.statusAndDateContainer.setLayoutParams(bottomContainerParams);
             } else {
                 binding.subjectNameTxt.setText("None");
                 binding.subjectNameTxt.setVisibility(View.VISIBLE);
