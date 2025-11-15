@@ -831,7 +831,7 @@ public class HomepageActivity extends AppCompatActivity {
 
     public void filterResources(final ArrayList<HashMap<String, Object>> _list) {
         ArrayList<HashMap<String, Object>> sortedList = new ArrayList<>(_list);
-        ListMapUtils.sortListByKey(sortedList, "date of verification", true, ListMapUtils.SortType.TIMESTAMP_STRING);
+        ListMapUtils.sortListByKey(sortedList, "session", true, ListMapUtils.SortType.SESSION);
         recentlyAddedList = new ArrayList<>(sortedList.stream().limit(3).collect(Collectors.toList()));
         binding.recentlyAddedList.setAdapter(new RecentlyAddedListAdapter(recentlyAddedList));
         toggleRecentListEmptyState(!recentlyAddedList.isEmpty());

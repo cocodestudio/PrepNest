@@ -142,6 +142,7 @@
                     android:id="@+id/subject_name_txt"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginEnd="13dp"
                     android:background="#F5F5F5"
                     android:focusable="false"
                     android:fontFamily="@font/medium"
@@ -152,14 +153,12 @@
                     android:text="sub"
                     android:textColor="#757575"
                     android:textSize="12sp"
-                    android:translationY="1.0dp"
                     android:visibility="gone" />
 
                 <TextView
                     android:id="@+id/session_txt"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="13dp"
                     android:background="#F5F5F5"
                     android:focusable="false"
                     android:fontFamily="@font/medium"
@@ -170,7 +169,6 @@
                     android:text="session"
                     android:textColor="#757575"
                     android:textSize="12sp"
-                    android:translationY="1.0dp"
                     android:visibility="gone" />
 
             </LinearLayout>

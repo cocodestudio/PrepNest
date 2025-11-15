@@ -13,7 +13,7 @@ public class ListMapUtils {
      * @param list      List to sort
      * @param key       The key to sort by
      * @param ascending true for ascending, false for descending
-     * @param type      SortType (NUMBER, STRING, TIMESTAMP_STRING)
+     * @param type      SortType (NUMBER, STRING, TIMESTAMP_STRING, SESSION)
      */
     public static void sortListByKey(List<HashMap<String, Object>> list, String key, boolean ascending, SortType type) {
         Collections.sort(list, new Comparator<HashMap<String, Object>>() {
@@ -39,6 +39,11 @@ public class ListMapUtils {
                         long t2 = safeTimestamp(o2.get(key));
                         comparison = Long.compare(t1, t2);
                         break;
+                    case SESSION:
+                        long session1 = safeSession(o1.get(key));
+                        long session2 = safeSession(o2.get(key));
+                        comparison = Long.compare(session1, session2);
+                        break;
                 }
 
                 return ascending ? comparison : -comparison;
@@ -56,6 +61,14 @@ public class ListMapUtils {
         }
     }
 
+    private static long safeSession(Object obj) {
+        if (obj instanceof String) {
+            String str = ((String) obj);
+            return (Long.parseLong(str.substring(str.lastIndexOf('-'))));
+        }
+        return 0L;
+    }
+
     private static String safeString(Object obj) {
         return obj != null ? obj.toString() : "";
     }
@@ -71,6 +84,7 @@ public class ListMapUtils {
     public enum SortType {
         NUMBER,
         STRING,
-        TIMESTAMP_STRING // timestamp stored as string in ms
+        TIMESTAMP_STRING, // timestamp stored as string in ms
+        SESSION
     }
 }

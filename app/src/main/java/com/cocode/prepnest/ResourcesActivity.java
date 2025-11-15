@@ -394,11 +394,11 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
             }
             boolean recentFirst = true;
             if (filterMap.containsKey("date")) {
-                if (!filterMap.get("date").toString().equals("recent")) {
+                if (!(filterMap.get("date").toString().equals("recent"))) {
                     recentFirst = false;
                 }
             }
-            ListMapUtils.sortListByKey(resourcesList, "date of verification", recentFirst, ListMapUtils.SortType.TIMESTAMP_STRING);
+            ListMapUtils.sortListByKey(resourcesList, "session", recentFirst, ListMapUtils.SortType.SESSION);
 			/*
 if (getIntent().hasExtra("type")) {
 if (!getIntent().getStringExtra("type").equals("paper")) {
@@ -1075,6 +1075,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             } else {
                 binding.title.setText("No title");
             }
+
             if (_data.get(_position).containsKey("subject")) {
                 binding.subjectNameTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
@@ -1096,7 +1097,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                     sessionTxtParams.setMargins(0, 0, 0, 0);
                     binding.subAndSessionContainer.setOrientation(LinearLayout.HORIZONTAL);
                 }
-                binding.subAndSessionContainer.setLayoutParams(sessionTxtParams);
+                binding.sessionTxt.setLayoutParams(sessionTxtParams);
             } else {
                 binding.subjectNameTxt.setVisibility(View.GONE);
             }

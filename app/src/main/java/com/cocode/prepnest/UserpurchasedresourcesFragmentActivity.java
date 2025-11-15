@@ -778,7 +778,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                     sessionTxtParams.setMargins(0, 0, 0, 0);
                     binding.subAndSessionContainer.setOrientation(LinearLayout.HORIZONTAL);
                 }
-                binding.subAndSessionContainer.setLayoutParams(sessionTxtParams);
+                binding.sessionTxt.setLayoutParams(sessionTxtParams);
             } else {
                 binding.subjectNameTxt.setVisibility(View.GONE);
             }
