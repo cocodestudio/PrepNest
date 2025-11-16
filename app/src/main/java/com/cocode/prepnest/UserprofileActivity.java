@@ -487,8 +487,7 @@ btn_phone_verification.setText("VERIFY");
                 return this;
             }
         }.getIns((int) 360, 0xFFFAFAFA));
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.setLightStatusBar(this);
         PrepNestUtil.changeNavBarColor(this, true);
     }
 

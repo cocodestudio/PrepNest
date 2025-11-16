@@ -135,8 +135,7 @@
                 android:id="@+id/sub_and_session_container"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingEnd="13dp">
+                android:orientation="horizontal">
 
                 <TextView
                     android:id="@+id/subject_name_txt"

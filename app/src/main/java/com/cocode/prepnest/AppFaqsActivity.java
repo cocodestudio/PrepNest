@@ -43,8 +43,7 @@ public class AppFaqsActivity extends AppCompatActivity {
     }
 
     private void initializeLogic() {
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.setLightStatusBar(this);
         addingFAQs();
         binding.faqsList.setHorizontalScrollBarEnabled(false);
         binding.faqsList.setVerticalScrollBarEnabled(false);

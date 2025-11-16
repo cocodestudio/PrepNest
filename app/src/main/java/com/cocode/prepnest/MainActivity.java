@@ -128,8 +128,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void createUI() {
         binding.appname.setTypeface(Typeface.createFromAsset(getAssets(), "fonts/appiconfont.ttf"), Typeface.NORMAL);
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.setLightStatusBar(this);
     }
 
 

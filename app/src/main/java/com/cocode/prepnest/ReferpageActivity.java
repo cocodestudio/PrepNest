@@ -90,8 +90,7 @@ public class ReferpageActivity extends AppCompatActivity {
 
     public void designUI() {
         PrepNestUtil.roundViewWithRipple(binding.referCodeMain, "#F5F5F5", 30, 0, "#000000", "#E0E0E0");
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.setLightStatusBar(this);
         PrepNestUtil.changeNavBarColor(this, true);
     }
 

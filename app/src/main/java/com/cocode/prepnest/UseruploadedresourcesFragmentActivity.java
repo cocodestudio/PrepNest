@@ -7,6 +7,7 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -268,6 +269,7 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
 
     public void checkIfBothLoaded() {
         if (requestedResourcesLoaded.get() && verifiedResourcesLoaded.get()) {
+            Log.d("ALL DATA", "ALL DATA IS LOADED");
             logFile.addLog("RESOURCES", "DATA FROM BOTH DB LOADED");
             binding.progressBarLayout.setVisibility(View.GONE);
             if ((requestedResources.size() + verifiedResources.size()) == 0) {
@@ -326,6 +328,8 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                         }
                     }
                     if (firstLoad) {
+                        Log.d("COUNT", "COUNT IS MAX FOR REQUEST");
+                        Log.d("DATA", "REQUESTED RESOURCES LOADED");
                         requestedResourcesLoaded.set(true);
                         checkIfBothLoaded();
                         firstLoad = false;
@@ -348,55 +352,111 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
     }
 
     public void getVerifiedResources(final ArrayList<String> _childNodes) {
-        if (_childNodes != null && !_childNodes.isEmpty()) {
-            AtomicInteger loadedCount = new AtomicInteger(0);
-            for (String id : _childNodes) {
-                logFile.addLog("RESOURCES", "LOADING DATA OF ID : ".concat(id));
-                DatabaseReference resourceRef = resources.child(id);
-                ValueEventListener listener = new ValueEventListener() {
-                    boolean firstLoad = true;
 
-                    @Override
-                    public void onDataChange(DataSnapshot dataSnapchot) {
-                        synchronized (verifiedResources) {
-                            verifiedResources.removeIf(map -> id.equals(map.get("id")));
-                            if (dataSnapchot.exists()) {
-                                Map<String, Object> map = (Map<String, Object>) dataSnapchot.getValue();
-                                if (map != null) {
-                                    map.put("id", id);
-                                    verifiedResources.add(new HashMap<>(map));
-                                }
-                            }
-
-                            if (firstLoad) {
-                                if (loadedCount.incrementAndGet() == _childNodes.size()) {
-                                    verifiedResourcesLoaded.set(true);
-                                    checkIfBothLoaded();
-                                }
-                                firstLoad = false;
-                            }
-                            if (requestedResourcesLoaded.get() && verifiedResourcesLoaded.get()) {
-                                updateCombinedList();
-                            }
-                        }
-                    }
-
-                    @Override
-                    public void onCancelled(@NonNull DatabaseError error) {
-                        if (isAdded()) {
-                            logFile.addLog("RESOURCES", "FAILED TO LOAD DATA, ID : " + id);
-                            PrepNestUtil.showToast(requireActivity(), "An unknown error occurred: " + error.getMessage());
-                        }
-                    }
-                };
-                resourceRef.addValueEventListener(listener);
-                listeners.put(id, listener);
-            }
-        } else {
+        if (_childNodes == null || _childNodes.isEmpty()) {
             verifiedResourcesLoaded.set(true);
             checkIfBothLoaded();
+            return;
+        }
+
+        AtomicInteger loadedCount = new AtomicInteger(0);
+
+        for (String id : _childNodes) {
+
+            final String finalId = id;
+
+            Log.d("VERIFIED", "VERIFIED RESOURCES LOADING ID : " + finalId);
+            logFile.addLog("RESOURCES", "LOADING DATA OF ID : " + finalId);
+
+            DatabaseReference lookupRef = firebase_database.getReference("other")
+                    .child("resource_lookup")
+                    .child(finalId);
+
+            lookupRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot lookupSnap) {
+
+                    if (!lookupSnap.exists()) {
+                        // Still count it as loaded to avoid blocking the UI
+                        if (loadedCount.incrementAndGet() == _childNodes.size()) {
+                            verifiedResourcesLoaded.set(true);
+                            checkIfBothLoaded();
+                        }
+                        return;
+                    }
+
+                    String courseId = lookupSnap.child("course id").getValue(String.class);
+
+                    if (courseId == null || courseId.trim().isEmpty()) {
+                        logFile.addLog("RESOURCES", "Missing course id for " + finalId);
+                        if (loadedCount.incrementAndGet() == _childNodes.size()) {
+                            verifiedResourcesLoaded.set(true);
+                            checkIfBothLoaded();
+                        }
+                        return;
+                    }
+
+                    DatabaseReference resourceRef = resources.child(courseId).child(finalId);
+
+                    // Track whether we counted this ID
+                    final boolean[] counted = {false};
+
+                    ValueEventListener listener = new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot resSnap) {
+
+                            synchronized (verifiedResources) {
+
+                                // Remove old entry of same ID
+                                verifiedResources.removeIf(map -> finalId.equals(map.get("id")));
+
+                                if (resSnap.exists()) {
+                                    Map<String, Object> data = (Map<String, Object>) resSnap.getValue();
+                                    if (data != null) {
+                                        data.put("id", finalId);
+                                        verifiedResources.add(new HashMap<>(data));
+                                    }
+                                }
+
+                                // COUNT ONLY FIRST DATA LOAD
+                                if (!counted[0]) {
+                                    if (loadedCount.incrementAndGet() == _childNodes.size()) {
+                                        verifiedResourcesLoaded.set(true);
+                                        checkIfBothLoaded();
+                                    }
+                                    counted[0] = true;
+                                }
+
+                                // Now update combined list if both lists are done
+                                if (requestedResourcesLoaded.get() && verifiedResourcesLoaded.get()) {
+                                    updateCombinedList();
+                                }
+                            }
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+                            if (isAdded()) {
+                                PrepNestUtil.showToast(requireActivity(),
+                                        "Error loading data for " + finalId + ": " + error.getMessage());
+                            }
+                            logFile.addLog("RESOURCES", "FAILED TO LOAD : " + finalId);
+                        }
+                    };
+
+                    // Use ADD VALUE LISTENER (real-time updates)
+                    resourceRef.addValueEventListener(listener);
+
+                    // Store for future removal
+                    listeners.put(finalId, listener);
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {}
+            });
         }
     }
+
 
     public double convertToDp(final double _pixels) {
         return TypedValue.applyDimension(

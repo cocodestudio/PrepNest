@@ -47,9 +47,8 @@ public class DebugActivity extends AppCompatActivity {
         networkMonitor = new NetworkMonitor(this);
         PrepNestUtil.roundViewWithRipple(binding.btnSendReport, "#000000", 15, 0, "#000000", "#212121");
         PrepNestUtil.roundViewWithRipple(binding.btnExitApp, "#FAFAFA", 15, 0, "#000000", "#E0E0E0");
-        ((ClipboardManager) getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("clipboard", getIntent().getStringExtra("error")));
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        getWindow().setStatusBarColor(0xFFFFFFFF);
+//        ((ClipboardManager) getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("clipboard", getIntent().getStringExtra("error")));
+        PrepNestUtil.setLightStatusBar(this);
         PrepNestUtil.changeNavBarColor(this, true);
     }
 

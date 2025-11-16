@@ -66,6 +66,7 @@ import com.takusemba.spotlight.shape.Circle;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.stream.Collectors;
@@ -445,8 +446,7 @@ public class HomepageActivity extends AppCompatActivity {
         Window window = getWindow();
         window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-        window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        window.setStatusBarColor(Color.WHITE);
+        PrepNestUtil.setLightStatusBar(this);
 
         binding.drawerLayout.setFitsSystemWindows(false);
         binding.drawerLayout.setStatusBarBackground(null);
@@ -709,7 +709,7 @@ public class HomepageActivity extends AppCompatActivity {
 
     public void loadResources() {
         if (resourceListener != null) {
-            resources.removeEventListener(resourceListener);
+            resources.child(Objects.requireNonNull(userData.get("course id")).toString()).removeEventListener(resourceListener);
         }
         logFile.addLog("RESOURCES", "LOADING RESOURCES");
         resourceListener = new ValueEventListener() {
@@ -746,7 +746,7 @@ public class HomepageActivity extends AppCompatActivity {
             }
         };
 
-        resources.addValueEventListener(resourceListener);
+        resources.child(Objects.requireNonNull(userData.get("course id")).toString()).addValueEventListener(resourceListener);
     }
 
     public void toggleRecentListEmptyState(final boolean isVisible) {
@@ -822,11 +822,9 @@ public class HomepageActivity extends AppCompatActivity {
     }
 
     public boolean getRequiredResources(final HashMap<String, Object> _item) {
-        boolean matchesCourse = _item.get("course id").toString().equals(userData.get("course id").toString());
         boolean matchesSemester = ((Number) (_item.get("semester"))).intValue() <= (((Number) (userData.get("semester"))).intValue() + 2);
-        boolean data = matchesCourse && matchesSemester;
         boolean isActive = !_item.containsKey("discontinue") || Boolean.FALSE.equals(_item.get("discontinue"));
-        return data && isActive;
+        return matchesSemester && isActive;
     }
 
     public void filterResources(final ArrayList<HashMap<String, Object>> _list) {

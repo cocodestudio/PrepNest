@@ -60,6 +60,29 @@ public class PrepNestUtil {
         }
     }
 
+    public static void setLightStatusBar(Activity activity) {
+        Window window = activity.getWindow();
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+ (API 30+)
+            WindowInsetsController controller = window.getInsetsController();
+            if (controller != null) {
+                controller.setSystemBarsAppearance(
+                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
+                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                );
+            }
+        } else {
+            // Android 10 (API 29)
+            View decor = window.getDecorView();
+            decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        }
+
+        // Must set a light color so black icons are visible
+        window.setStatusBarColor(Color.WHITE);
+    }
+
+
     public static void changeNavBarColor(Activity activity, boolean isLight) {
         if (activity == null) return;
 

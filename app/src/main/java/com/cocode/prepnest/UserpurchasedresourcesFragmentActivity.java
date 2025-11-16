@@ -178,45 +178,124 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
         });
     }
 
+    private void showPurchasedResourcesUI() {
+        binding.progressBarLayout.setVisibility(View.GONE);
+
+        if (resourcesList.isEmpty()) {
+            binding.emptyStateContainer.setVisibility(View.VISIBLE);
+            binding.itemsLayout.setVisibility(View.GONE);
+        } else {
+            binding.emptyStateContainer.setVisibility(View.GONE);
+            binding.itemsLayout.setVisibility(View.VISIBLE);
+            loadResourceItemsToList();
+        }
+    }
+
+
     public void getPurchasedResources(final ArrayList<String> _childNodes) {
-        if (_childNodes != null && _childNodes.isEmpty()) {
+
+        // Case: null or empty list
+        if (_childNodes == null || _childNodes.isEmpty()) {
             binding.emptyStateContainer.setVisibility(View.VISIBLE);
             binding.progressBarLayout.setVisibility(View.GONE);
             return;
         }
+
         AtomicInteger loadedCount = new AtomicInteger(0);
+
         for (String id : _childNodes) {
-            logFile.addLog("RESOURCES", "LOADING RESOURCE WITH ID : ".concat(id));
-            ValueEventListener listener = new ValueEventListener() {
+
+            final String finalId = id;
+
+            logFile.addLog("RESOURCES", "LOADING RESOURCE WITH ID : " + finalId);
+
+            DatabaseReference lookupRef = firebase_database
+                    .getReference("other")
+                    .child("resource_lookup")
+                    .child(finalId);
+
+            lookupRef.addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
-                public void onDataChange(DataSnapshot dataSnapshot) {
-                    if (dataSnapshot.exists()) {
-                        Map<String, Object> item = (Map<String, Object>) dataSnapshot.getValue();
-                        if (item != null) {
-                            item.put("id", id);
-                            resourcesList.add(0, new HashMap<>(item));
+                public void onDataChange(@NonNull DataSnapshot lookupSnap) {
+
+                    if (!lookupSnap.exists()) {
+                        // Even if lookup missing, count as loaded to avoid UI freeze
+                        if (loadedCount.incrementAndGet() == _childNodes.size()) {
+                            showPurchasedResourcesUI();
                         }
+                        return;
                     }
 
-                    if (loadedCount.incrementAndGet() == _childNodes.size()) {
-                        binding.progressBarLayout.setVisibility(View.GONE);
-                        binding.emptyStateContainer.setVisibility(View.GONE);
-                        binding.itemsLayout.setVisibility(View.VISIBLE);
-                        loadResourceItemsToList();
+                    String courseId = lookupSnap.child("course id").getValue(String.class);
+
+                    if (courseId == null || courseId.trim().isEmpty()) {
+                        logFile.addLog("RESOURCES", "Missing course id for " + finalId);
+
+                        if (loadedCount.incrementAndGet() == _childNodes.size()) {
+                            showPurchasedResourcesUI();
+                        }
+                        return;
                     }
+
+                    DatabaseReference resourceRef = resources.child(courseId).child(finalId);
+
+                    resourceRef.addListenerForSingleValueEvent(new ValueEventListener() {
+
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot resourceSnap) {
+
+                            synchronized (resourcesList) {
+                                // Remove any existing entry of same ID
+                                resourcesList.removeIf(map -> finalId.equals(map.get("id")));
+
+                                if (resourceSnap.exists()) {
+                                    Map<String, Object> item =
+                                            (Map<String, Object>) resourceSnap.getValue();
+
+                                    if (item != null) {
+                                        item.put("id", finalId);
+                                        resourcesList.add(0, new HashMap<>(item));
+                                    }
+                                }
+                            }
+
+                            if (loadedCount.incrementAndGet() == _childNodes.size()) {
+                                showPurchasedResourcesUI();
+                            }
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+                            logFile.addLog("RESOURCES", "FAILED LOADING DATA : " + finalId);
+
+                            binding.progressBarLayout.setVisibility(View.GONE);
+                            binding.emptyStateContainer.setVisibility(View.VISIBLE);
+
+                            Toast.makeText(
+                                    requireActivity(),
+                                    "Failed loading resources: " + error.getMessage(),
+                                    Toast.LENGTH_SHORT
+                            ).show();
+
+                            // Still count load so UI doesn't freeze
+                            if (loadedCount.incrementAndGet() == _childNodes.size()) {
+                                showPurchasedResourcesUI();
+                            }
+                        }
+                    });
                 }
 
                 @Override
-                public void onCancelled(DatabaseError error) {
-                    binding.progressBarLayout.setVisibility(View.GONE);
-                    binding.emptyStateContainer.setVisibility(View.VISIBLE);
-                    logFile.addLog("RESOURCES", "FAILED LOADING DATA : " + id);
-                    Toast.makeText(requireActivity(), "Failed loading resources: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                public void onCancelled(@NonNull DatabaseError error) {
+                    // Nothing to do but count load
+                    if (loadedCount.incrementAndGet() == _childNodes.size()) {
+                        showPurchasedResourcesUI();
+                    }
                 }
-            };
-            resources.child(id).addListenerForSingleValueEvent(listener);
+            });
         }
     }
+
 
     public void attachAdapterToRecyclerView() {
         binding.itemsList.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -773,7 +852,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
                 if (item.get("subject").toString().length() >= 20) {
                     binding.subAndSessionContainer.setOrientation(LinearLayout.VERTICAL);
-                    sessionTxtParams.setMargins(0, (int)convertToDp(8), 0, 0);
+                    sessionTxtParams.setMargins(0, (int) convertToDp(8), 0, 0);
                 } else {
                     sessionTxtParams.setMargins(0, 0, 0, 0);
                     binding.subAndSessionContainer.setOrientation(LinearLayout.HORIZONTAL);

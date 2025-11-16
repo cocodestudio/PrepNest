@@ -225,8 +225,7 @@ public class LoginActivity extends AppCompatActivity {
 
     public void designUI() {
         binding.passwordEdittext.setTransformationMethod(android.text.method.PasswordTransformationMethod.getInstance());
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.setLightStatusBar(this);
         PrepNestUtil.changeNavBarColor(this, true);
     }
 

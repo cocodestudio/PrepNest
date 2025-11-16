@@ -114,8 +114,7 @@ public class OnboardingActivity extends AppCompatActivity {
         initializeViewPager();
         PrepNestUtil.roundViewWithRipple(binding.moveToNextBtn, "#000000", 360, 0, "#000000", "#212121");
         PrepNestUtil.roundViewWithRipple(binding.signUpBtn, "#FAFAFA", 15, 0, "#000000", "#E0E0E0");
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.setLightStatusBar(this);
         PrepNestUtil.changeNavBarColor(this, true);
     }
 

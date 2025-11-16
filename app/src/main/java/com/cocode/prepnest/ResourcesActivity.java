@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 import okhttp3.Call;
@@ -131,8 +132,7 @@ public class ResourcesActivity extends AppCompatActivity {
     public void designUI() {
         binding.itemsList.setHorizontalScrollBarEnabled(false);
         binding.itemsList.setVerticalScrollBarEnabled(false);
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.setLightStatusBar(this);
         PrepNestUtil.changeNavBarColor(this, true);
     }
 
@@ -330,7 +330,7 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
             }
         };
 
-        resources.addListenerForSingleValueEvent(listener);
+        resources.child(Objects.requireNonNull(userData.get("course id")).toString()).addListenerForSingleValueEvent(listener);
     }
 
 
@@ -421,9 +421,7 @@ ListMapUtils.sortListByKey(resourcesList, "rating", true, ListMapUtils.SortType.
 
 
     public boolean getRequiredResources(final HashMap<String, Object> _item) {
-        boolean matchesCourse = _item.get("course id").toString().equals(userData.get("course id").toString());
         boolean matchesSemester = ((Number) (_item.get("semester"))).intValue() <= (((Number) (userData.get("semester"))).intValue() + 2);
-        boolean data = matchesCourse && matchesSemester;
         boolean isActive = !_item.containsKey("discontinue") || Boolean.FALSE.equals(_item.get("discontinue"));
         boolean tagMatches = true;
         if (getIntent().hasExtra("tag type")) {
@@ -433,7 +431,7 @@ ListMapUtils.sortListByKey(resourcesList, "rating", true, ListMapUtils.SortType.
                 tagMatches = _item.containsKey("best choice") && Boolean.parseBoolean(_item.get("best choice").toString());
             }
         }
-        return data && isActive && tagMatches;
+        return matchesSemester && isActive && tagMatches;
     }
 
 

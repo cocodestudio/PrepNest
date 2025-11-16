@@ -273,8 +273,7 @@ public class CashmanageActivity extends AppCompatActivity {
         PrepNestUtil.roundViewWithRipple(binding.payoutOp, "#FAFAFA", 30, 0, "#9E9E9E", "#E0E0E0");
         PrepNestUtil.roundViewWithRipple(binding.historyOp, "#FAFAFA", 30, 0, "#9E9E9E", "#E0E0E0");
         PrepNestUtil.roundViewWithRipple(binding.earnCoinsOp, "#FAFAFA", 30, 0, "#9E9E9E", "#E0E0E0");
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.setLightStatusBar(this);
         PrepNestUtil.changeNavBarColor(this, true);
     }
 

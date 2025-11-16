@@ -47,8 +47,7 @@ public class InfoviewActivity extends AppCompatActivity {
         binding.recyclerview.setHorizontalScrollBarEnabled(false);
         binding.recyclerview.setVerticalScrollBarEnabled(false);
         data();
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.setLightStatusBar(this);
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {

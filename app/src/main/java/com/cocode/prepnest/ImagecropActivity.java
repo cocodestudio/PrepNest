@@ -67,8 +67,7 @@ public class ImagecropActivity extends AppCompatActivity {
 
     public void designUI() {
         PrepNestUtil.roundViewWithRipple(binding.cropBtn, "#000000", 360, 0, "#000000", "#212121");
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        getWindow().setStatusBarColor(0xFFFFFFFF);
+        PrepNestUtil.setLightStatusBar(this);
         PrepNestUtil.changeNavBarColor(this, true);
     }
 

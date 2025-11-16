@@ -9,6 +9,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
+import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
@@ -118,9 +119,7 @@ public class UserWishlistActivity extends AppCompatActivity {
 //                return this;
 //            }
 //        }.getIns((int) 360, 0xFFFAFAFA));
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        getWindow().setStatusBarColor(0xFFFFFFFF);
-
+        PrepNestUtil.setLightStatusBar(this);
         PrepNestUtil.changeNavBarColor(this, true);
     }
 
@@ -191,41 +190,121 @@ public class UserWishlistActivity extends AppCompatActivity {
 
 
     public void getResources(final ArrayList<String> _list) {
-        if (_list.isEmpty()) {
+
+        // Case: empty wishlist
+        if (_list == null || _list.isEmpty()) {
             toggleEmptyState(false);
             return;
         }
-        AtomicInteger loadedCount = new AtomicInteger(0);
-        for (String id : _list) {
-            logFile.addLog("WISHLIST RESOURCES", "LOADING RESOURCE: ".concat(id));
-            ValueEventListener listener = new ValueEventListener() {
-                @Override
-                public void onDataChange(DataSnapshot dataSnapshot) {
-                    if (dataSnapshot.exists()) {
-                        Map<String, Object> item = (Map<String, Object>) dataSnapshot.getValue();
 
-                        if (item != null && !item.containsKey("discontinue") || Boolean.FALSE.equals(item.get("discontinue"))) {
-                            item.put("id", id);
-                            logFile.addLog("WISHLIST RESOURCES", "RESOURCE LOADED SUCCESSFULLY: ".concat(id));
-                            wishlistedResources.add(0, new HashMap<>(item));
+        AtomicInteger loadedCount = new AtomicInteger(0);
+
+        for (String id : _list) {
+
+            final String finalId = id;
+
+            logFile.addLog("WISHLIST RESOURCES", "LOADING RESOURCE: " + finalId);
+
+            DatabaseReference lookupRef = firebase_database
+                    .getReference("other")
+                    .child("resource_lookup")
+                    .child(finalId);
+
+            lookupRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot lookupSnap) {
+
+                    if (!lookupSnap.exists()) {
+                        // Count load to avoid freezing
+                        if (loadedCount.incrementAndGet() == _list.size()) {
+                            toggleEmptyState(!wishlistedResources.isEmpty());
                         }
+                        return;
                     }
 
+                    String courseId = lookupSnap.child("course id").getValue(String.class);
+
+                    if (courseId == null || courseId.trim().isEmpty()) {
+                        logFile.addLog("WISHLIST RESOURCES",
+                                "Missing course_id for: " + finalId);
+
+                        if (loadedCount.incrementAndGet() == _list.size()) {
+                            toggleEmptyState(!wishlistedResources.isEmpty());
+                        }
+                        return;
+                    }
+
+                    DatabaseReference resourceRef =
+                            resources.child(courseId).child(finalId);
+
+                    resourceRef.addListenerForSingleValueEvent(new ValueEventListener() {
+
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot resourceSnap) {
+
+                            synchronized (wishlistedResources) {
+                                // Remove old entry with same ID
+                                wishlistedResources.removeIf(map ->
+                                        finalId.equals(map.get("id")));
+
+                                if (resourceSnap.exists()) {
+
+                                    Map<String, Object> item =
+                                            (Map<String, Object>) resourceSnap.getValue();
+
+                                    if (item != null) {
+                                        // Check discontinue flag safely
+                                        boolean isDiscontinued =
+                                                Boolean.TRUE.equals(item.get("discontinue"));
+
+                                        if (!isDiscontinued) {
+                                            item.put("id", finalId);
+
+                                            logFile.addLog("WISHLIST RESOURCES",
+                                                    "RESOURCE LOADED SUCCESSFULLY: " + finalId);
+
+                                            wishlistedResources.add(0, new HashMap<>(item));
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Count only once per ID
+                            if (loadedCount.incrementAndGet() == _list.size()) {
+                                toggleEmptyState(!wishlistedResources.isEmpty());
+                            }
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+
+                            logFile.addLog("WISHLIST RESOURCES",
+                                    "FAILED LOADING RESOURCE: " + finalId);
+
+                            PrepNestUtil.showToast(
+                                    UserWishlistActivity.this,
+                                    "Failed loading resources: " + error.getMessage()
+                            );
+
+                            // Count load anyway
+                            if (loadedCount.incrementAndGet() == _list.size()) {
+                                toggleEmptyState(!wishlistedResources.isEmpty());
+                            }
+                        }
+                    });
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    // Still count load
                     if (loadedCount.incrementAndGet() == _list.size()) {
                         toggleEmptyState(!wishlistedResources.isEmpty());
                     }
                 }
-
-                @Override
-                public void onCancelled(DatabaseError databaseError) {
-                    logFile.addLog("WISHLIST RESOURCES", "FAILED LOADING RESOURCE: " + id);
-                    toggleEmptyState(false);
-                    PrepNestUtil.showToast(UserWishlistActivity.this, "Failed loading resources: " + databaseError.getMessage());
-                }
-            };
-            resources.child(id).addListenerForSingleValueEvent(listener);
+            });
         }
     }
+
 
     public void removeWishlist(final String _ID, final int position) {
         for (int i = 0; i < resourceIDs.size(); i++) {
