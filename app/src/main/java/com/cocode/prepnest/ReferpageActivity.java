@@ -4,7 +4,6 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
@@ -23,7 +22,6 @@ public class ReferpageActivity extends AppCompatActivity {
 
     private ReferpageBinding binding;
     private HashMap<String, Object> userData = new HashMap<>();
-    private LogUtils logFile;
     private NetworkMonitor networkMonitor;
 
     private ArrayList<String> referredUsers = new ArrayList<>();
@@ -54,16 +52,12 @@ public class ReferpageActivity extends AppCompatActivity {
     }
 
     private void initializeLogic() {
-        logFile = new LogUtils(this);
         networkMonitor = new NetworkMonitor(this);
-        logFile.addActivity();
         designUI();
         if ((FirebaseAuth.getInstance().getCurrentUser() != null)) {
-            logFile.addLog("USER", "USER IS LOGGED IN");
             binding.referCode.setText(FirebaseAuth.getInstance().getCurrentUser().getUid().substring(0, 7));
             fetchReferData();
         } else {
-            logFile.addLog("USER", "USER IS NOT LOGGED IN");
             PrepNestUtil.showToast(ReferpageActivity.this, "Error: please login again");
             FirebaseAuth.getInstance().signOut();
             finishAffinity();
@@ -98,7 +92,6 @@ public class ReferpageActivity extends AppCompatActivity {
     public void fetchReferData() {
         userData.clear();
         PrepNestUtil.showLoadingDialog(this, true);
-        logFile.addLog("REFERRAL", "GETTING REFERRAL DATA");
         if (getIntent().hasExtra("user")) {
             userData = new Gson().fromJson(getIntent().getStringExtra("user"), new TypeToken<HashMap<String, Object>>() {
             }.getType());
@@ -118,9 +111,7 @@ public class ReferpageActivity extends AppCompatActivity {
                 binding.totalReferredAmountTxt.setText("0");
             }
             PrepNestUtil.showLoadingDialog(this, false);
-            logFile.addLog("REFERRAL", "REFERRAL DATA LOADED");
         } else {
-            logFile.addLog("REFERRAL", "FAILED TO LOAD REFERRAL DATA");
             PrepNestUtil.showToast(ReferpageActivity.this, "Please login again");
             PrepNestUtil.showLoadingDialog(this, false);
             FirebaseAuth.getInstance().signOut();

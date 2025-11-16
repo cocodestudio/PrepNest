@@ -5,20 +5,12 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.os.Bundle;
-import android.view.View;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.cocode.prepnest.databinding.MainBinding;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.GenericTypeIndicator;
-import com.google.firebase.database.ValueEventListener;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -37,7 +29,6 @@ public class MainActivity extends AppCompatActivity {
     private MainBinding binding;
     private NetworkMonitor networkMonitor;
     private HashMap<String, Object> features_visit_map = new HashMap<>();
-    private LogUtils logFile;
     private TimerTask timer;
     private SharedPreferences features_visit;
 
@@ -56,10 +47,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initializeLogic() {
-        logFile = new LogUtils(this);
-        logFile.createLogFile();
-        logFile.addActivity();
-        logFile.addLog("OPEN", "APP IS OPENED");
         createUI();
         networkMonitor = new NetworkMonitor(this);
         PrepNestUtil.changeNavBarColor(this, true);
@@ -97,17 +84,14 @@ public class MainActivity extends AppCompatActivity {
                 };
                 _timer.schedule(timer, 2000);
             } else {
-                logFile.addLog("USER", "USER IS NOT LOGGED IN");
                 timer = new TimerTask() {
                     @Override
                     public void run() {
                         runOnUiThread(() -> {
                             if (features_visit_map.get("onboarding").toString().equals("false")) {
-                                logFile.addLog("NAVIGATION", "NAVIGATING TO ONBOARDING");
                                 toOnboarding.setClass(MainActivity.this, OnboardingActivity.class);
                                 startActivity(toOnboarding);
                             } else {
-                                logFile.addLog("NAVIGATION", "NAVIGATING TO LOGIN");
                                 toLogin.setClass(MainActivity.this, LoginActivity.class);
                                 startActivity(toLogin);
                             }

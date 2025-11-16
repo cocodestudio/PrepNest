@@ -9,7 +9,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
-import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
@@ -58,7 +57,6 @@ public class UserWishlistActivity extends AppCompatActivity {
     private final ArrayList<HashMap<String, Object>> wishlistedResources = new ArrayList<>();
     private HashMap<String, Object> userData = new HashMap<>();
     private UserWishlistBinding binding;
-    private LogUtils logFile;
     private NetworkMonitor networkMonitor;
     private ArrayList<String> resourceIDs = new ArrayList<>();
     private Items_listAdapter listAdapter;
@@ -82,9 +80,7 @@ public class UserWishlistActivity extends AppCompatActivity {
     }
 
     private void initializeLogic() {
-        logFile = new LogUtils(this);
         networkMonitor = new NetworkMonitor(this);
-        logFile.addActivity();
         designUI();
         listAdapter = new Items_listAdapter(wishlistedResources);
         binding.itemsList.setAdapter(listAdapter);
@@ -124,11 +120,9 @@ public class UserWishlistActivity extends AppCompatActivity {
     }
 
     public void getUserData() {
-        logFile.addLog("USER", "LOADING USER DATA");
         if (getIntent().hasExtra("user")) {
             userData = new Gson().fromJson(getIntent().getStringExtra("user"), new TypeToken<HashMap<String, Object>>() {
             }.getType());
-            logFile.addLog("USER", "DATA LOADED SUCCESSFULLY");
             if (userData.containsKey("wishlist")) {
                 resourceIDs = new Gson().fromJson(userData.get("wishlist").toString(), new TypeToken<ArrayList<String>>() {
                 }.getType());
@@ -137,7 +131,6 @@ public class UserWishlistActivity extends AppCompatActivity {
             }
             getResources(resourceIDs);
         } else {
-            logFile.addLog("USER", "FAILED TO GET DATA");
             auth.signOut();
             PrepNestUtil.showToast(this, "An unknown error occurred, please login again");
             finishAffinity();
@@ -146,13 +139,11 @@ public class UserWishlistActivity extends AppCompatActivity {
 
 
     public void getWishlistedResources() {
-        logFile.addLog("WISHLIST", "GETTING USER WISHLISTED RESOURCES IDs");
         DatabaseReference dataRef = users.child(auth.getCurrentUser().getUid()).child("wishlist");
         dataRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 if (dataSnapshot.exists() && (dataSnapshot.getValue() != null || !dataSnapshot.getValue(String.class).isEmpty())) {
-                    logFile.addLog("WISHLIST", "IDs LOADED SUCCESSFULLY");
                     resourceIDs = new Gson().fromJson(dataSnapshot.getValue(String.class), new TypeToken<ArrayList<String>>() {
                     }.getType());
                 } else {
@@ -163,7 +154,6 @@ public class UserWishlistActivity extends AppCompatActivity {
 
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
-                logFile.addLog("WISHLIST", "FAILED TO LOAD IDs: ".concat(databaseError.toString()));
                 PrepNestUtil.showToast(UserWishlistActivity.this, "An unknown error occurred : ".concat(databaseError.toString()));
             }
         });
@@ -203,7 +193,6 @@ public class UserWishlistActivity extends AppCompatActivity {
 
             final String finalId = id;
 
-            logFile.addLog("WISHLIST RESOURCES", "LOADING RESOURCE: " + finalId);
 
             DatabaseReference lookupRef = firebase_database
                     .getReference("other")
@@ -225,9 +214,6 @@ public class UserWishlistActivity extends AppCompatActivity {
                     String courseId = lookupSnap.child("course id").getValue(String.class);
 
                     if (courseId == null || courseId.trim().isEmpty()) {
-                        logFile.addLog("WISHLIST RESOURCES",
-                                "Missing course_id for: " + finalId);
-
                         if (loadedCount.incrementAndGet() == _list.size()) {
                             toggleEmptyState(!wishlistedResources.isEmpty());
                         }
@@ -260,9 +246,6 @@ public class UserWishlistActivity extends AppCompatActivity {
                                         if (!isDiscontinued) {
                                             item.put("id", finalId);
 
-                                            logFile.addLog("WISHLIST RESOURCES",
-                                                    "RESOURCE LOADED SUCCESSFULLY: " + finalId);
-
                                             wishlistedResources.add(0, new HashMap<>(item));
                                         }
                                     }
@@ -277,10 +260,6 @@ public class UserWishlistActivity extends AppCompatActivity {
 
                         @Override
                         public void onCancelled(@NonNull DatabaseError error) {
-
-                            logFile.addLog("WISHLIST RESOURCES",
-                                    "FAILED LOADING RESOURCE: " + finalId);
-
                             PrepNestUtil.showToast(
                                     UserWishlistActivity.this,
                                     "Failed loading resources: " + error.getMessage()
@@ -323,7 +302,6 @@ public class UserWishlistActivity extends AppCompatActivity {
                 PrepNestUtil.showLoadingDialog(UserWishlistActivity.this, false);
                 PrepNestUtil.showToast(UserWishlistActivity.this, "Removed from wishlist");
             } else {
-                logFile.addLog("WISHLIST", "FAILED TO UPDATE WISHLIST: " + task.getException().toString());
                 PrepNestUtil.showToast(UserWishlistActivity.this, "An unknown error occurred: " + task.getException().toString());
             }
         });
@@ -607,7 +585,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
                 if (_data.get(_position).get("subject").toString().length() >= 20) {
                     binding.subAndSessionContainer.setOrientation(LinearLayout.VERTICAL);
-                    sessionTxtParams.setMargins(0, (int)convertToDp(8), 0, 0);
+                    sessionTxtParams.setMargins(0, (int) convertToDp(8), 0, 0);
                 } else {
                     sessionTxtParams.setMargins(0, 0, 0, 0);
                     binding.subAndSessionContainer.setOrientation(LinearLayout.HORIZONTAL);

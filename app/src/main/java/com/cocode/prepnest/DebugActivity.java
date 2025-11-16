@@ -1,24 +1,15 @@
 package com.cocode.prepnest;
 
-import android.content.ClipData;
-import android.content.ClipboardManager;
-import android.net.Uri;
 import android.os.Bundle;
-import android.view.View;
-import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.FileProvider;
 
 import com.cocode.prepnest.databinding.DebugBinding;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
 
-import java.io.File;
 import java.util.HashMap;
 
 public class DebugActivity extends AppCompatActivity {
@@ -66,54 +57,53 @@ public class DebugActivity extends AppCompatActivity {
     }
 
 
+//    public void sendErrorReport() {
+//        File externalDir = getExternalFilesDir(null);
+//
+//        File logFile = new File(externalDir, "logs.txt");
+//
+//        if (logFile.exists()) {
+//            Uri fileUri = FileProvider.getUriForFile(this, getPackageName() + ".provider", logFile);
+//
+//            if (fileUri != null) {
+//                StorageReference logRef = FirebaseStorage.getInstance().getReference("other").child("reports").child("error_reports").child(FirebaseAuth.getInstance().getCurrentUser().getUid()).child(System.currentTimeMillis() + ".txt");
+//                PrepNestUtil.showLoadingDialog(this, true);
+//                logRef.putFile(fileUri).addOnSuccessListener(taskSnapshot -> taskSnapshot.getStorage().getDownloadUrl().addOnSuccessListener(uri -> {
+//                    // upload data to fdb
+//                    uploadDataToFDB(uri.toString());
+//                })).addOnFailureListener(error -> {
+//                    PrepNestUtil.showLoadingDialog(this, false);
+//                    PrepNestUtil.showToast(DebugActivity.this, "Failed to send request");
+//                });
+//            }
+//        } else {
+//            // upload without log file
+//            uploadDataToFDB("null");
+//        }
+//    }
+
+
     public void sendErrorReport() {
-        File externalDir = getExternalFilesDir(null);
-
-        File logFile = new File(externalDir, "logs.txt");
-
-        if (logFile.exists()) {
-            Uri fileUri = FileProvider.getUriForFile(this, getPackageName() + ".provider", logFile);
-
-            if (fileUri != null) {
-                StorageReference logRef = FirebaseStorage.getInstance().getReference("other").child("reports").child("error_reports").child(FirebaseAuth.getInstance().getCurrentUser().getUid()).child(System.currentTimeMillis() + ".txt");
-                PrepNestUtil.showLoadingDialog(this, true);
-                logRef.putFile(fileUri).addOnSuccessListener(taskSnapshot -> taskSnapshot.getStorage().getDownloadUrl().addOnSuccessListener(uri -> {
-                    // upload data to fdb
-                    uploadDataToFDB(uri.toString());
-                })).addOnFailureListener(error -> {
-                    PrepNestUtil.showLoadingDialog(this, false);
-                    PrepNestUtil.showToast(DebugActivity.this, "Failed to send request");
-                });
-            }
-        } else {
-            // upload without log file
-            uploadDataToFDB("null");
-        }
-    }
-
-
-    public void uploadDataToFDB(final String _url) {
+        PrepNestUtil.showLoadingDialog(this, true);
         DatabaseReference reports = FirebaseDatabase.getInstance().getReference("reports/error_reports");
         HashMap<String, Object> errorMap = new HashMap<>();
         errorMap.put("error", getIntent().getStringExtra("error"));
         if (FirebaseAuth.getInstance().getCurrentUser() != null) {
             errorMap.put("user", FirebaseAuth.getInstance().getCurrentUser().getUid());
-        }
-        if (!_url.equals("null")) {
-            errorMap.put("log file", _url);
+        } else {
+            errorMap.put("user", "null");
         }
         errorMap.put("timestamp", String.valueOf(System.currentTimeMillis()));
         reports.child(reports.push().getKey()).setValue(errorMap).addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
                 PrepNestUtil.showLoadingDialog(this, false);
-                Toast.makeText(DebugActivity.this, "Sent successfully!", Toast.LENGTH_SHORT).show();
+                PrepNestUtil.showToast(DebugActivity.this, "Sent successfully!");
                 finishAffinity();
             } else {
                 PrepNestUtil.showLoadingDialog(this, false);
-                Toast.makeText(DebugActivity.this, "An unknown error occurred", Toast.LENGTH_SHORT).show();
+                PrepNestUtil.showToast(DebugActivity.this, "An unknown error occurred");
                 finishAffinity();
             }
         });
     }
-
 }

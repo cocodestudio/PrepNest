@@ -42,12 +42,10 @@ import com.cocode.prepnest.databinding.StatusViewBinding;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.MobileAds;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
-import com.google.android.material.snackbar.Snackbar;
 import com.google.android.play.core.appupdate.AppUpdateInfo;
 import com.google.android.play.core.appupdate.AppUpdateManager;
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory;
 import com.google.android.play.core.install.model.AppUpdateType;
-import com.google.android.play.core.install.model.InstallStatus;
 import com.google.android.play.core.install.model.UpdateAvailability;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
@@ -58,7 +56,6 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.gson.Gson;
-import com.takusemba.spotlight.OnSpotlightListener;
 import com.takusemba.spotlight.Spotlight;
 import com.takusemba.spotlight.Target;
 import com.takusemba.spotlight.shape.Circle;
@@ -97,7 +94,6 @@ public class HomepageActivity extends AppCompatActivity {
     private final Intent toFAQs = new Intent();
     private HomepageBinding binding;
     private NetworkMonitor networkMonitor;
-    private LogUtils logFile;
     private ValueEventListener resourceListener;
     private ArrayList<HashMap<String, Object>> recentlyAddedList = new ArrayList<>();
     private ArrayList<HashMap<String, Object>> recommendedList = new ArrayList<>();
@@ -277,7 +273,6 @@ public class HomepageActivity extends AppCompatActivity {
     }
 
     private void initializeLogic() {
-        logFile = new LogUtils(this);
         networkMonitor = new NetworkMonitor(this);
         designUI();
         attachAdaptersToRecyclerViews();
@@ -379,8 +374,10 @@ public class HomepageActivity extends AppCompatActivity {
 
         spotlight.start();
     }
+
     private void loadBannerAd() {
-        MobileAds.initialize(this, initializationStatus -> {});
+        MobileAds.initialize(this, initializationStatus -> {
+        });
         AdRequest adRequest = new AdRequest.Builder().build();
         binding.adView.loadAd(adRequest);
     }
@@ -388,7 +385,6 @@ public class HomepageActivity extends AppCompatActivity {
     @Override
     public void onStart() {
         super.onStart();
-        logFile.addActivity();
         checkAppMaintenance();
     }
 
@@ -501,7 +497,7 @@ public class HomepageActivity extends AppCompatActivity {
                         userData.put(child.getKey(), child.getValue());
                     }
 
-                    if ((Boolean)userData.getOrDefault("banned", false)) {
+                    if ((Boolean) userData.getOrDefault("banned", false)) {
                         PrepNestUtil.showToast(HomepageActivity.this, "Your account has been banned.");
                         finishAffinity();
                     }
@@ -711,7 +707,6 @@ public class HomepageActivity extends AppCompatActivity {
         if (resourceListener != null) {
             resources.child(Objects.requireNonNull(userData.get("course id")).toString()).removeEventListener(resourceListener);
         }
-        logFile.addLog("RESOURCES", "LOADING RESOURCES");
         resourceListener = new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
@@ -741,7 +736,6 @@ public class HomepageActivity extends AppCompatActivity {
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                logFile.addLog("RESOURCES", "FAILED TO LOAD RESOURCES: " + error);
                 toggleAllEmptyState();
             }
         };
@@ -855,7 +849,6 @@ public class HomepageActivity extends AppCompatActivity {
         );
         toggleBestListEmptyState(!bestList.isEmpty());
         binding.bestList.setAdapter(new BestListAdapter(bestList));
-        logFile.addLog("RESOURCES", "LOADED SUCCESSFULLY");
     }
 
     public void attachAdaptersToRecyclerViews() {

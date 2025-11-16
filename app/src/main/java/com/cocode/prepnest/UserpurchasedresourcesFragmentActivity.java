@@ -69,7 +69,6 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
     private final Intent toPDFView = new Intent();
     private UserpurchasedresourcesFragmentBinding binding;
     private resourcesAdapter listAdapter;
-    private LogUtils logFile;
     private String jsonCourseData = "";
     private ProgressDialog progress_dialog;
     private ArrayList<String> resourceIDs = new ArrayList<>();
@@ -102,10 +101,7 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
     }
 
     private void initializeLogic() {
-        logFile = new LogUtils(this);
-        logFile.addFragment();
         attachAdapterToRecyclerView();
-        logFile.addLog("RESOURCES", "LOADING RESOURCES");
         getPurchasedResourcesIDs();
         loadCourses();
 
@@ -151,7 +147,6 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
 
     public void getPurchasedResourcesIDs() {
         binding.progressBarLayout.setVisibility(View.VISIBLE);
-        logFile.addLog("RESOURCES", "GETTING RESOURCES IDS");
         DatabaseReference dataRef = users.child(auth.getCurrentUser().getUid()).child("purchased resources");
         dataRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -159,18 +154,14 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
                 if (dataSnapshot.exists() && (dataSnapshot.getValue() != null && !dataSnapshot.getValue(String.class).isEmpty())) {
                     resourceIDs = new Gson().fromJson(dataSnapshot.getValue(String.class), new TypeToken<ArrayList<String>>() {
                     }.getType());
-                    logFile.addLog("RESOURCES", "GOT SUCCESSFULLY");
                 } else {
                     resourceIDs = new ArrayList<>();
-                    logFile.addLog("RESOURCES", "NO IDS FOUND");
                 }
-                logFile.addLog("RESOURCES", "LOADING RESOURCES DATA");
                 getPurchasedResources(resourceIDs);
             }
 
             @Override
             public void onCancelled(DatabaseError databaseError) {
-                logFile.addLog("RESOURCES", "FAILED TO GET IDS : ".concat(databaseError.toString()));
                 PrepNestUtil.showToast(requireContext(), "An unknown error occurred : ".concat(databaseError.toString()));
                 binding.progressBarLayout.setVisibility(View.GONE);
                 binding.emptyStateContainer.setVisibility(View.VISIBLE);
@@ -207,7 +198,6 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
 
             final String finalId = id;
 
-            logFile.addLog("RESOURCES", "LOADING RESOURCE WITH ID : " + finalId);
 
             DatabaseReference lookupRef = firebase_database
                     .getReference("other")
@@ -229,7 +219,6 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
                     String courseId = lookupSnap.child("course id").getValue(String.class);
 
                     if (courseId == null || courseId.trim().isEmpty()) {
-                        logFile.addLog("RESOURCES", "Missing course id for " + finalId);
 
                         if (loadedCount.incrementAndGet() == _childNodes.size()) {
                             showPurchasedResourcesUI();
@@ -266,7 +255,6 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
 
                         @Override
                         public void onCancelled(@NonNull DatabaseError error) {
-                            logFile.addLog("RESOURCES", "FAILED LOADING DATA : " + finalId);
 
                             binding.progressBarLayout.setVisibility(View.GONE);
                             binding.emptyStateContainer.setVisibility(View.VISIBLE);
@@ -331,7 +319,6 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
         sheetbinding.deleteOption.setOnClickListener(_view -> {
             showLoadingDialog(true);
             resource_options.dismiss();
-            logFile.addLog("RESOURCE DELETE", "RESOURCE DELETION START");
             deleteItemFromFirebase(_item);
         });
         sheetbinding.showDetailsOption.setOnClickListener(_view -> {
@@ -378,7 +365,6 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
             showLoadingDialog(false);
             return;
         }
-        logFile.addLog("RESOURCE DELETION", "RESOURCE STARTS DELETING");
         final String folderName = _item.get("id").toString();
         for (int pos = 0; pos < resourceIDs.size(); pos++) {
             if (resourceIDs.get(pos).equals(_item.get("id").toString())) {
@@ -388,7 +374,6 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
         }
         String newIDs = new Gson().toJson(resourceIDs);
         users.child(auth.getCurrentUser().getUid()).child("purchased resources").setValue(newIDs).addOnCompleteListener(unused -> {
-            logFile.addLog("RESOURCE DELETE", "DELETED SUCCESSFULLY");
             showLoadingDialog(false);
             resourcesList.remove(_item);
             loadResourceItemsToList();
@@ -396,7 +381,6 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
             PrepNestUtil.showToast(requireActivity(), "Deleted successfully!");
             FolderUtils.deleteFolder(getContext(), folderName);
         }).addOnFailureListener(error -> {
-            logFile.addLog("RESOURCE DELETE", "FAILED TO DELETE : " + error.getCause());
             showLoadingDialog(false);
             PrepNestUtil.showToast(requireActivity(), "Failed to delete: " + error.getMessage());
         });
@@ -407,39 +391,30 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
         String folderName = _item.get("id").toString();
         File targetFolder = new File(internalDir, folderName);
         if (targetFolder.exists()) {
-            logFile.addLog("RESOURCE OPEN", "FOLDER EXISTS");
             navigateToResourceView(_item);
         } else {
-            logFile.addLog("RESOURCE OPEN", "FOLDER DOESN'T EXISTS");
-            logFile.addLog("RESOURCE DOWNLOAD", "DOWNLOADING RESOURCE ITEMS");
             showLoadingDialog(true);
             boolean created = targetFolder.mkdirs();
 
             if (created) {
-                logFile.addLog("RESOURCE DOWNLOAD", "FOLDER CREATED SUCCESSFULLY");
                 List<String> fileURLs;
                 fileURLs = new Gson().fromJson(_item.get("resource urls").toString(), new TypeToken<ArrayList<String>>() {
                 }.getType());
                 FilesDownloader.downloadFiles(getContext(), fileURLs, folderName, new FilesDownloader.DownloadCallback() {
                     @Override
                     public void onDownloadComplete() {
-                        logFile.addLog("RESOURCE DOWNLOAD", "ALL RESOURCES DOWNLOADED");
                         showLoadingDialog(false);
-                        logFile.addLog("RESOURCE OPEN", "MOVING TO NEXT ACTIVITY");
                         navigateToResourceView(_item);
                     }
 
                     @Override
                     public void onDownloadFailed(Exception e) {
-                        logFile.addLog("RESOURCE DOWNLOAD", "FAILED TO DOWNLOAD RESOURCES : " + e.getCause().toString());
                         showLoadingDialog(false);
                         boolean success = FolderUtils.deleteFolder(getContext(), folderName);
-                        logFile.addLog("RESOURCE DOWNLOAD", "FOLDER DELETION STATUS : " + success);
                         PrepNestUtil.showToast(getContext(), e.getCause().toString());
                     }
                 });
             } else {
-                logFile.addLog("RESOURCE DOWNLOAD", "FAILED TO CREATE FOLDER");
                 showLoadingDialog(false);
                 PrepNestUtil.showToast(getContext(), "An unknown error occurred !");
             }
@@ -640,12 +615,10 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
     public void navigateToResourceView(final HashMap<String, Object> _item) {
         if (_item.containsKey("type")) {
             if (_item.get("type").toString().equals("paper")) {
-                logFile.addLog("RESOURCE OPEN", "NAVIGATE TO IMAGE VIEW");
                 toImageView.setClass(requireContext(), ImageviewActivity.class);
                 toImageView.putExtra("id", _item.get("id").toString());
                 startActivity(toImageView);
             } else {
-                logFile.addLog("RESOURCE OPEN", "NAVIGATE TO PDF VIEW");
                 toPDFView.putExtra("id", _item.get("id").toString());
                 startActivity(toPDFView);
             }
@@ -905,7 +878,6 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             binding.container.setOnClickListener(_view1 -> {
                 int pos = _holder.getAdapterPosition();
                 if (pos != RecyclerView.NO_POSITION) {
-                    logFile.addLog("RESOURCE OPEN", "OPENING RESOURCE ITEM");
                     openResource(_data.get(pos));
                 }
             });

@@ -66,7 +66,6 @@ public class SignupActivity extends AppCompatActivity {
     private boolean isPasswordShow = false;
     private String coursesJson = "";
     private String selectedCourseID = "";
-    private LogUtils logFile;
     private double selectedSemester = 0;
     private ArrayList<HashMap<String, Object>> allCoursesList = new ArrayList<>();
     private FirebaseAuth auth;
@@ -129,7 +128,6 @@ public class SignupActivity extends AppCompatActivity {
                                                 if (binding.passwordEdittext.getText().toString().trim().equals(binding.confirmPwdEdittext.getText().toString().trim())) {
                                                     if (PrepNestUtil.isConnected(SignupActivity.this)) {
                                                         PrepNestUtil.showLoadingDialog(SignupActivity.this, true);
-                                                        logFile.addLog("USER", "CREATING USER ACCOUNT");
                                                         auth.createUserWithEmailAndPassword(binding.emailEdittext.getText().toString().trim(), binding.confirmPwdEdittext.getText().toString().trim()).addOnCompleteListener(SignupActivity.this, _auth_create_user_listener);
                                                     } else {
                                                         com.google.android.material.snackbar.Snackbar.make(binding.wrapperLayout, "No internet connection", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).setAction("", _view1 -> {
@@ -436,7 +434,6 @@ public class SignupActivity extends AppCompatActivity {
         _auth_create_user_listener = task -> {
 //                final String _errorMessage = _param1.getException() != null ? _param1.getException().getMessage() : "";
             if (task.isSuccessful()) {
-                logFile.addLog("USER", "ACCOUNT CREATED SUCCESSFULLY");
                 HashMap<String, Object> addUser;
                 addUser = new HashMap<>();
                 addUser.put("name", binding.nameEdittext.getText().toString().trim());
@@ -448,7 +445,6 @@ public class SignupActivity extends AppCompatActivity {
                 addUser.put("current year", (int) ((selectedSemester + 1) / 2));
                 addUser.put("provider", false);
 //                addUser.put("referred by", "");
-                logFile.addLog("USER", "ADDING USER TO DB");
 //                addWelcomeBonusToUser(addUser);
                 createNewUser(addUser);
             } else {
@@ -468,8 +464,6 @@ public class SignupActivity extends AppCompatActivity {
     }
 
     private void initializeLogic() {
-        logFile = new LogUtils(this);
-        logFile.addActivity();
         designUI();
         getCourses();
     }
@@ -646,17 +640,13 @@ public class SignupActivity extends AppCompatActivity {
         DatabaseReference userRef = users.child(auth.getCurrentUser().getUid());
         userRef.updateChildren(_user).addOnCompleteListener(addUser -> {
             if (addUser.isSuccessful()) {
-                logFile.addLog("USER", "USER ADDED TO DB SUCCESSFULLY");
                 HashMap<String, Object> userCredentials;
                 userCredentials = new HashMap<>();
                 userCredentials.put("email", FirebaseAuth.getInstance().getCurrentUser().getEmail());
                 userCredentials.put("password", binding.confirmPwdEdittext.getText().toString().trim());
                 user_credentials.edit().putString("credentials", new Gson().toJson(userCredentials)).apply();
-                logFile.addLog("USER", "ADDING WELCOME BONUS");
                 userRef.child("coins").setValue(Long.parseLong(temp)).addOnCompleteListener(addBonus -> {
                     if (addBonus.isSuccessful()) {
-                        logFile.addLog("USER", "WELCOME BONUS ADDED SUCCESSFULLY");
-                        logFile.addLog("USER", "ADDING BONUS TO USER HISTORY");
                         DatabaseReference historyRef = transaction_history.child(auth.getCurrentUser().getUid());
                         final String key = historyRef.push().getKey();
                         HashMap<String, Object> addHistory;
@@ -666,9 +656,7 @@ public class SignupActivity extends AppCompatActivity {
                         addHistory.put("timestamp", String.valueOf(System.currentTimeMillis()));
                         historyRef.child(key).setValue(addHistory).addOnCompleteListener(historyTask -> {
                             if (historyTask.isSuccessful()) {
-                                logFile.addLog("USER", "BONUS ADDED SUCCESSFULLY");
                             } else {
-                                logFile.addLog("USER", "FAILED TO ADD BONUS HISTORY : ".concat(historyTask.getException().toString()));
                             }
                             PrepNestUtil.showLoadingDialog(SignupActivity.this, false);
                             toAddRefer.setClass(SignupActivity.this, AddreferralActivity.class);
@@ -677,7 +665,6 @@ public class SignupActivity extends AppCompatActivity {
                             finish();
                         });
                     } else {
-                        logFile.addLog("USER", "FAILED TO ADD BONUS TO USER : ".concat(addBonus.getException().toString()));
                         PrepNestUtil.showLoadingDialog(SignupActivity.this, false);
                         toAddRefer.setClass(SignupActivity.this, AddreferralActivity.class);
                         startActivity(toAddRefer);
@@ -686,7 +673,6 @@ public class SignupActivity extends AppCompatActivity {
                     }
                 });
             } else {
-                logFile.addLog("USER", "FAILED TO ADD USER TO DB : ".concat(addUser.getException().toString()));
                 PrepNestUtil.showLoadingDialog(SignupActivity.this, false);
                 PrepNestUtil.showToast(SignupActivity.this, "Error: try again");
                 FirebaseAuth.getInstance().signOut();

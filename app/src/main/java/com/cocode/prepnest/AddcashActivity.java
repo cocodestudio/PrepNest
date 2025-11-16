@@ -42,7 +42,6 @@ public class AddcashActivity extends AppCompatActivity {
     private String qrText = "";
     private String fileName = "";
     private FirebaseAuth auth;
-    private LogUtils logFile;
     private NetworkMonitor networkMonitor;
 
 
@@ -95,9 +94,7 @@ public class AddcashActivity extends AppCompatActivity {
     }
 
     private void initializeLogic() {
-        logFile = new LogUtils(this);
         networkMonitor = new NetworkMonitor(this);
-        logFile.addActivity();
         designUI();
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -231,15 +228,12 @@ public class AddcashActivity extends AppCompatActivity {
 
     public void uploadPhotoToStorage(final Uri _uri) {
         PrepNestUtil.showLoadingDialog(this, true);
-        logFile.addLog("ADD CASH", "UPLOADING SCREENSHOT");
         StorageReference fileRef = FirebaseStorage.getInstance().getReference("other/add_cash_screenshots").child(auth.getCurrentUser().getUid()).child(System.currentTimeMillis() + ".jpg");
         UploadTask fileUpload = fileRef.putFile(_uri);
         fileUpload.addOnSuccessListener(taskSnapshot -> {
-            logFile.addLog("ADD CASH", "SCREENSHOT UPLOADED");
             fileRef.getDownloadUrl().addOnSuccessListener(uri -> sendRequest(uri.toString()));
         });
         fileUpload.addOnFailureListener(exception -> {
-            logFile.addLog("ADD CASH", "FAILED TO UPLOAD : ".concat(exception.toString()));
             PrepNestUtil.showToast(AddcashActivity.this, "An unknown error occurred : ".concat(exception.toString()));
             PrepNestUtil.showLoadingDialog(this, false);
         });
@@ -247,7 +241,6 @@ public class AddcashActivity extends AppCompatActivity {
 
 
     public void sendRequest(final String _url) {
-        logFile.addLog("ADD CASH", "SENDING REQUEST");
         DatabaseReference addCashRef = FirebaseDatabase.getInstance().getReference("requests/add_cash_requests").child(auth.getCurrentUser().getUid());
         String key = addCashRef.push().getKey();
         HashMap<String, Object> dataMap = new HashMap<>();
@@ -255,14 +248,12 @@ public class AddcashActivity extends AppCompatActivity {
         dataMap.put("timestamp", String.valueOf(System.currentTimeMillis()));
         addCashRef.child(key).setValue(dataMap).addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
-                logFile.addLog("ADD CASH", "REQUEST SENT SUCCESSFULLY");
                 screenshotUri = null;
                 fileName = "";
                 PrepNestUtil.showToast(AddcashActivity.this, "Request sent successfully.");
                 binding.ssFileName.setText("Select screenshot");
                 PrepNestUtil.showLoadingDialog(this, false);
             } else {
-                logFile.addLog("ADD CASH", "FAILED TO SENT REQUEST : ".concat(task.getException().toString()));
                 PrepNestUtil.showLoadingDialog(this, false);
                 PrepNestUtil.showToast(AddcashActivity.this, "An unknown error occurred.");
             }

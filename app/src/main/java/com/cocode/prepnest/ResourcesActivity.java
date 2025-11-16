@@ -64,7 +64,6 @@ public class ResourcesActivity extends AppCompatActivity {
     private final Intent toManageResources = new Intent();
     private ResourcesBinding binding;
     private HashMap<String, Object> filterMap = new HashMap<>();
-    private LogUtils logFile;
     private HashMap<String, Object> userData = new HashMap<>();
     private Items_listAdapter listAdapter;
     private NetworkMonitor networkMonitor;
@@ -93,9 +92,7 @@ public class ResourcesActivity extends AppCompatActivity {
     }
 
     private void initializeLogic() {
-        logFile = new LogUtils(this);
         networkMonitor = new NetworkMonitor(this);
-        logFile.addActivity();
         designUI();
         attachAdapterToRecyclerView();
         getUserData();
@@ -295,7 +292,6 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
 
 
     public void loadResources() {
-        logFile.addLog("RESOURCES", "LOADING RESOURCES");
         ValueEventListener listener = new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
@@ -323,7 +319,6 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
 
             @Override
             public void onCancelled(DatabaseError error) {
-                logFile.addLog("RESOURCES", "FAILED TO LOAD RESOURCES: " + error.toString());
                 binding.emptyStateLinear.setVisibility(View.VISIBLE);
                 binding.progressLinear.setVisibility(View.GONE);
                 binding.itemsList.setVisibility(View.GONE);
@@ -335,11 +330,9 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
 
 
     public void getUserData() {
-        logFile.addLog("USER", "LOADING USER DATA");
         if (getIntent().hasExtra("user")) {
             userData = new Gson().fromJson(getIntent().getStringExtra("user"), new TypeToken<HashMap<String, Object>>() {
             }.getType());
-            logFile.addLog("USER", "DATA LOADED SUCCESSFULLY");
             if (userData.containsKey("wishlist")) {
                 wishlistedResources = new Gson().fromJson(userData.get("wishlist").toString(), new TypeToken<ArrayList<String>>() {
                 }.getType());
@@ -359,7 +352,6 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
                 uploadedResources = new ArrayList<>();
             }
         } else {
-            logFile.addLog("USER", "FAILED TO GET DATA");
             auth.signOut();
             PrepNestUtil.showToast(this, "An unknown error occurred, please login again");
             finishAffinity();
@@ -656,7 +648,6 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             if (task.isSuccessful()) {
                 PrepNestUtil.showToast(ResourcesActivity.this, message);
             } else {
-                logFile.addLog("WISHLIST", "FAILED TO UPDATE WISHLIST: " + task.getException().toString());
                 PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred: " + task.getException().toString());
             }
         });
@@ -1090,7 +1081,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
                 if (_data.get(_position).get("subject").toString().length() >= 20) {
                     binding.subAndSessionContainer.setOrientation(LinearLayout.VERTICAL);
-                    sessionTxtParams.setMargins(0, (int)convertToDp(8), 0, 0);
+                    sessionTxtParams.setMargins(0, (int) convertToDp(8), 0, 0);
                 } else {
                     sessionTxtParams.setMargins(0, 0, 0, 0);
                     binding.subAndSessionContainer.setOrientation(LinearLayout.HORIZONTAL);

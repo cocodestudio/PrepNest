@@ -83,7 +83,6 @@ public class UseruploadedresourcesFragmentActivity extends Fragment {
     private HashMap<String, Object> userData = new HashMap<>();
     private resourcesAdapter listAdapter;
     private DatabaseReference userRequestedResources;
-    private LogUtils logFile;
     private String jsonCourseData = "";
     private ArrayList<String> resourceIDs = new ArrayList<>();
     private ProgressDialog progress_dialog;
@@ -132,11 +131,8 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
     }
 
     private void initializeLogic() {
-        logFile = new LogUtils(this);
         userRequestedResources = requests.child(auth.getCurrentUser().getUid());
         attachAdapterToRecyclerView();
-        logFile.addFragment();
-        logFile.addLog("RESOURCES", "LOADING RESOURCES");
         requestedResourcesLoaded.set(false);
         verifiedResourcesLoaded.set(false);
         getUploadedResources();
@@ -172,7 +168,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
 
     public void getUploadedResources() {
         DatabaseReference dataRef = users.child(auth.getCurrentUser().getUid());
-        logFile.addLog("RESOURCES", "GETTING UPLOADED RESOURCES");
         dataRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
@@ -195,9 +190,7 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                             } else {
                                 toggleState(R.drawable.icon_empty_box, getString(R.string.no_uploaded_resource_message), true, false);
                             }
-                            logFile.addLog("RESOURCES", "LOADING VERIFIED RESOURCES");
                             getVerifiedResources(resourceIDs);
-                            logFile.addLog("RESOURCES", "LOADING REQUESTED RESOURCES");
                             getRequestedResources();
                         } else {
                             binding.btnFab.setVisibility(View.GONE);
@@ -224,7 +217,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                         binding.progressBarLayout.setVisibility(View.GONE);
                     }
                 } else {
-                    logFile.addLog("RESOURCES", "FAILED LOADING USER DATA");
                     PrepNestUtil.showToast(requireContext(), "User data not found, please login again!");
                     auth.signOut();
                     requireActivity().finishAffinity();
@@ -234,7 +226,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
 
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
-                logFile.addLog("RESOURCES", "FAILED LOADING DATA : ".concat(databaseError.toString()));
                 PrepNestUtil.showToast(requireContext(), "An unknown error occurred : ".concat(databaseError.toString()));
                 binding.progressBarLayout.setVisibility(View.GONE);
             }
@@ -270,14 +261,12 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
     public void checkIfBothLoaded() {
         if (requestedResourcesLoaded.get() && verifiedResourcesLoaded.get()) {
             Log.d("ALL DATA", "ALL DATA IS LOADED");
-            logFile.addLog("RESOURCES", "DATA FROM BOTH DB LOADED");
             binding.progressBarLayout.setVisibility(View.GONE);
             if ((requestedResources.size() + verifiedResources.size()) == 0) {
                 toggleState(R.drawable.empty_box_illus, getString(R.string.no_uploaded_resource_message), true, false);
             } else {
                 binding.emptyStateLayout.setVisibility(View.GONE);
                 binding.itemsLayout.setVisibility(View.VISIBLE);
-                logFile.addLog("RESOURCES", "COMBINING LIST");
                 updateCombinedList();
             }
         }
@@ -302,7 +291,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                 allResources.clear();
                 allResources.addAll(updatedList);
                 listAdapter.updateData(new ArrayList<>(allResources));
-                logFile.addLog("RESOURCES", "LIST IS COMBINED");
             }
         });
     }
@@ -343,7 +331,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
                 if (isAdded()) {
-                    logFile.addLog("RESOURCES", "FAILED LOADING REQUESTED RESOURCES");
                     PrepNestUtil.showToast(requireActivity(), "An unknown error occurred: " + error.getMessage());
                 }
             }
@@ -366,7 +353,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
             final String finalId = id;
 
             Log.d("VERIFIED", "VERIFIED RESOURCES LOADING ID : " + finalId);
-            logFile.addLog("RESOURCES", "LOADING DATA OF ID : " + finalId);
 
             DatabaseReference lookupRef = firebase_database.getReference("other")
                     .child("resource_lookup")
@@ -388,7 +374,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                     String courseId = lookupSnap.child("course id").getValue(String.class);
 
                     if (courseId == null || courseId.trim().isEmpty()) {
-                        logFile.addLog("RESOURCES", "Missing course id for " + finalId);
                         if (loadedCount.incrementAndGet() == _childNodes.size()) {
                             verifiedResourcesLoaded.set(true);
                             checkIfBothLoaded();
@@ -440,7 +425,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                                 PrepNestUtil.showToast(requireActivity(),
                                         "Error loading data for " + finalId + ": " + error.getMessage());
                             }
-                            logFile.addLog("RESOURCES", "FAILED TO LOAD : " + finalId);
                         }
                     };
 
@@ -452,7 +436,8 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                 }
 
                 @Override
-                public void onCancelled(@NonNull DatabaseError error) {}
+                public void onCancelled(@NonNull DatabaseError error) {
+                }
             });
         }
     }
@@ -544,13 +529,11 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
             sheetbinding.discontinueTxt.setText("Discontinue");
         }
         sheetbinding.deleteOption.setOnClickListener(_view -> {
-            logFile.addLog("ITEM DELETE", "ITEM DELETION START");
             showLoadingDialog(true);
             resource_options.dismiss();
             deleteItemFromFirebase(_item);
         });
         sheetbinding.discontinueOption.setOnClickListener(_view -> {
-            logFile.addLog("RESOURCE STATUS", "RESOURCE IS CONTINUING/DISCONTINUING");
             showLoadingDialog(true);
             changeResourceStatus(_item);
             resource_options.dismiss();
@@ -567,10 +550,7 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         String id = String.valueOf(_item.get("id"));
         int length = allResources.size();
         if (!resourceIDs.contains(_item.get("id").toString())) {
-            logFile.addLog("RESOURCE ITEM", "STARTS DELETING");
             userRequestedResources.child(id).removeValue().addOnCompleteListener(aVoid -> {
-                logFile.addLog("RESOURCE ITEM", "DELETED FROM DATABASE");
-                logFile.addLog("RESOURCE ITEM", "DELETING FROM STORAGE");
                 List<String> fileURLs;
                 fileURLs = new Gson().fromJson(_item.get("resource urls").toString(), new TypeToken<ArrayList<String>>() {
                 }.getType());
@@ -581,7 +561,6 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                             allResources.remove(_item);
                             listAdapter.updateData(new ArrayList<>(allResources));
                         }
-                        logFile.addLog("RESOURCE DELETE", "ALL FILES DELETED");
                         showLoadingDialog(false);
                         PrepNestUtil.showToast(requireActivity(), "Deleted successfully!");
                         FolderUtils.deleteFolder(requireActivity(), id);
@@ -589,14 +568,12 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
 
                     @Override
                     public void onError(Exception e) {
-                        logFile.addLog("RESOURCE DELETE", "FILES FAILED TO DELETE : " + e.getMessage());
                         showLoadingDialog(false);
                         PrepNestUtil.showToast(requireActivity(), "An unknown error occurred: " + e.getMessage());
                     }
                 });
 
             }).addOnFailureListener(e -> {
-                logFile.addLog("RESOURCE DELETE", "FAILED TO DELETE FROM DATABASE : " + e.getMessage());
                 showLoadingDialog(false);
                 PrepNestUtil.showToast(requireActivity(), "Failed to delete, try again later");
             });
@@ -608,39 +585,31 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         String folderName = _item.get("id").toString();
         File targetFolder = new File(internalDir, folderName);
         if (targetFolder.exists()) {
-            logFile.addLog("RESOURCE OPEN", "FOLDER EXISTS");
             navigateToResourceView(_item);
         } else {
-            logFile.addLog("RESOURCE OPEN", "FOLDER DOESN'T EXISTS");
-            logFile.addLog("RESOURCE DOWNLOAD", "DOWNLOADING RESOURCE ITEMS");
             showLoadingDialog(true);
             boolean created = targetFolder.mkdirs();
 
             if (created) {
 
-                logFile.addLog("RESOURCE DOWNLOAD", "FOLDER CREATED SUCCESSFULLY");
                 List<String> fileURLs;
                 fileURLs = new Gson().fromJson(_item.get("resource urls").toString(), new TypeToken<ArrayList<String>>() {
                 }.getType());
                 FilesDownloader.downloadFiles(getContext(), fileURLs, folderName, new FilesDownloader.DownloadCallback() {
                     @Override
                     public void onDownloadComplete() {
-                        logFile.addLog("RESOURCE DOWNLOAD", "ALL RESOURCES DOWNLOADED");
                         showLoadingDialog(false);
                         navigateToResourceView(_item);
                     }
 
                     @Override
                     public void onDownloadFailed(Exception e) {
-                        logFile.addLog("RESOURCE DOWNLOAD", "FAILED TO DOWNLOAD RESOURCES : " + e.toString());
                         showLoadingDialog(false);
                         boolean success = FolderUtils.deleteFolder(getContext(), folderName);
-                        logFile.addLog("RESOURCE DOWNLOAD", "FOLDER DELETION STATUS : " + success);
                         PrepNestUtil.showToast(getContext(), e.getCause().toString());
                     }
                 });
             } else {
-                logFile.addLog("RESOURCE DOWNLOAD", "FAILED TO CREATE FOLDER");
                 showLoadingDialog(false);
                 PrepNestUtil.showToast(getContext(), "An unknown error occurred !");
             }
@@ -655,14 +624,11 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         if (_item.containsKey("discontinue")) {
             status = (Boolean) _item.get("discontinue");
         }
-        logFile.addLog("RESOURCE STATUS", "CURRENT STATUS : ".concat(Boolean.toString(status)));
         resourceItem.child("discontinue").setValue(!status).addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
-                logFile.addLog("RESOURCE STATUS", "UPDATED SUCCESSFULLY");
                 showLoadingDialog(false);
                 PrepNestUtil.showToast(getContext(), "Successfully updated!");
             } else {
-                logFile.addLog("RESOURCE STATUS", "FAILED TO UPDATE");
                 showLoadingDialog(false);
                 PrepNestUtil.showToast(getContext(), task.getException() != null ? task.getException().getCause().toString() : "An unknown error occurred");
             }
@@ -863,12 +829,10 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
     public void navigateToResourceView(final HashMap<String, Object> _item) {
         if (_item.containsKey("type")) {
             if (_item.get("type").toString().equals("paper")) {
-                logFile.addLog("RESOURCE OPEN", "NAVIGATE TO IMAGE VIEW");
                 toImageView.setClass(requireContext(), ImageviewActivity.class);
                 toImageView.putExtra("id", _item.get("id").toString());
                 startActivity(toImageView);
             } else {
-                logFile.addLog("RESOURCE OPEN", "NAVIGATE TO PDF VIEW");
                 toPDFView.putExtra("id", _item.get("id").toString());
                 startActivity(toPDFView);
             }
@@ -1142,7 +1106,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
                 if (item.get("subject").toString().length() >= 20) {
                     binding.metaDataContainer.setOrientation(LinearLayout.VERTICAL);
-                    bottomContainerParams.setMargins(0, (int)convertToDp(8), 0, 0);
+                    bottomContainerParams.setMargins(0, (int) convertToDp(8), 0, 0);
                 } else {
                     bottomContainerParams.setMargins(0, 0, 0, 0);
                     binding.metaDataContainer.setOrientation(LinearLayout.HORIZONTAL);
@@ -1231,7 +1195,6 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             binding.container.setOnClickListener(_view1 -> {
                 int pos = _holder.getAdapterPosition();
                 if (pos != RecyclerView.NO_POSITION) {
-                    logFile.addLog("RESOURCE OPEN", "OPENING RESOURCE ITEM");
                     openResource(_data.get(pos));
                 }
             });

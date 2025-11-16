@@ -53,7 +53,6 @@ public class AddreferralActivity extends AppCompatActivity {
     private String tempid = "";
     private HashMap<String, Object> otherUserData = new HashMap<>();
     private String currentUID = "";
-    private LogUtils logFile;
     private NetworkMonitor networkMonitor;
     private ArrayList<String> otherUserRefers = new ArrayList<>();
 
@@ -84,7 +83,6 @@ public class AddreferralActivity extends AppCompatActivity {
                 if (validateReferralCode(binding.edittext.getText().toString().trim())) {
                     if (PrepNestUtil.isConnected(AddreferralActivity.this)) {
                         PrepNestUtil.showLoadingDialog(AddreferralActivity.this, true);
-                        logFile.addLog("REFERRAL", "ADDING REFERRAL");
                         addReferCF(auth.getCurrentUser().getUid(), tempid);
                     } else {
                         com.google.android.material.snackbar.Snackbar.make(binding.wrapperLayout, "No internet connection", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).setAction("", _view1 -> {
@@ -121,9 +119,7 @@ public class AddreferralActivity extends AppCompatActivity {
     }
 
     private void initializeLogic() {
-        logFile = new LogUtils(this);
         networkMonitor = new NetworkMonitor(this);
-        logFile.addActivity();
         getAllUserIDs();
         designUI();
 //        updateOnChangedListener();
@@ -169,7 +165,6 @@ public class AddreferralActivity extends AppCompatActivity {
 
     public void getAllUserIDs() {
         PrepNestUtil.showLoadingDialog(this, true);
-        logFile.addLog("REFERRAL", "GETTING USER ID");
         users.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
@@ -179,7 +174,6 @@ public class AddreferralActivity extends AppCompatActivity {
                     userKeys.add(key);
                 }
                 PrepNestUtil.showLoadingDialog(AddreferralActivity.this, false);
-                logFile.addLog("REFERRAL", "ALL USER IDs FETCHED");
 
             }
 
@@ -187,7 +181,6 @@ public class AddreferralActivity extends AppCompatActivity {
             public void onCancelled(@NonNull DatabaseError databaseError) {
 
                 PrepNestUtil.showLoadingDialog(AddreferralActivity.this, false);
-                logFile.addLog("REFERRAL", "FAILED TO GET DATA : ".concat(databaseError.getMessage()));
                 PrepNestUtil.showToast(AddreferralActivity.this, "Database error: " + databaseError.getMessage());
 
             }
@@ -218,7 +211,6 @@ public class AddreferralActivity extends AppCompatActivity {
 
             @Override
             public void onChildChanged(@NonNull DataSnapshot dataSnapshot, String previousChildName) {
-                logFile.addLog("REFERRAL", "REFERRAL ADDED SUCCESSFULLY");
                 PrepNestUtil.showLoadingDialog(AddreferralActivity.this, false);
                 toHomePage.setClass(AddreferralActivity.this, HomepageActivity.class);
                 startActivity(toHomePage);
@@ -283,7 +275,6 @@ public class AddreferralActivity extends AppCompatActivity {
                         Log.d("ADD_REFER", "Response: " + resp);
                         if (response.isSuccessful()) {
                             runOnUiThread(() -> {
-                                logFile.addLog("REFERRAL", "REFERRAL ADDED SUCCESSFULLY");
                                 PrepNestUtil.showLoadingDialog(AddreferralActivity.this, false);
                                 toHomePage.setClass(AddreferralActivity.this, HomepageActivity.class);
                                 startActivity(toHomePage);
@@ -325,13 +316,10 @@ public class AddreferralActivity extends AppCompatActivity {
                     map.put("referred users", new Gson().toJson(otherUserRefers));
                     users.child(tempid).updateChildren(map).addOnCompleteListener(otask -> {
                         if (otask.isSuccessful()) {
-                            logFile.addLog("REFERRAL", "OTHER USER DATA IS UPDATED");
                             map = new HashMap<>();
                             map.put("referred by", tempid);
-                            logFile.addLog("REFERRAL", "ADDING DATA TO CURRENT USER");
                             users.child(auth.getCurrentUser().getUid()).updateChildren(map);
                         } else {
-                            logFile.addLog("REFERRAL", "FAILED TO REFER : ".concat(otask.getException().toString()));
                             PrepNestUtil.showToast(AddreferralActivity.this, "Error: try again");
                         }
                     });
@@ -343,7 +331,6 @@ public class AddreferralActivity extends AppCompatActivity {
 
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
-                logFile.addLog("REFERRAL", "FAILED TO OTHER USER DATA : ".concat(databaseError.toString()));
                 PrepNestUtil.showToast(AddreferralActivity.this, databaseError.toString());
             }
         });

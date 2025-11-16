@@ -45,7 +45,6 @@ public class TransactionhistoryActivity extends AppCompatActivity {
     private double amount = 0;
     private History_listviewAdapter adapter;
     private ChildEventListener transactionListener;
-    private LogUtils logFile;
     private NetworkMonitor networkMonitor;
     private FirebaseAuth auth;
 
@@ -69,9 +68,7 @@ public class TransactionhistoryActivity extends AppCompatActivity {
     }
 
     private void initializeLogic() {
-        logFile = new LogUtils(this);
         networkMonitor = new NetworkMonitor(this);
-        logFile.addActivity();
         designUI();
         adapter = new History_listviewAdapter(historyList);
         binding.historyListview.setLayoutManager(new LinearLayoutManager(this));
@@ -87,7 +84,8 @@ public class TransactionhistoryActivity extends AppCompatActivity {
     }
 
     private void loadBannerAd() {
-        MobileAds.initialize(this, initializationStatus -> {});
+        MobileAds.initialize(this, initializationStatus -> {
+        });
         AdRequest adRequest = new AdRequest.Builder().build();
         binding.adView.loadAd(adRequest);
     }
@@ -165,7 +163,6 @@ public class TransactionhistoryActivity extends AppCompatActivity {
 
 
     public void getTransactionHistory() {
-        logFile.addLog("TRANSACTIONS HISTORY", "LOADING HISTORY DATA");
         if (transactionListener == null) {
             transactionListener = new ChildEventListener() {
                 @Override
@@ -177,7 +174,6 @@ public class TransactionhistoryActivity extends AppCompatActivity {
                     adapter.notifyDataSetChanged();
                     showProgressBar(false);
                     toggleEmptyState();
-                    logFile.addLog("TRANSACTIONS HISTORY", "HISTORY LOADED SUCCESSFULLY");
                 }
 
                 @Override
@@ -262,12 +258,10 @@ public class TransactionhistoryActivity extends AppCompatActivity {
 
 
     public void checkDataExistence() {
-        logFile.addLog("TRANSACTIONS HISTORY", "CHECKING DATA EXISTENCE");
         transaction_history.child(auth.getCurrentUser().getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot _dataSnapshot) {
                 if (!_dataSnapshot.exists() || !_dataSnapshot.hasChildren()) {
-                    logFile.addLog("TRANSACTIONS HISTORY", "CHECKED SUCCESSFULLY");
                     showProgressBar(false);
                     toggleEmptyState();
                 }
@@ -312,10 +306,8 @@ public class TransactionhistoryActivity extends AppCompatActivity {
             boolean hasTime = _data.get(_data.size() - 1 - _position).containsKey("timestamp");
             if (hasAmount && hasType) {
                 typeValue = _data.get(_data.size() - 1 - _position).get("type").toString();
-                logFile.addLog("HISTORY", String.valueOf((long) ((_data.size() - 1) - _position)).concat("-TYPE VALUE: ").concat(typeValue));
                 if ((typeValue.equals("purchase") || typeValue.equals("resource_sold")) && _data.get(_data.size() - 1 - _position).containsKey("amount type")) {
                     amountType = _data.get(_data.size() - 1 - _position).get("amount type").toString();
-                    logFile.addLog("HISTORY", String.valueOf((long) ((_data.size() - 1) - _position)).concat("-AMOUNT TYPE HERE: ").concat(amountType));
                 } else {
                     if (typeValue.equals("cash_deduct") || typeValue.equals("cash_add")) {
                         amountType = "cash";
@@ -325,12 +317,10 @@ public class TransactionhistoryActivity extends AppCompatActivity {
                         }
                     }
                 }
-                logFile.addLog("HISTORY", String.valueOf((long) ((_data.size() - 1) - _position)).concat("-AMOUNT TYPE: ").concat(amountType));
                 if (!amountType.isEmpty()) {
                     binding.container.setVisibility(View.VISIBLE);
                     binding.line.setVisibility(View.VISIBLE);
                     amount = Double.parseDouble(_data.get(_data.size() - 1 - _position).get("amount").toString());
-                    logFile.addLog("HISTORY", String.valueOf((long) ((_data.size() - 1) - _position)).concat("-AMOUNT: ").concat(amountType));
                 } else {
                     binding.container.setVisibility(View.GONE);
                     binding.line.setVisibility(View.GONE);
@@ -396,7 +386,7 @@ public class TransactionhistoryActivity extends AppCompatActivity {
                         binding.type.setText("Welcome bonus");
                         binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
                         break;
-                    case "rewarded_ads" :
+                    case "rewarded_ads":
                         binding.amountTxt.setTextColor(0xFF4CAF50);
                         binding.type.setText("Rewarded ad");
                         binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));

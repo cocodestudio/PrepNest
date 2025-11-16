@@ -88,7 +88,6 @@ public class UserprofileActivity extends AppCompatActivity {
     private String jsonCourseData = "";
     private DatabaseReference users;
     private StorageReference profile_pictures;
-    private LogUtils logFile;
     private NetworkMonitor networkMonitor;
     private double selectedSemester = 0;
     private boolean semesterChanged = false;
@@ -398,9 +397,7 @@ btn_phone_verification.setText("VERIFY");
     private void initializeLogic() {
         users = FirebaseDatabase.getInstance().getReference("users");
         profile_pictures = FirebaseStorage.getInstance().getReference("profile_pictures");
-        logFile = new LogUtils(this);
         networkMonitor = new NetworkMonitor(this);
-        logFile.addActivity();
         String reference = "users/".concat(FirebaseAuth.getInstance().getCurrentUser().getUid());
         semesterChanged = false;
         designUI();
@@ -494,7 +491,6 @@ btn_phone_verification.setText("VERIFY");
     public void getUserData() {
         PrepNestUtil.showLoadingDialog(UserprofileActivity.this, true);
         PrepNestUtil.TransitionManager(binding.background, 150);
-        logFile.addLog("USER", "USER DATA IS LOADING");
         users.child(auth.getCurrentUser().getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
@@ -576,7 +572,6 @@ btn_phone_verification.setText("VERIFY");
                         addTotalSemesters(((Number) userData.get("course duration")).doubleValue());
                     }
                 } else {
-                    logFile.addLog("USER", "FAILED TO LOAD DATA");
                     PrepNestUtil.showToast(UserprofileActivity.this, "Failed to load data, login again!");
                     FirebaseAuth.getInstance().signOut();
                     finishAffinity();
@@ -588,7 +583,6 @@ btn_phone_verification.setText("VERIFY");
             public void onCancelled(@NonNull DatabaseError databaseError) {
 
                 if (!isFinishing() && !isDestroyed()) {
-                    logFile.addLog("USER", "ERROR IN LOADING USER DATA : ".concat(databaseError.toString()));
                     PrepNestUtil.showLoadingDialog(UserprofileActivity.this, false);
                     FirebaseAuth.getInstance().signOut();
                     PrepNestUtil.showToast(UserprofileActivity.this, "Please login again!");
@@ -849,15 +843,12 @@ phn_verification_sheet.show();
 
     public void uploadProfileToFirebase(final Uri _imageUri) {
         PrepNestUtil.showLoadingDialog(this, true);
-        logFile.addLog("PROFILE", "PROFILE IS STARTING TO UPLOAD");
         if (_imageUri == null) {
-            logFile.addLog("PROFILE", "FAILED TO UPLOAD, IMAGE URI IS NULL");
             PrepNestUtil.showLoadingDialog(UserprofileActivity.this, false);
             PrepNestUtil.showToast(UserprofileActivity.this, "Unknown error occurred, try again");
             return;
         }
         createNotificationChannel();
-        logFile.addLog("PROFILE", "PROFILE UPLOADING STARTS");
         NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(R.drawable.ic_notification).setContentTitle("Uploading").setContentText("Profile uploading").setPriority(NotificationCompat.PRIORITY_LOW).setOnlyAlertOnce(true).setProgress(100, 0, false);
 
@@ -883,7 +874,6 @@ phn_verification_sheet.show();
             notificationManager.notify(NOTIFICATION_ID, builder.build());
         });
         profileUpload.addOnSuccessListener(taskSnapshot -> {
-            logFile.addLog("PROFILE", "PROFILE IS UPLOADED");
             ref.getDownloadUrl().addOnSuccessListener(uri -> {
                 updateUserData(true, uri.toString());
                 builder.setContentText("Upload complete").setProgress(0, 0, false);
@@ -891,7 +881,6 @@ phn_verification_sheet.show();
             });
         });
         profileUpload.addOnFailureListener(e -> {
-            logFile.addLog("PROFILE", "PROFILE FAILED TO UPLOAD : ".concat(e.getMessage()));
             builder.setContentText("Upload failed!").setProgress(0, 0, false);
             notificationManager.notify(NOTIFICATION_ID, builder.build());
             PrepNestUtil.showLoadingDialog(UserprofileActivity.this, false);
@@ -914,7 +903,6 @@ phn_verification_sheet.show();
     }
 
     public void updateUserData(final boolean _hasProfile, final String _url) {
-        logFile.addLog("USER", "USER DATA ADDING TO DB");
         HashMap<String, Object> newUserData = new HashMap<>();
         if (!binding.nameEdittext.getText().toString().trim().equals(userData.get("name").toString())) {
             newUserData.put("name", binding.nameEdittext.getText().toString().trim());
@@ -949,10 +937,8 @@ phn_verification_sheet.show();
             users.child(auth.getCurrentUser().getUid()).updateChildren(newUserData).addOnCompleteListener(task -> {
                 PrepNestUtil.showLoadingDialog(UserprofileActivity.this, false);
                 if (task.isSuccessful()) {
-                    logFile.addLog("USER", "USER DATA ADDED");
                     PrepNestUtil.showToast(UserprofileActivity.this, "Changed successfully!");
                 } else {
-                    logFile.addLog("USER", "USER DATA FAILED TO ADD : ".concat(task.getException().toString()));
                     PrepNestUtil.showToast(UserprofileActivity.this, "Error : Try again");
                 }
             });
@@ -961,11 +947,9 @@ phn_verification_sheet.show();
 
     public void deleteProfileFromStorage(final String _url) {
         PrepNestUtil.showLoadingDialog(this, true);
-        logFile.addLog("PROFILE", "DELETING USER PROFILE FROM STORAGE");
         Uri uri = Uri.parse(_url);
         String fullPath = uri.getPath();
         if (fullPath == null || !fullPath.contains("/o/")) {
-            logFile.addLog("PROFILE", "FAILED TO DELETE PROFILE : STORAGE PATH ERROR");
             PrepNestUtil.showToast(UserprofileActivity.this, "Unknown error occurred.");
             PrepNestUtil.showLoadingDialog(UserprofileActivity.this, false);
             return;
@@ -977,10 +961,8 @@ phn_verification_sheet.show();
         String decodedPath = Uri.decode(encodedPath);
         StorageReference ref = FirebaseStorage.getInstance().getReference().child(decodedPath);
         ref.delete().addOnSuccessListener(aVoid -> {
-            logFile.addLog("PROFILE", "PROFILE DELETED SUCCESSFULLY");
             updateUserData(true, "delete");
         }).addOnFailureListener(exception -> {
-            logFile.addLog("PROFILE", "FAILED TO DELETE PROFILE PICTURE : ".concat(exception.getMessage()));
             PrepNestUtil.showLoadingDialog(UserprofileActivity.this, false);
             PrepNestUtil.showToast(UserprofileActivity.this, "Failed to remove profile picture, try again later.");
         });

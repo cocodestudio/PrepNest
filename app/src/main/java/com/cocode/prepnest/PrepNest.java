@@ -11,6 +11,11 @@ import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderF
 
 public class PrepNest extends Application {
     private static FirebaseAnalytics firebaseAnalytics;
+
+    public static FirebaseAnalytics getFirebaseAnalytics() {
+        return firebaseAnalytics;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -52,8 +57,5 @@ public class PrepNest extends Application {
             android.os.Process.killProcess(android.os.Process.myPid());
             System.exit(1);
         });
-    }
-    public static FirebaseAnalytics getFirebaseAnalytics() {
-        return firebaseAnalytics;
     }
 }

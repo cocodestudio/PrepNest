@@ -114,7 +114,8 @@ public class ReportIssueActivity extends AppCompatActivity {
     }
 
     private void loadBannerAd() {
-        MobileAds.initialize(this, initializationStatus -> {});
+        MobileAds.initialize(this, initializationStatus -> {
+        });
         AdRequest adRequest = new AdRequest.Builder().build();
         binding.adView.loadAd(adRequest);
     }

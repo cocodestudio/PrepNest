@@ -46,18 +46,17 @@ import okhttp3.Response;
 
 public class CashmanageActivity extends AppCompatActivity {
 
-    private RewardedAd rewardedAd;
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
     private final DatabaseReference users = FirebaseDatabase.getInstance().getReference("users");
     private final DatabaseReference requests = FirebaseDatabase.getInstance().getReference("requests/payout_requests");
     private final DatabaseReference transaction_history = FirebaseDatabase.getInstance().getReference("transactions_history");
     private final Intent toTransactionHistory = new Intent();
     private final Intent toAddCash = new Intent();
+    private RewardedAd rewardedAd;
     private CashmanageBinding binding;
     private HashMap<String, Object> userData = new HashMap<>();
     private HashMap<String, Object> dataMap = new HashMap<>();
     private double newAmount = 0;
-    private LogUtils logFile;
     private String keyRequest = "";
     private String keyHistory = "";
     private NetworkMonitor networkMonitor;
@@ -113,9 +112,7 @@ public class CashmanageActivity extends AppCompatActivity {
     }
 
     private void initializeLogic() {
-        logFile = new LogUtils(this);
         networkMonitor = new NetworkMonitor(this);
-        logFile.addActivity();
         designUI();
         getMoneyData();
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -280,7 +277,6 @@ public class CashmanageActivity extends AppCompatActivity {
 
     public void getMoneyData() {
         PrepNestUtil.showLoadingDialog(this, true);
-        logFile.addLog("MONEY", "GETTING MONEY DATA");
         if (getIntent().hasExtra("user")) {
             userData.clear();
             userData = new Gson().fromJson(getIntent().getStringExtra("user"), new TypeToken<HashMap<String, Object>>() {
@@ -320,9 +316,7 @@ public class CashmanageActivity extends AppCompatActivity {
                 binding.cashAmountTxt.setText("₹ 0");
             }
             PrepNestUtil.showLoadingDialog(this, false);
-            logFile.addLog("MONEY", "DATA LOADED SUCCESSFULLY");
         } else {
-            logFile.addLog("MONEY", "FAILED TO LOAD DATA");
             PrepNestUtil.showLoadingDialog(this, false);
             PrepNestUtil.showToast(CashmanageActivity.this, "Please login again!");
             FirebaseAuth.getInstance().signOut();

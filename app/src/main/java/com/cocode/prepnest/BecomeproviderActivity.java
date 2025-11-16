@@ -52,7 +52,6 @@ public class BecomeproviderActivity extends AppCompatActivity {
     private boolean isEmailVerified = false;
     private boolean isEligible = false;
     private HashMap<String, Object> features_visit_map = new HashMap<>();
-    private LogUtils logFile;
     private NetworkMonitor networkMonitor;
     private com.google.android.material.bottomsheet.BottomSheetDialog eligibility_issues_sheet;
     private com.google.android.material.bottomsheet.BottomSheetDialog provider_overview_sheet;
@@ -88,9 +87,7 @@ public class BecomeproviderActivity extends AppCompatActivity {
     }
 
     private void initializeLogic() {
-        logFile = new LogUtils(this);
         networkMonitor = new NetworkMonitor(this);
-        logFile.addActivity();
         designUI();
         showOverviewSheet();
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -128,7 +125,6 @@ public class BecomeproviderActivity extends AppCompatActivity {
 
     public void getUserData() {
         PrepNestUtil.showLoadingDialog(this, true);
-        logFile.addLog("USER", "GETTING USER DATA");
         users.child(auth.getCurrentUser().getUid()).addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -169,10 +165,8 @@ isPhnVerified = true;
                         });
                     }
                     PrepNestUtil.showLoadingDialog(BecomeproviderActivity.this, false);
-                    logFile.addLog("USER", "USER DATA LOADED SUCCESSFULLY");
                 } else {
                     PrepNestUtil.showLoadingDialog(BecomeproviderActivity.this, false);
-                    logFile.addLog("USER", "FAILED TO LOAD USER DATA");
                     PrepNestUtil.showToast(BecomeproviderActivity.this, "Please login again!");
                     FirebaseAuth.getInstance().signOut();
                     finishAffinity();
@@ -183,7 +177,6 @@ isPhnVerified = true;
             public void onCancelled(@NonNull DatabaseError error) {
 
                 if (!isFinishing() && !isDestroyed()) {
-                    logFile.addLog("USER", "FAILED TO LOAD USER DATA : ".concat(error.toString()));
                     PrepNestUtil.showLoadingDialog(BecomeproviderActivity.this, false);
                     FirebaseAuth.getInstance().signOut();
                     PrepNestUtil.showToast(BecomeproviderActivity.this, "Please login again!");
@@ -431,7 +424,6 @@ phone_status_txt.setText("Phone number is not verified");
 
     public void sendRequest() {
         PrepNestUtil.showLoadingDialog(this, true);
-        logFile.addLog("PROVIDER", "SENDING REQUEST");
         long currentTimeInMS = System.currentTimeMillis();
         HashMap<String, Object> requestMap = new HashMap<>();
         requestMap.put("timestamp", String.valueOf(currentTimeInMS));
@@ -439,12 +431,10 @@ phone_status_txt.setText("Phone number is not verified");
             if (addRequest.isSuccessful()) {
                 users.child(auth.getCurrentUser().getUid()).child("provider verification status").setValue("pending").addOnCompleteListener(updateRequest -> {
                     if (updateRequest.isSuccessful()) {
-                        logFile.addLog("PROVIDER", "REQUEST SENT SUCCESSFULLY");
                         PrepNestUtil.showToast(BecomeproviderActivity.this, "Request is successfully sent.");
                         binding.backIcon.performClick();
                         PrepNestUtil.showLoadingDialog(BecomeproviderActivity.this, false);
                     } else {
-                        logFile.addLog("PROVIDER", "FAILED TO SEND : ".concat(updateRequest.getException().toString()));
                         PrepNestUtil.showToast(BecomeproviderActivity.this, "An unknown error occured.");
                         PrepNestUtil.showLoadingDialog(BecomeproviderActivity.this, false);
                     }

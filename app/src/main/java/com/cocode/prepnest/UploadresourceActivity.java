@@ -84,8 +84,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class UploadresourceActivity extends AppCompatActivity {
 
     private static final String CHANNEL_ID = "files_upload";
-    private static String selectedKey;
     private static final int NOTIFICATION_ID = 1010;
+    private static String selectedKey;
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
     private final FirebaseDatabase fdb = FirebaseDatabase.getInstance();
     private final DatabaseReference requests = fdb.getReference("requests/new_resources_requests");

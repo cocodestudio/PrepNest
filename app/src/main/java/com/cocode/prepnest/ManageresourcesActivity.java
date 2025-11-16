@@ -1,7 +1,6 @@
 package com.cocode.prepnest;
 
 import android.os.Bundle;
-import android.view.View;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;

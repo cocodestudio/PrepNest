@@ -25,7 +25,6 @@ public class ImageviewActivity extends AppCompatActivity {
 
     private final List<Uri> imageURIs = new ArrayList<>();
     private ImageviewBinding binding;
-    private LogUtils logFile;
     private SharedPreferences features_visit;
 
     @Override
@@ -45,8 +44,6 @@ public class ImageviewActivity extends AppCompatActivity {
     private void initializeLogic() {
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
 
-        logFile = new LogUtils(this);
-        logFile.addActivity();
         loadImages(getIntent().getStringExtra("id"));
         initializeAndAttachAdapter();
 //        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
@@ -91,9 +88,8 @@ public class ImageviewActivity extends AppCompatActivity {
         }
         File folder = new File(getFilesDir(), _folder);
         if (folder.exists() && folder.isDirectory()) {
-            logFile.addLog("RESOURCE", "FOLDER EXISTS");
             File[] files = folder.listFiles();
-            logFile.addLog("RESOURCE", "HAS FILES : ".concat(String.valueOf((long) (files.length))));
+            assert files != null;
             for (File file : files) {
                 if (file.isFile()) {
                     Uri fileUri = Uri.fromFile(file);

@@ -34,7 +34,6 @@ public class LoginActivity extends AppCompatActivity {
     private final Intent toHomePage = new Intent();
     private boolean isPasswordShow = false;
     private LoginBinding binding;
-    private LogUtils logFile;
     private FirebaseAuth auth;
     private OnCompleteListener<AuthResult> _auth_sign_in_listener;
     private OnCompleteListener<Void> _auth_reset_password_listener;
@@ -69,7 +68,6 @@ public class LoginActivity extends AppCompatActivity {
                         if (binding.passwordEdittext.getText().toString().trim().length() > 7) {
                             if (PrepNestUtil.isConnected(LoginActivity.this)) {
                                 PrepNestUtil.showLoadingDialog(LoginActivity.this, true);
-                                logFile.addLog("USER", "USER IS LOGGING");
                                 auth.signInWithEmailAndPassword(binding.emailEdittext.getText().toString().trim(), binding.passwordEdittext.getText().toString().trim()).addOnCompleteListener(LoginActivity.this, _auth_sign_in_listener);
                             } else {
                                 com.google.android.material.snackbar.Snackbar.make(binding.wrapperLayout, "No internet connection", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).setAction("", _view1 -> {
@@ -170,7 +168,6 @@ public class LoginActivity extends AppCompatActivity {
 //                final String _errorMessage = _param1.getException() != null ? _param1.getException().getMessage() : "";
             PrepNestUtil.showLoadingDialog(LoginActivity.this, false);
             if (task.isSuccessful()) {
-                logFile.addLog("USER", "USER LOGGED IN SUCCESSFULLY");
                 HashMap<String, Object> userCredentials;
                 userCredentials = new HashMap<>();
                 userCredentials.put("email", FirebaseAuth.getInstance().getCurrentUser().getEmail());
@@ -182,7 +179,6 @@ public class LoginActivity extends AppCompatActivity {
 
                 finish();
             } else {
-                logFile.addLog("USER", "FAILED TO LOGGED IN : ".concat(task.getException() != null ? task.getException().getMessage() : ""));
                 showLoginErrorDialog();
             }
         };
@@ -199,8 +195,6 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void initializeLogic() {
-        logFile = new LogUtils(this);
-        logFile.addActivity();
         designUI();
     }
 
