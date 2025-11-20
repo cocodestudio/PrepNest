@@ -234,7 +234,7 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
 
     public void attachAdapterToRecyclerView() {
         binding.itemsList.setLayoutManager(new LinearLayoutManager(getContext()));
-        listAdapter = new resourcesAdapter(this::showResourceOptionsSheet);
+        listAdapter = new resourcesAdapter(this::showResourceOptionsSheet, allResources);
         binding.itemsList.setAdapter(listAdapter);
         binding.itemsList.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
@@ -958,63 +958,62 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
     public class resourcesAdapter extends RecyclerView.Adapter<resourcesAdapter.ViewHolder> {
 
-        private final ArrayList<HashMap<String, Object>> _data = new ArrayList<>();
+        private final ArrayList<HashMap<String, Object>> list;
         private final onResourceActionListener listener;
         private int _lastPosition = -1; // Used to track animations
 
 
-        public resourcesAdapter(onResourceActionListener listener) {
+        public resourcesAdapter(onResourceActionListener listener, ArrayList<HashMap<String, Object>> list) {
+            this.list = list;
             this.listener = listener;
             setHasStableIds(true);
         }
 
         public void updateData(List<HashMap<String, Object>> newData) {
-            DiffUtil.DiffResult result = DiffUtil.calculateDiff(new ResourceDiffCallback(_data, newData));
-            _data.clear();
-            _data.addAll(newData);
+            DiffUtil.DiffResult result = DiffUtil.calculateDiff(new ResourceDiffCallback(list, newData));
+            list.clear();
+            list.addAll(newData);
             result.dispatchUpdatesTo(this);
         }
 
         @Override
         public long getItemId(int position) {
-            Object id = _data.get(position).get("id");
+            Object id = list.get(position).get("id");
             return id != null ? id.toString().hashCode() : position;
         }
 
         @NonNull
         @Override
-        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            LayoutInflater _inflater = LayoutInflater.from(parent.getContext());
-            View _v = _inflater.inflate(R.layout.resource_item_card_full, parent, false);
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            ResourceItemCardFullBinding resourceItemCardFullBinding = ResourceItemCardFullBinding.inflate(
+                    LayoutInflater.from(parent.getContext()),
+                    parent,
+                    false
+            );
 
-            return new ViewHolder(_v);
+            return new ViewHolder(resourceItemCardFullBinding);
         }
 
         @Override
-        public void onBindViewHolder(ViewHolder _holder, final int _position) {
-            View _view = _holder.itemView;
-            ResourceItemCardFullBinding binding = ResourceItemCardFullBinding.bind(_view);
-            RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            _view.setLayoutParams(_lp);
-
+        public void onBindViewHolder(@NonNull ViewHolder holder, final int position) {
             // UI design
-            binding.iconMoreOptions.setVisibility(View.VISIBLE);
-            PrepNestUtil.roundViewWithRipple(binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            binding.uploadDateTxt.setBackground(new GradientDrawable() {
+            holder.binding.iconMoreOptions.setVisibility(View.VISIBLE);
+            PrepNestUtil.roundViewWithRipple(holder.binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
+            holder.binding.uploadDateTxt.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            binding.bestChoiceTag.setBackground(new GradientDrawable() {
+            holder.binding.bestChoiceTag.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFF000000));
-            binding.recommendedTag.setBackground(new GradientDrawable() {
+            holder.binding.recommendedTag.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
@@ -1024,15 +1023,15 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             // UI End
 
 
-            HashMap<String, Object> item = _data.get(_position);
+            HashMap<String, Object> item = list.get(position);
 
             if (item.containsKey("status")) {
-                binding.statusTxt.setText(item.get("status").toString());
-                binding.statusTxt.setVisibility(View.VISIBLE);
+                holder.binding.statusTxt.setText(item.get("status").toString());
+                holder.binding.statusTxt.setVisibility(View.VISIBLE);
                 switch (item.get("status").toString()) {
                     case "pending":
-                        binding.statusTxt.setTextColor(0xFFF57C00);
-                        binding.statusTxt.setBackground(new GradientDrawable() {
+                        holder.binding.statusTxt.setTextColor(0xFFF57C00);
+                        holder.binding.statusTxt.setBackground(new GradientDrawable() {
                             public GradientDrawable getIns(int a, int b) {
                                 this.setCornerRadius(a);
                                 this.setColor(b);
@@ -1042,8 +1041,8 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                         break;
 
                     case "failed":
-                        binding.statusTxt.setTextColor(0xFFE53935);
-                        binding.statusTxt.setBackground(new GradientDrawable() {
+                        holder.binding.statusTxt.setTextColor(0xFFE53935);
+                        holder.binding.statusTxt.setBackground(new GradientDrawable() {
                             public GradientDrawable getIns(int a, int b) {
                                 this.setCornerRadius(a);
                                 this.setColor(b);
@@ -1055,33 +1054,33 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                     case "verified":
                         if (item.containsKey("discontinue")) {
                             if (item.get("discontinue").toString().equals("true")) {
-                                binding.statusTxt.setBackground(new GradientDrawable() {
+                                holder.binding.statusTxt.setBackground(new GradientDrawable() {
                                     public GradientDrawable getIns(int a, int b) {
                                         this.setCornerRadius(a);
                                         this.setColor(b);
                                         return this;
                                     }
                                 }.getIns((int) 360, 0xFFF5F5F5));
-                                binding.statusTxt.setTextColor(0xFF757575);
-                                binding.statusTxt.setText("discontinue");
-                                binding.statusTxt.setVisibility(View.VISIBLE);
+                                holder.binding.statusTxt.setTextColor(0xFF757575);
+                                holder.binding.statusTxt.setText("discontinue");
+                                holder.binding.statusTxt.setVisibility(View.VISIBLE);
                             } else {
-                                binding.statusTxt.setVisibility(View.GONE);
+                                holder.binding.statusTxt.setVisibility(View.GONE);
                             }
                         } else {
-                            binding.statusTxt.setVisibility(View.GONE);
+                            holder.binding.statusTxt.setVisibility(View.GONE);
                         }
                         break;
 
                     default:
-                        binding.statusTxt.setTextColor(0xFF757575);
-                        binding.statusTxt.setVisibility(View.VISIBLE);
+                        holder.binding.statusTxt.setTextColor(0xFF757575);
+                        holder.binding.statusTxt.setVisibility(View.VISIBLE);
                 }
             } else {
-                binding.statusTxt.setVisibility(View.VISIBLE);
-                binding.statusTxt.setText("pending");
-                binding.statusTxt.setTextColor(0xFFF57C00);
-                binding.statusTxt.setBackground(new GradientDrawable() {
+                holder.binding.statusTxt.setVisibility(View.VISIBLE);
+                holder.binding.statusTxt.setText("pending");
+                holder.binding.statusTxt.setTextColor(0xFFF57C00);
+                holder.binding.statusTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
@@ -1091,78 +1090,78 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             }
 
             if (item.containsKey("subject")) {
-                binding.subjectNameTxt.setText(item.get("subject").toString());
-                binding.subjectNameTxt.setBackground(new GradientDrawable() {
+                holder.binding.subjectNameTxt.setText(item.get("subject").toString());
+                holder.binding.subjectNameTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.subjectNameTxt.setVisibility(View.VISIBLE);
+                holder.binding.subjectNameTxt.setVisibility(View.VISIBLE);
 
                 ViewGroup.MarginLayoutParams bottomContainerParams =
-                        (ViewGroup.MarginLayoutParams) binding.statusAndDateContainer.getLayoutParams();
+                        (ViewGroup.MarginLayoutParams) holder.binding.statusAndDateContainer.getLayoutParams();
 
                 if (item.get("subject").toString().length() >= 20) {
-                    binding.metaDataContainer.setOrientation(LinearLayout.VERTICAL);
+                    holder.binding.metaDataContainer.setOrientation(LinearLayout.VERTICAL);
                     bottomContainerParams.setMargins(0, (int) convertToDp(8), 0, 0);
                 } else {
                     bottomContainerParams.setMargins(0, 0, 0, 0);
-                    binding.metaDataContainer.setOrientation(LinearLayout.HORIZONTAL);
+                    holder.binding.metaDataContainer.setOrientation(LinearLayout.HORIZONTAL);
                 }
-                binding.statusAndDateContainer.setLayoutParams(bottomContainerParams);
+                holder.binding.statusAndDateContainer.setLayoutParams(bottomContainerParams);
             } else {
-                binding.subjectNameTxt.setText("None");
-                binding.subjectNameTxt.setVisibility(View.VISIBLE);
+                holder.binding.subjectNameTxt.setText("None");
+                holder.binding.subjectNameTxt.setVisibility(View.VISIBLE);
             }
 
 
             if (item.containsKey("resource title")) {
-                binding.title.setText(item.get("resource title").toString());
+                holder.binding.title.setText(item.get("resource title").toString());
             } else {
-                binding.title.setText("No name");
+                holder.binding.title.setText("No name");
             }
 
             if (item.containsKey("type")) {
                 if (item.get("type").toString().equals("paper")) {
-                    binding.image.setImageResource(R.drawable.previous_paper);
+                    holder.binding.image.setImageResource(R.drawable.previous_paper);
                 } else {
-                    binding.image.setImageResource(R.drawable.short_notes);
+                    holder.binding.image.setImageResource(R.drawable.short_notes);
                 }
             } else {
-                binding.image.setVisibility(View.INVISIBLE);
+                holder.binding.image.setVisibility(View.INVISIBLE);
             }
             if (item.containsKey("best choice")) {
                 if (item.get("best choice").toString().equals("true")) {
-                    binding.bestChoiceTag.setVisibility(View.VISIBLE);
+                    holder.binding.bestChoiceTag.setVisibility(View.VISIBLE);
                 } else {
-                    binding.bestChoiceTag.setVisibility(View.GONE);
+                    holder.binding.bestChoiceTag.setVisibility(View.GONE);
                 }
             } else {
-                binding.bestChoiceTag.setVisibility(View.GONE);
+                holder.binding.bestChoiceTag.setVisibility(View.GONE);
             }
             if (item.containsKey("recommended")) {
                 if (item.get("recommended").toString().equals("true")) {
-                    binding.recommendedTag.setVisibility(View.VISIBLE);
+                    holder.binding.recommendedTag.setVisibility(View.VISIBLE);
                 } else {
-                    binding.recommendedTag.setVisibility(View.GONE);
+                    holder.binding.recommendedTag.setVisibility(View.GONE);
                 }
             } else {
-                binding.recommendedTag.setVisibility(View.GONE);
+                holder.binding.recommendedTag.setVisibility(View.GONE);
             }
             if (item.containsKey("date of upload")) {
-                binding.uploadDateTxt.setText(formatTimeDifference(item.get("date of upload").toString()));
-                binding.uploadDateTxt.setVisibility(View.VISIBLE);
+                holder.binding.uploadDateTxt.setText(formatTimeDifference(item.get("date of upload").toString()));
+                holder.binding.uploadDateTxt.setVisibility(View.VISIBLE);
             } else {
-                binding.uploadDateTxt.setVisibility(View.GONE);
+                holder.binding.uploadDateTxt.setVisibility(View.GONE);
             }
 
 
             ViewGroup.MarginLayoutParams paramscontainer =
-                    (ViewGroup.MarginLayoutParams) binding.container.getLayoutParams();
+                    (ViewGroup.MarginLayoutParams) holder.binding.container.getLayoutParams();
 
-            if (_position == (_data.size() - 1)) {
+            if (position == (list.size() - 1)) {
                 paramscontainer.setMargins(
                         (int) convertToDp(20),
                         (int) convertToDp(10),
@@ -1181,28 +1180,28 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             paramscontainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
             paramscontainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
 
-            binding.container.setLayoutParams(paramscontainer);
+            holder.binding.container.setLayoutParams(paramscontainer);
 
 
-            binding.iconMoreOptions.setOnClickListener(v -> {
-                int pos = _holder.getAdapterPosition();
+            holder.binding.iconMoreOptions.setOnClickListener(v -> {
+                int pos = holder.getAdapterPosition();
                 if (pos != RecyclerView.NO_POSITION && listener != null) {
-                    listener.showOptions(_data.get(pos));
+                    listener.showOptions(list.get(pos));
                 }
             });
 
 
-            binding.container.setOnClickListener(_view1 -> {
-                int pos = _holder.getAdapterPosition();
+            holder.binding.container.setOnClickListener(_view1 -> {
+                int pos = holder.getAdapterPosition();
                 if (pos != RecyclerView.NO_POSITION) {
-                    openResource(_data.get(pos));
+                    openResource(list.get(pos));
                 }
             });
         }
 
         @Override
         public int getItemCount() {
-            return _data.size();
+            return list.size();
         }
 
         // Custom animation method
@@ -1221,8 +1220,10 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
         }
 
         public class ViewHolder extends RecyclerView.ViewHolder {
-            public ViewHolder(View v) {
-                super(v);
+            ResourceItemCardFullBinding binding;
+            public ViewHolder(ResourceItemCardFullBinding binding) {
+                super(binding.getRoot());
+                this.binding = binding;
             }
         }
     }

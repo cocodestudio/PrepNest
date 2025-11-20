@@ -38,12 +38,12 @@ public class OnboardingActivity extends AppCompatActivity {
         super.onCreate(_savedInstanceState);
         binding = OnboardingBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        initialize(_savedInstanceState);
+        initialize();
         FirebaseApp.initializeApp(this);
         initializeLogic();
     }
 
-    private void initialize(Bundle _savedInstanceState) {
+    private void initialize() {
         features_visit = getSharedPreferences("features visit", Activity.MODE_PRIVATE);
 
         binding.viewpager.addOnPageChangeListener(new OnPageChangeListener() {
@@ -106,6 +106,7 @@ public class OnboardingActivity extends AppCompatActivity {
         datamap.put("subtext", getString(R.string.app_earn_coins_msg));
         datalist.add(datamap);
         binding.viewpager.setAdapter(new ViewpagerAdapter(datalist));
+        assert binding.viewpager.getAdapter() != null;
         binding.viewpager.getAdapter().notifyDataSetChanged();
     }
 
@@ -120,65 +121,73 @@ public class OnboardingActivity extends AppCompatActivity {
 
     public class ViewpagerAdapter extends PagerAdapter {
 
-        Context _context;
-        ArrayList<HashMap<String, Object>> _data;
+        private final Context context;
+        private final ArrayList<HashMap<String, Object>> data;
 
-        public ViewpagerAdapter(Context _ctx, ArrayList<HashMap<String, Object>> _arr) {
-            _context = _ctx;
-            _data = _arr;
+        public ViewpagerAdapter(Context context, ArrayList<HashMap<String, Object>> data) {
+            this.context = context;
+            this.data = data;
         }
 
-        public ViewpagerAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _context = OnboardingActivity.this;
-            _data = _arr;
+        // Only valid when called inside OnboardingActivity
+        public ViewpagerAdapter(ArrayList<HashMap<String, Object>> data) {
+            this.context = OnboardingActivity.this;
+            this.data = data;
         }
 
         @Override
         public int getCount() {
-            return _data.size();
+            return data.size();
         }
 
         @Override
-        public boolean isViewFromObject(@NonNull View _view, @NonNull Object _object) {
-            return _view == _object;
+        public boolean isViewFromObject(@NonNull View view, @NonNull Object object) {
+            return view == object;
         }
 
         @Override
-        public void destroyItem(ViewGroup _container, int _position, @NonNull Object _object) {
-            _container.removeView((View) _object);
+        public void destroyItem(@NonNull ViewGroup container, int position, @NonNull Object object) {
+            container.removeView((View) object);
         }
 
         @Override
-        public int getItemPosition(@NonNull Object _object) {
-            return super.getItemPosition(_object);
-        }
-
-        @Override
-        public CharSequence getPageTitle(int pos) {
-            // Use the Activity Event (onTabLayoutNewTabAdded) in order to use this method
-            return "page " + pos;
+        public CharSequence getPageTitle(int position) {
+            return "page " + position;
         }
 
         @NonNull
         @Override
-        public Object instantiateItem(@NonNull ViewGroup _container, final int _position) {
-            OnboardingItemBinding binding = OnboardingItemBinding.inflate(LayoutInflater.from(_context), _container, false);
+        public Object instantiateItem(@NonNull ViewGroup container, int position) {
 
-            binding.title.setText(_data.get(_position).get("title").toString());
-            binding.subtext.setText(_data.get(_position).get("subtext").toString());
-            if (_position == 0) {
-                binding.image.setImageResource(R.drawable.welcome_illus);
-            }
-            if (_position == 1) {
-                binding.image.setImageResource(R.drawable.app_about_illus);
-            }
-            if (_position == 2) {
-                binding.image.setImageResource(R.drawable.earn_illus);
+            OnboardingItemBinding binding = OnboardingItemBinding.inflate(
+                    LayoutInflater.from(context),
+                    container,
+                    false
+            );
+
+            // Safe value extraction
+            String title = String.valueOf(data.get(position).get("title"));
+            String subtext = String.valueOf(data.get(position).get("subtext"));
+
+            binding.title.setText(title);
+            binding.subtext.setText(subtext);
+
+            // Set image based on position
+            switch (position) {
+                case 0:
+                    binding.image.setImageResource(R.drawable.welcome_illus);
+                    break;
+                case 1:
+                    binding.image.setImageResource(R.drawable.app_about_illus);
+                    break;
+                case 2:
+                    binding.image.setImageResource(R.drawable.earn_illus);
+                    break;
             }
 
-            View _view = binding.getRoot();
-            _container.addView(_view);
-            return _view;
+            View root = binding.getRoot();
+            container.addView(root);
+            return root;
         }
     }
 }

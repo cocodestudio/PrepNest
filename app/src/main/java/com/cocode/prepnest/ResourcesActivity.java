@@ -65,7 +65,7 @@ public class ResourcesActivity extends AppCompatActivity {
     private ResourcesBinding binding;
     private HashMap<String, Object> filterMap = new HashMap<>();
     private HashMap<String, Object> userData = new HashMap<>();
-    private Items_listAdapter listAdapter;
+    private ItemsListAdapter listAdapter;
     private NetworkMonitor networkMonitor;
     private ArrayList<String> wishlistedResources = new ArrayList<>();
     private ArrayList<String> purchasedResources = new ArrayList<>();
@@ -163,10 +163,10 @@ public class ResourcesActivity extends AppCompatActivity {
         gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
         sheetbinding.container.setBackground(gd);
         if (filterMap.containsKey("date")) {
-            if (filterMap.get("date").toString().equals("recent")) {
+            if (Objects.requireNonNull(filterMap.get("date")).toString().equals("recent")) {
                 setFilterOption(sheetbinding.dateSortRecentTxt, sheetbinding.dateSortOldTxt, null);
             } else {
-                if (filterMap.get("date").toString().equals("old")) {
+                if (Objects.requireNonNull(filterMap.get("date")).toString().equals("old")) {
                     setFilterOption(sheetbinding.dateSortOldTxt, sheetbinding.dateSortRecentTxt, null);
                 } else {
                     filterMap.put("date", "recent");
@@ -178,13 +178,13 @@ public class ResourcesActivity extends AppCompatActivity {
             setFilterOption(sheetbinding.dateSortRecentTxt, sheetbinding.dateSortOldTxt, null);
         }
         if (filterMap.containsKey("type")) {
-            if (filterMap.get("type").toString().equals("both")) {
+            if (Objects.requireNonNull(filterMap.get("type")).toString().equals("both")) {
                 setFilterOption(sheetbinding.typeSortBothTxt, sheetbinding.typeSortMidTxt, sheetbinding.typeSortSemTxt);
             } else {
-                if (filterMap.get("type").toString().equals("sem")) {
+                if (Objects.requireNonNull(filterMap.get("type")).toString().equals("sem")) {
                     setFilterOption(sheetbinding.typeSortSemTxt, sheetbinding.typeSortMidTxt, sheetbinding.typeSortBothTxt);
                 } else {
-                    if (filterMap.get("type").toString().equals("mid")) {
+                    if (Objects.requireNonNull(filterMap.get("type")).toString().equals("mid")) {
                         setFilterOption(sheetbinding.typeSortMidTxt, sheetbinding.typeSortSemTxt, sheetbinding.typeSortBothTxt);
                     } else {
                         filterMap.put("type", "both");
@@ -318,7 +318,7 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
             }
 
             @Override
-            public void onCancelled(DatabaseError error) {
+            public void onCancelled(@NonNull DatabaseError error) {
                 binding.emptyStateLinear.setVisibility(View.VISIBLE);
                 binding.progressLinear.setVisibility(View.GONE);
                 binding.itemsList.setVisibility(View.GONE);
@@ -333,20 +333,21 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
         if (getIntent().hasExtra("user")) {
             userData = new Gson().fromJson(getIntent().getStringExtra("user"), new TypeToken<HashMap<String, Object>>() {
             }.getType());
+            assert userData != null;
             if (userData.containsKey("wishlist")) {
-                wishlistedResources = new Gson().fromJson(userData.get("wishlist").toString(), new TypeToken<ArrayList<String>>() {
+                wishlistedResources = new Gson().fromJson(Objects.requireNonNull(userData.get("wishlist")).toString(), new TypeToken<ArrayList<String>>() {
                 }.getType());
             } else {
                 wishlistedResources = new ArrayList<>();
             }
             if (userData.containsKey("purchased resources")) {
-                purchasedResources = new Gson().fromJson(userData.get("purchased resources").toString(), new TypeToken<ArrayList<String>>() {
+                purchasedResources = new Gson().fromJson(Objects.requireNonNull(userData.get("purchased resources")).toString(), new TypeToken<ArrayList<String>>() {
                 }.getType());
             } else {
                 purchasedResources = new ArrayList<>();
             }
             if (userData.containsKey("uploaded resources")) {
-                uploadedResources = new Gson().fromJson(userData.get("uploaded resources").toString(), new TypeToken<ArrayList<String>>() {
+                uploadedResources = new Gson().fromJson(Objects.requireNonNull(userData.get("uploaded resources")).toString(), new TypeToken<ArrayList<String>>() {
                 }.getType());
             } else {
                 uploadedResources = new ArrayList<>();
@@ -366,16 +367,16 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
             for (HashMap<String, Object> resource : list) {
                 if (filterMap.containsKey("type")) {
                     if (resource.containsKey("type")) {
-                        if (filterMap.get("type").toString().equals("both")) {
+                        if (Objects.requireNonNull(filterMap.get("type")).toString().equals("both")) {
                             resourcesList.add(resource);
                         } else {
-                            if (filterMap.get("type").toString().equals("mid")) {
-                                if (resource.get("subtype").toString().equals("midterm")) {
+                            if (Objects.requireNonNull(filterMap.get("type")).toString().equals("mid")) {
+                                if (Objects.requireNonNull(resource.get("subtype")).toString().equals("midterm")) {
                                     resourcesList.add(resource);
                                 }
                             } else {
-                                if (filterMap.get("type").toString().equals("sem")) {
-                                    if (resource.get("subtype").toString().equals("semester")) {
+                                if (Objects.requireNonNull(filterMap.get("type")).toString().equals("sem")) {
+                                    if (Objects.requireNonNull(resource.get("subtype")).toString().equals("semester")) {
                                         resourcesList.add(resource);
                                     }
                                 }
@@ -386,7 +387,7 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
             }
             boolean recentFirst = true;
             if (filterMap.containsKey("date")) {
-                if (!(filterMap.get("date").toString().equals("recent"))) {
+                if (!(Objects.requireNonNull(filterMap.get("date")).toString().equals("recent"))) {
                     recentFirst = false;
                 }
             }
@@ -413,14 +414,14 @@ ListMapUtils.sortListByKey(resourcesList, "rating", true, ListMapUtils.SortType.
 
 
     public boolean getRequiredResources(final HashMap<String, Object> _item) {
-        boolean matchesSemester = ((Number) (_item.get("semester"))).intValue() <= (((Number) (userData.get("semester"))).intValue() + 2);
+        boolean matchesSemester = ((Number) (Objects.requireNonNull(_item.get("semester")))).intValue() <= (((Number) (Objects.requireNonNull(userData.get("semester")))).intValue() + 2);
         boolean isActive = !_item.containsKey("discontinue") || Boolean.FALSE.equals(_item.get("discontinue"));
         boolean tagMatches = true;
         if (getIntent().hasExtra("tag type")) {
-            if (getIntent().getStringExtra("tag type").equals("recommended")) {
-                tagMatches = _item.containsKey("recommended") && Boolean.parseBoolean(_item.get("recommended").toString());
-            } else if (getIntent().getStringExtra("tag type").equals("best")) {
-                tagMatches = _item.containsKey("best choice") && Boolean.parseBoolean(_item.get("best choice").toString());
+            if (Objects.equals(getIntent().getStringExtra("tag type"), "recommended")) {
+                tagMatches = _item.containsKey("recommended") && Boolean.parseBoolean(Objects.requireNonNull(_item.get("recommended")).toString());
+            } else if (Objects.equals(getIntent().getStringExtra("tag type"), "best")) {
+                tagMatches = _item.containsKey("best choice") && Boolean.parseBoolean(Objects.requireNonNull(_item.get("best choice")).toString());
             }
         }
         return matchesSemester && isActive && tagMatches;
@@ -441,7 +442,7 @@ ListMapUtils.sortListByKey(resourcesList, "rating", true, ListMapUtils.SortType.
 
     public void attachAdapterToRecyclerView() {
         binding.itemsList.setLayoutManager(new LinearLayoutManager(this));
-        listAdapter = new Items_listAdapter(resourcesList);
+        listAdapter = new ItemsListAdapter(resourcesList);
         binding.itemsList.setAdapter(listAdapter);
     }
 
@@ -466,9 +467,9 @@ ListMapUtils.sortListByKey(resourcesList, "rating", true, ListMapUtils.SortType.
 
             if (checkedId == sheetbinding.cashRadiobutton.getId()) {
                 if (userData.containsKey("cash")) {
-                    sheetbinding.cashRadiobutton.setText("Cash (₹".concat(String.valueOf(((Number) userData.get("cash")).longValue()).concat(")")));
+                    sheetbinding.cashRadiobutton.setText("Cash (₹".concat(String.valueOf(((Number) Objects.requireNonNull(userData.get("cash"))).longValue()).concat(")")));
                     if (resourceItem.containsKey("price")) {
-                        sheetbinding.btnBuy.setText("Buy for ₹".concat(String.valueOf(((Number) resourceItem.get("price")).longValue())));
+                        sheetbinding.btnBuy.setText("Buy for ₹".concat(String.valueOf(((Number) Objects.requireNonNull(resourceItem.get("price"))).longValue())));
                         sheetbinding.btnBuy.setEnabled(true);
                         sheetbinding.btnBuy.setAlpha(1f);
                     } else {
@@ -485,9 +486,9 @@ ListMapUtils.sortListByKey(resourcesList, "rating", true, ListMapUtils.SortType.
                 }
             } else if (checkedId == sheetbinding.coinsRadiobutton.getId()) {
                 if (userData.containsKey("coins")) {
-                    sheetbinding.coinsRadiobutton.setText("Coins (".concat(String.valueOf(((Number) userData.get("coins")).longValue()).concat(")")));
+                    sheetbinding.coinsRadiobutton.setText("Coins (".concat(String.valueOf(((Number) Objects.requireNonNull(userData.get("coins"))).longValue()).concat(")")));
                     if (resourceItem.containsKey("price")) {
-                        sheetbinding.btnBuy.setText("Buy for ".concat(String.valueOf(((Number) resourceItem.get("price")).longValue() * 5)).concat(" coins"));
+                        sheetbinding.btnBuy.setText("Buy for ".concat(String.valueOf(((Number) Objects.requireNonNull(resourceItem.get("price"))).longValue() * 5)).concat(" coins"));
                         sheetbinding.btnBuy.setEnabled(true);
                         sheetbinding.btnBuy.setAlpha(1f);
                     } else {
@@ -513,7 +514,7 @@ ListMapUtils.sortListByKey(resourcesList, "rating", true, ListMapUtils.SortType.
         PrepNestUtil.roundViewWithRipple(sheetbinding.btnWishlist, "#F5F5F5", 15, 0, "#000000", "#E0E0E0");
         PrepNestUtil.roundViewWithRipple(sheetbinding.btnBuy, "#000000", 15, 0, "#000000", "#212121");
         if (resourceItem.containsKey("resource title")) {
-            sheetbinding.resourceTitle.setText(resourceItem.get("resource title").toString());
+            sheetbinding.resourceTitle.setText(Objects.requireNonNull(resourceItem.get("resource title")).toString());
         } else {
             sheetbinding.resourceTitle.setText("No title");
         }
@@ -527,7 +528,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 }
 */
         if (resourceItem.containsKey("subject")) {
-            sheetbinding.subjectNameTxt.setText(resourceItem.get("subject").toString());
+            sheetbinding.subjectNameTxt.setText(Objects.requireNonNull(resourceItem.get("subject")).toString());
             sheetbinding.subjectNameTxt.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
@@ -540,7 +541,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             sheetbinding.subjectNameTxt.setVisibility(View.GONE);
         }
         if (resourceItem.containsKey("session")) {
-            sheetbinding.sessionTxt.setText(resourceItem.get("session").toString());
+            sheetbinding.sessionTxt.setText(Objects.requireNonNull(resourceItem.get("session")).toString());
             sheetbinding.sessionTxt.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
@@ -1035,120 +1036,119 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
         void onResult(boolean result);
     }
 
-    public class Items_listAdapter extends RecyclerView.Adapter<Items_listAdapter.ViewHolder> {
+    public class ItemsListAdapter extends RecyclerView.Adapter<ItemsListAdapter.ViewHolder> {
 
-        ArrayList<HashMap<String, Object>> _data;
+        private final ArrayList<HashMap<String, Object>> list;
 
-        public Items_listAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _data = _arr;
+        public ItemsListAdapter(ArrayList<HashMap<String, Object>> list) {
+            this.list = list;
         }
 
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            LayoutInflater _inflater = getLayoutInflater();
-            View _v = _inflater.inflate(R.layout.resource_item_card_full, null);
-            RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            _v.setLayoutParams(_lp);
-            return new ViewHolder(_v);
+            ResourceItemCardFullBinding resourceItemCardFullBinding = ResourceItemCardFullBinding.inflate(
+                    LayoutInflater.from(parent.getContext()),
+                    parent,
+                    false
+            );
+
+            return new ViewHolder(resourceItemCardFullBinding);
         }
 
         @Override
-        public void onBindViewHolder(ViewHolder _holder, final int _position) {
-            View _view = _holder.itemView;
-            ResourceItemCardFullBinding binding = ResourceItemCardFullBinding.bind(_view);
-
-            PrepNestUtil.roundViewWithRipple(binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            if (_data.get(_position).containsKey("resource title")) {
-                binding.title.setText(_data.get(_position).get("resource title").toString());
+        public void onBindViewHolder(@NonNull ViewHolder holder, final int position) {
+            PrepNestUtil.roundViewWithRipple(holder.binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
+            if (list.get(position).containsKey("resource title")) {
+                holder.binding.title.setText(list.get(position).get("resource title").toString());
             } else {
-                binding.title.setText("No title");
+                holder.binding.title.setText("No title");
             }
 
-            if (_data.get(_position).containsKey("subject")) {
-                binding.subjectNameTxt.setBackground(new GradientDrawable() {
+            if (list.get(position).containsKey("subject")) {
+                holder.binding.subjectNameTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.subjectNameTxt.setText(_data.get(_position).get("subject").toString());
-                binding.subjectNameTxt.setVisibility(View.VISIBLE);
+                holder.binding.subjectNameTxt.setText(list.get(position).get("subject").toString());
+                holder.binding.subjectNameTxt.setVisibility(View.VISIBLE);
 
                 ViewGroup.MarginLayoutParams sessionTxtParams =
-                        (ViewGroup.MarginLayoutParams) binding.sessionTxt.getLayoutParams();
+                        (ViewGroup.MarginLayoutParams) holder.binding.sessionTxt.getLayoutParams();
 
-                if (_data.get(_position).get("subject").toString().length() >= 20) {
-                    binding.subAndSessionContainer.setOrientation(LinearLayout.VERTICAL);
+                if (list.get(position).get("subject").toString().length() >= 20) {
+                    holder.binding.subAndSessionContainer.setOrientation(LinearLayout.VERTICAL);
                     sessionTxtParams.setMargins(0, (int) convertToDp(8), 0, 0);
                 } else {
                     sessionTxtParams.setMargins(0, 0, 0, 0);
-                    binding.subAndSessionContainer.setOrientation(LinearLayout.HORIZONTAL);
+                    holder.binding.subAndSessionContainer.setOrientation(LinearLayout.HORIZONTAL);
                 }
-                binding.sessionTxt.setLayoutParams(sessionTxtParams);
+                holder.binding.sessionTxt.setLayoutParams(sessionTxtParams);
             } else {
-                binding.subjectNameTxt.setVisibility(View.GONE);
+                holder.binding.subjectNameTxt.setVisibility(View.GONE);
             }
-            if (_data.get(_position).containsKey("session")) {
-                binding.sessionTxt.setBackground(new GradientDrawable() {
+            if (list.get(position).containsKey("session")) {
+                holder.binding.sessionTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.sessionTxt.setText(_data.get(_position).get("session").toString());
-                binding.sessionTxt.setVisibility(View.VISIBLE);
+                holder.binding.sessionTxt.setText(list.get(position).get("session").toString());
+                holder.binding.sessionTxt.setVisibility(View.VISIBLE);
             } else {
-                binding.sessionTxt.setVisibility(View.GONE);
+                holder.binding.sessionTxt.setVisibility(View.GONE);
             }
-            if (_data.get(_position).containsKey("best choice")) {
-                if (_data.get(_position).get("best choice").toString().equals("true")) {
-                    binding.bestChoiceTag.setBackground(new GradientDrawable() {
+            if (list.get(position).containsKey("best choice")) {
+                if (list.get(position).get("best choice").toString().equals("true")) {
+                    holder.binding.bestChoiceTag.setBackground(new GradientDrawable() {
                         public GradientDrawable getIns(int a, int b) {
                             this.setCornerRadius(a);
                             this.setColor(b);
                             return this;
                         }
                     }.getIns((int) 360, 0xFF000000));
-                    binding.bestChoiceTag.setVisibility(View.VISIBLE);
+                    holder.binding.bestChoiceTag.setVisibility(View.VISIBLE);
                 } else {
-                    binding.bestChoiceTag.setVisibility(View.GONE);
+                    holder.binding.bestChoiceTag.setVisibility(View.GONE);
                 }
             } else {
-                binding.bestChoiceTag.setVisibility(View.GONE);
+                holder.binding.bestChoiceTag.setVisibility(View.GONE);
             }
-            if (_data.get(_position).containsKey("recommended")) {
-                if (_data.get(_position).get("recommended").toString().equals("true")) {
-                    binding.recommendedTag.setBackground(new GradientDrawable() {
+            if (list.get(position).containsKey("recommended")) {
+                if (list.get(position).get("recommended").toString().equals("true")) {
+                    holder.binding.recommendedTag.setBackground(new GradientDrawable() {
                         public GradientDrawable getIns(int a, int b) {
                             this.setCornerRadius(a);
                             this.setColor(b);
                             return this;
                         }
                     }.getIns((int) 360, 0xFF000000));
-                    binding.recommendedTag.setVisibility(View.VISIBLE);
+                    holder.binding.recommendedTag.setVisibility(View.VISIBLE);
                 } else {
-                    binding.recommendedTag.setVisibility(View.GONE);
+                    holder.binding.recommendedTag.setVisibility(View.GONE);
                 }
             } else {
-                binding.recommendedTag.setVisibility(View.GONE);
+                holder.binding.recommendedTag.setVisibility(View.GONE);
             }
-            if (_data.get(_position).containsKey("type")) {
-                if (_data.get(_position).get("type").toString().equals("paper")) {
-                    binding.image.setImageResource(R.drawable.previous_paper);
+            if (list.get(position).containsKey("type")) {
+                if (list.get(position).get("type").toString().equals("paper")) {
+                    holder.binding.image.setImageResource(R.drawable.previous_paper);
                 } else {
-                    if (_data.get(_position).get("type").toString().equals("notes")) {
-                        binding.image.setImageResource(R.drawable.short_notes);
+                    if (list.get(position).get("type").toString().equals("notes")) {
+                        holder.binding.image.setImageResource(R.drawable.short_notes);
                     } else {
-                        binding.image.setVisibility(View.INVISIBLE);
+                        holder.binding.image.setVisibility(View.INVISIBLE);
                     }
                 }
             } else {
-                binding.image.setVisibility(View.INVISIBLE);
+                holder.binding.image.setVisibility(View.INVISIBLE);
             }
-            ViewGroup.LayoutParams rawParams = binding.container.getLayoutParams();
+            ViewGroup.LayoutParams rawParams = holder.binding.container.getLayoutParams();
             ViewGroup.MarginLayoutParams paramscontainer;
 
             if (rawParams instanceof ViewGroup.MarginLayoutParams) {
@@ -1161,7 +1161,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 );
             }
 
-            if (_position == (_data.size() - 1)) {
+            if (position == (list.size() - 1)) {
                 paramscontainer.setMargins(
                         (int) convertToDp(20),
                         (int) convertToDp(10),
@@ -1180,25 +1180,27 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             paramscontainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
             paramscontainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
 
-            binding.container.setLayoutParams(paramscontainer);
+            holder.binding.container.setLayoutParams(paramscontainer);
 
 
-            binding.container.setOnClickListener(_view1 -> {
-                int pos = _holder.getAdapterPosition();
+            holder.binding.container.setOnClickListener(_view1 -> {
+                int pos = holder.getAdapterPosition();
                 if (pos != RecyclerView.NO_POSITION) {
-                    checkResource(_data.get(pos));
+                    checkResource(list.get(pos));
                 }
             });
         }
 
         @Override
         public int getItemCount() {
-            return _data.size();
+            return list.size();
         }
 
         public class ViewHolder extends RecyclerView.ViewHolder {
-            public ViewHolder(View v) {
-                super(v);
+            ResourceItemCardFullBinding binding;
+            public ViewHolder(ResourceItemCardFullBinding binding) {
+                super(binding.getRoot());
+                this.binding = binding;
             }
         }
     }

@@ -108,13 +108,13 @@ public class HomepageActivity extends AppCompatActivity {
         super.onCreate(_savedInstanceState);
         binding = HomepageBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        initialize(_savedInstanceState);
+        initialize();
         FirebaseApp.initializeApp(this);
 
         initializeLogic();
     }
 
-    private void initialize(Bundle _savedInstanceState) {
+    private void initialize() {
 //        setSupportActionBar(binding.appToolbar);
 //        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 //        getSupportActionBar().setHomeButtonEnabled(true);
@@ -133,7 +133,7 @@ public class HomepageActivity extends AppCompatActivity {
 
         binding.cashContainer.setOnLongClickListener(_view -> {
             toAddCash.setClass(HomepageActivity.this, AddcashActivity.class);
-            toAddCash.putExtra("name", userData.get("name").toString());
+            toAddCash.putExtra("name", Objects.requireNonNull(userData.get("name")).toString());
             startActivity(toAddCash);
             overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
             return true;
@@ -213,10 +213,10 @@ public class HomepageActivity extends AppCompatActivity {
 
         binding.drawer.becomeProviderOp.setOnClickListener(_view -> {
             if (userData.containsKey("provider verification status")) {
-                if (userData.get("provider verification status").toString().equals("pending")) {
+                if (Objects.requireNonNull(userData.get("provider verification status")).toString().equals("pending")) {
                     showProviderVerificationStatusSheet(true);
                 } else {
-                    if (userData.get("provider verification status").toString().equals("failed")) {
+                    if (Objects.requireNonNull(userData.get("provider verification status")).toString().equals("failed")) {
                         showProviderVerificationStatusSheet(false);
                     } else {
                         PrepNestUtil.showToast(HomepageActivity.this, "Unknown error, try login again!");
@@ -255,6 +255,7 @@ public class HomepageActivity extends AppCompatActivity {
 
         binding.drawer.logoutOp.setOnClickListener(_view -> {
             FirebaseMessaging.getInstance().unsubscribeFromTopic("all");
+            assert auth.getCurrentUser() != null;
             FirebaseMessaging.getInstance().unsubscribeFromTopic(auth.getCurrentUser().getUid());
             FirebaseAuth.getInstance().signOut();
             toLogin.setClass(HomepageActivity.this, LoginActivity.class);
@@ -396,7 +397,7 @@ public class HomepageActivity extends AppCompatActivity {
 
         appUpdateManager.getAppUpdateInfo().addOnSuccessListener(appUpdateInfo -> {
             if (appUpdateInfo.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                startUpdate(appUpdateInfo, AppUpdateType.IMMEDIATE);
+                startUpdate(appUpdateInfo);
             }
         });
     }
@@ -465,16 +466,16 @@ public class HomepageActivity extends AppCompatActivity {
 
             // Check if update is available
             if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
-                startUpdate(appUpdateInfo, AppUpdateType.IMMEDIATE);
+                startUpdate(appUpdateInfo);
             }
         });
     }
 
-    private void startUpdate(AppUpdateInfo appUpdateInfo, int updateType) {
+    private void startUpdate(AppUpdateInfo appUpdateInfo) {
         try {
             appUpdateManager.startUpdateFlowForResult(
                     appUpdateInfo,
-                    updateType,
+                    AppUpdateType.IMMEDIATE,
                     this,
                     UPDATE_REQUEST_CODE);
         } catch (Exception e) {
@@ -484,6 +485,7 @@ public class HomepageActivity extends AppCompatActivity {
 
 
     public void getUserData() {
+        assert auth.getCurrentUser() != null;
         users.child(auth.getCurrentUser().getUid()).addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -502,25 +504,25 @@ public class HomepageActivity extends AppCompatActivity {
                         finishAffinity();
                     }
                     if (userData.containsKey("course id")) {
-                        FirebaseMessaging.getInstance().subscribeToTopic(userData.get("course id").toString());
+                        FirebaseMessaging.getInstance().subscribeToTopic(Objects.requireNonNull(userData.get("course id")).toString());
                     }
 
                     if (userData.containsKey("profile")) {
-                        if (userData.get("profile").toString().equals("null")) {
+                        if (Objects.requireNonNull(userData.get("profile")).toString().equals("null")) {
                             binding.drawer.userProfilePicture.setVisibility(View.GONE);
                             binding.drawer.defaultProfileTitle.setVisibility(View.VISIBLE);
                         } else {
                             binding.drawer.defaultProfileTitle.setVisibility(View.GONE);
                             binding.drawer.userProfilePicture.setVisibility(View.VISIBLE);
-                            Glide.with(getApplicationContext()).load(Uri.parse(userData.get("profile").toString())).into(binding.drawer.userProfilePicture);
+                            Glide.with(getApplicationContext()).load(Uri.parse(Objects.requireNonNull(userData.get("profile")).toString())).into(binding.drawer.userProfilePicture);
                         }
                     } else {
                         binding.drawer.userProfilePicture.setVisibility(View.GONE);
                         binding.drawer.defaultProfileTitle.setVisibility(View.VISIBLE);
                     }
                     if (userData.containsKey("name")) {
-                        binding.drawer.userNameTxt.setText(userData.get("name").toString());
-                        binding.drawer.defaultProfileTitle.setText(generateDefaultName(userData.get("name").toString()).toUpperCase());
+                        binding.drawer.userNameTxt.setText(Objects.requireNonNull(userData.get("name")).toString());
+                        binding.drawer.defaultProfileTitle.setText(generateDefaultName(Objects.requireNonNull(userData.get("name")).toString()).toUpperCase());
                     } else {
                         binding.drawer.defaultProfileTitle.setText("U");
                         binding.drawer.userNameTxt.setText("User");
@@ -552,10 +554,10 @@ public class HomepageActivity extends AppCompatActivity {
                         binding.drawer.becomeProviderOp.setVisibility(View.VISIBLE);
                     }
                     if (userData.containsKey("provider verification status")) {
-                        if (userData.get("provider verification status").toString().equals("pending")) {
+                        if (Objects.requireNonNull(userData.get("provider verification status")).toString().equals("pending")) {
                             binding.drawer.providerPendingIcon.setVisibility(View.VISIBLE);
                         } else {
-                            if (userData.get("provider verification status").toString().equals("failed")) {
+                            if (Objects.requireNonNull(userData.get("provider verification status")).toString().equals("failed")) {
                                 binding.drawer.providerPendingIcon.setImageResource(R.drawable.icon_error);
                             } else {
                                 binding.drawer.providerPendingIcon.setVisibility(View.GONE);
@@ -673,6 +675,7 @@ public class HomepageActivity extends AppCompatActivity {
 
     public void cancelProviderRequest() {
         PrepNestUtil.showLoadingDialog(this, true);
+        assert auth.getCurrentUser() != null;
         requests.child(auth.getCurrentUser().getUid()).removeValue().addOnCompleteListener(removeTask -> {
             if (removeTask.isSuccessful()) {
                 users.child(auth.getCurrentUser().getUid()).child("provider verification status").removeValue().addOnCompleteListener(updateTask -> {
@@ -695,11 +698,11 @@ public class HomepageActivity extends AppCompatActivity {
         binding.shimmerrecyclerview1.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         binding.shimmerrecyclerview2.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         binding.shimmerrecyclerview3.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
-        binding.shimmerrecyclerview1.setAdapter(new ShimmerAdapter(3));
+        binding.shimmerrecyclerview1.setAdapter(new ShimmerAdapter(this, 3));
         binding.shimmerView1.startShimmer();
-        binding.shimmerrecyclerview2.setAdapter(new ShimmerAdapter(3));
+        binding.shimmerrecyclerview2.setAdapter(new ShimmerAdapter(this, 3));
         binding.shimmerView2.startShimmer();
-        binding.shimmerrecyclerview3.setAdapter(new ShimmerAdapter(3));
+        binding.shimmerrecyclerview3.setAdapter(new ShimmerAdapter(this, 3));
         binding.shimmerView3.startShimmer();
     }
 
@@ -816,7 +819,7 @@ public class HomepageActivity extends AppCompatActivity {
     }
 
     public boolean getRequiredResources(final HashMap<String, Object> _item) {
-        boolean matchesSemester = ((Number) (_item.get("semester"))).intValue() <= (((Number) (userData.get("semester"))).intValue() + 2);
+        boolean matchesSemester = ((Number) (Objects.requireNonNull(_item.get("semester")))).intValue() <= (((Number) (Objects.requireNonNull(userData.get("semester")))).intValue() + 2);
         boolean isActive = !_item.containsKey("discontinue") || Boolean.FALSE.equals(_item.get("discontinue"));
         return matchesSemester && isActive;
     }
@@ -824,29 +827,23 @@ public class HomepageActivity extends AppCompatActivity {
     public void filterResources(final ArrayList<HashMap<String, Object>> _list) {
         ArrayList<HashMap<String, Object>> sortedList = new ArrayList<>(_list);
         ListMapUtils.sortListByKey(sortedList, "session", true, ListMapUtils.SortType.SESSION);
-        recentlyAddedList = new ArrayList<>(sortedList.stream().limit(3).collect(Collectors.toList()));
+        recentlyAddedList = sortedList.stream().limit(3).collect(Collectors.toCollection(ArrayList::new));
         binding.recentlyAddedList.setAdapter(new RecentlyAddedListAdapter(recentlyAddedList));
         toggleRecentListEmptyState(!recentlyAddedList.isEmpty());
-        recommendedList = new ArrayList<>(
-                sortedList.stream()
-                        .filter(item -> {
-                            Object value = item.get("recommended");
-                            return Boolean.TRUE.equals(value);
-                        })
-                        .limit(3)
-                        .collect(Collectors.toList())
-        );
+        recommendedList = sortedList.stream()
+                .filter(item -> {
+                    Object value = item.get("recommended");
+                    return Boolean.TRUE.equals(value);
+                })
+                .limit(3).collect(Collectors.toCollection(ArrayList::new));
         toggleRecommendedListEmptyState(!recommendedList.isEmpty());
         binding.recommendedList.setAdapter(new RecommendedListAdapter(recommendedList));
-        bestList = new ArrayList<>(
-                sortedList.stream()
-                        .filter(item -> {
-                            Object value = item.get("best choice");
-                            return Boolean.TRUE.equals(value);
-                        })
-                        .limit(3)
-                        .collect(Collectors.toList())
-        );
+        bestList = sortedList.stream()
+                .filter(item -> {
+                    Object value = item.get("best choice");
+                    return Boolean.TRUE.equals(value);
+                })
+                .limit(3).collect(Collectors.toCollection(ArrayList::new));
         toggleBestListEmptyState(!bestList.isEmpty());
         binding.bestList.setAdapter(new BestListAdapter(bestList));
     }
@@ -886,7 +883,7 @@ public class HomepageActivity extends AppCompatActivity {
         appMaintenance.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                boolean isAppClosed = dataSnapshot.getValue(Boolean.class);
+                boolean isAppClosed = Boolean.TRUE.equals(dataSnapshot.getValue(Boolean.class));
 
                 if (isAppClosed) {
                     Intent toAppMaintenance = new Intent();
@@ -952,50 +949,44 @@ public class HomepageActivity extends AppCompatActivity {
     }
 
     public class ShimmerAdapter extends RecyclerView.Adapter<ShimmerAdapter.ShimmerViewHolder> {
-        private final int itemCount;
 
-        public ShimmerAdapter(int itemCount) {
+        private final int itemCount;
+        private final Context context;
+
+        public ShimmerAdapter(Context context, int itemCount) {
+            this.context = context;
             this.itemCount = itemCount;
         }
 
         @NonNull
         @Override
         public ShimmerViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.shimmer_layout, parent, false);
-            return new ShimmerViewHolder(view);
+            LayoutInflater inflater = LayoutInflater.from(parent.getContext());
+            ShimmerLayoutBinding binding = ShimmerLayoutBinding.inflate(inflater, parent, false);
+            return new ShimmerViewHolder(binding);
         }
 
         @Override
         public void onBindViewHolder(@NonNull ShimmerViewHolder holder, int position) {
-            View _view = holder.itemView;
-            ShimmerLayoutBinding binding = ShimmerLayoutBinding.bind(_view);
 
-            binding.layout.setBackground(new GradientDrawable() {
-                public GradientDrawable getIns(int a, int b) {
-                    this.setCornerRadius(a);
-                    this.setColor(b);
-                    return this;
-                }
-            }.getIns((int) PrepNestUtil.getDip(HomepageActivity.this, 10), 0xFFEEEEEE));
+            // Background
+            GradientDrawable bg = new GradientDrawable();
+            bg.setCornerRadius(dp(10));
+            bg.setColor(0xFFEEEEEE);
+            holder.binding.layout.setBackground(bg);
 
-            ViewGroup.LayoutParams params = binding.layout.getLayoutParams();
-            if (params instanceof ViewGroup.MarginLayoutParams) {
-                ViewGroup.MarginLayoutParams marginParams = (ViewGroup.MarginLayoutParams) params;
+            // Margins
+            ViewGroup.MarginLayoutParams params =
+                    (ViewGroup.MarginLayoutParams) holder.binding.layout.getLayoutParams();
 
-                int marginStart = (int) convertToDp(10);
-                int marginTop = (int) convertToDp(10);
-                int marginEnd = (int) convertToDp(0);
-                int marginBottom = (int) convertToDp(10);
+            int marginStart = dp(10);
+            int marginEnd = dp(0);
 
-                if (position == 0) {
-                    marginStart = (int) convertToDp(20);
-                } else if (position == itemCount - 1) {
-                    marginEnd = (int) convertToDp(20);
-                }
+            if (position == 0) marginStart = dp(20);
+            else if (position == itemCount - 1) marginEnd = dp(20);
 
-                marginParams.setMargins(marginStart, marginTop, marginEnd, marginBottom);
-                binding.layout.setLayoutParams(marginParams);
-            }
+            params.setMargins(marginStart, dp(10), marginEnd, dp(10));
+            holder.binding.layout.setLayoutParams(params);
         }
 
         @Override
@@ -1004,152 +995,168 @@ public class HomepageActivity extends AppCompatActivity {
         }
 
         public class ShimmerViewHolder extends RecyclerView.ViewHolder {
-            public ShimmerViewHolder(@NonNull View itemView) {
-                super(itemView);
+            ShimmerLayoutBinding binding;
+
+            public ShimmerViewHolder(@NonNull ShimmerLayoutBinding binding) {
+                super(binding.getRoot());
+                this.binding = binding;
             }
+        }
+
+        private int dp(int value) {
+            return (int) TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP,
+                    value,
+                    context.getResources().getDisplayMetrics()
+            );
         }
     }
 
+
     public class InAppBannerAdapter extends PagerAdapter {
 
-        Context _context;
-        ArrayList<HashMap<String, Object>> _data;
+        private final Context context;
+        private final ArrayList<HashMap<String, Object>> data;
 
-        public InAppBannerAdapter(Context _ctx, ArrayList<HashMap<String, Object>> _arr) {
-            _context = _ctx;
-            _data = _arr;
+        public InAppBannerAdapter(Context context, ArrayList<HashMap<String, Object>> data) {
+            this.context = context;
+            this.data = data;
         }
 
-        public InAppBannerAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _context = HomepageActivity.this;
-            _data = _arr;
+        // If you must keep this constructor:
+        public InAppBannerAdapter(ArrayList<HashMap<String, Object>> data) {
+            this.context = HomepageActivity.this; // Works only inside the Activity
+            this.data = data;
         }
 
         @Override
         public int getCount() {
-            return _data.size();
+            return data.size();
         }
 
         @Override
-        public boolean isViewFromObject(@NonNull View _view, @NonNull Object _object) {
-            return _view == _object;
+        public boolean isViewFromObject(@NonNull View view, @NonNull Object object) {
+            return view == object;
         }
 
         @Override
-        public void destroyItem(ViewGroup _container, int _position, @NonNull Object _object) {
-            _container.removeView((View) _object);
+        public void destroyItem(@NonNull ViewGroup container, int position, @NonNull Object object) {
+            container.removeView((View) object);
         }
 
         @Override
-        public int getItemPosition(@NonNull Object _object) {
-            return super.getItemPosition(_object);
-        }
-
-        @Override
-        public CharSequence getPageTitle(int pos) {
-            // Use the Activity Event (onTabLayoutNewTabAdded) in order to use this method
-            return "page " + pos;
+        public CharSequence getPageTitle(int position) {
+            return "page " + position;
         }
 
         @NonNull
         @Override
-        public Object instantiateItem(@NonNull ViewGroup _container, final int _position) {
-            InAppBannerLayoutBinding binding = InAppBannerLayoutBinding.inflate(LayoutInflater.from(_context), _container, false);
+        public Object instantiateItem(@NonNull ViewGroup container, int position) {
 
-            Glide.with(getApplicationContext()).load(Uri.parse(_data.get(_position).get("image url").toString())).into(binding.image);
+            InAppBannerLayoutBinding binding = InAppBannerLayoutBinding.inflate(
+                    LayoutInflater.from(context),
+                    container,
+                    false
+            );
 
-            View _view = binding.getRoot();
-            _container.addView(_view);
-            return _view;
+            // Load image safely
+            Object urlObj = data.get(position).get("image url");
+            String imageUrl = urlObj != null ? urlObj.toString() : "";
+
+            Glide.with(context)
+                    .load(Uri.parse(imageUrl))
+                    .into(binding.image);
+
+            View root = binding.getRoot();
+            container.addView(root);
+
+            return root;
         }
     }
 
     public class RecentlyAddedListAdapter extends RecyclerView.Adapter<RecentlyAddedListAdapter.ViewHolder> {
 
-        ArrayList<HashMap<String, Object>> _data;
+        private final ArrayList<HashMap<String, Object>> list;
 
-        public RecentlyAddedListAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _data = _arr;
+        public RecentlyAddedListAdapter(ArrayList<HashMap<String, Object>> list) {
+            this.list = list;
         }
 
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            LayoutInflater _inflater = getLayoutInflater();
-            View _v = _inflater.inflate(R.layout.resource_item_short, null);
-            RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            _v.setLayoutParams(_lp);
-            return new ViewHolder(_v);
+            ResourceItemShortBinding resourceItemShortBinding = ResourceItemShortBinding.inflate(
+                    LayoutInflater.from(parent.getContext()),
+                    parent,
+                    false
+            );
+
+            return new ViewHolder(resourceItemShortBinding);
         }
 
         @Override
-        public void onBindViewHolder(ViewHolder _holder, final int _position) {
-            View _view = _holder.itemView;
-            ResourceItemShortBinding binding = ResourceItemShortBinding.bind(_view);
-
-            RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            _view.setLayoutParams(_lp);
-            PrepNestUtil.roundViewWithRipple(binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            if (_data.get(_position).containsKey("resource title")) {
-                binding.title.setText(getPrettyResourceTitle(_data.get(_position).get("resource title").toString()));
+        public void onBindViewHolder(@NonNull ViewHolder holder, final int position) {
+            PrepNestUtil.roundViewWithRipple(holder.binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
+            if (list.get(position).containsKey("resource title")) {
+                holder.binding.title.setText(getPrettyResourceTitle(Objects.requireNonNull(list.get(position).get("resource title")).toString()));
             } else {
-                binding.title.setText("No title");
+                holder.binding.title.setText("No title");
             }
-            if (_data.get(_position).containsKey("subject")) {
-                binding.subjectNameTxt.setBackground(new GradientDrawable() {
+            if (list.get(position).containsKey("subject")) {
+                holder.binding.subjectNameTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.subjectNameTxt.setText(_data.get(_position).get("subject").toString());
-                binding.subjectNameTxt.setVisibility(View.VISIBLE);
+                holder.binding.subjectNameTxt.setText(Objects.requireNonNull(list.get(position).get("subject")).toString());
+                holder.binding.subjectNameTxt.setVisibility(View.VISIBLE);
             } else {
-                binding.subjectNameTxt.setVisibility(View.GONE);
+                holder.binding.subjectNameTxt.setVisibility(View.GONE);
             }
-            if (_data.get(_position).containsKey("session")) {
-                binding.sessionTxt.setBackground(new GradientDrawable() {
+            if (list.get(position).containsKey("session")) {
+                holder.binding.sessionTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.sessionTxt.setText(_data.get(_position).get("session").toString());
-                binding.sessionTxt.setVisibility(View.VISIBLE);
+                holder.binding.sessionTxt.setText(Objects.requireNonNull(list.get(position).get("session")).toString());
+                holder.binding.sessionTxt.setVisibility(View.VISIBLE);
             } else {
-                binding.sessionTxt.setVisibility(View.GONE);
+                holder.binding.sessionTxt.setVisibility(View.GONE);
             }
-            if (_data.get(_position).containsKey("type")) {
-                if (_data.get(_position).get("type").toString().equals("paper")) {
-                    binding.image.setImageResource(R.drawable.previous_paper);
+            if (list.get(position).containsKey("type")) {
+                if (Objects.requireNonNull(list.get(position).get("type")).toString().equals("paper")) {
+                    holder.binding.image.setImageResource(R.drawable.previous_paper);
                 } else {
-                    if (_data.get(_position).get("type").toString().equals("notes")) {
-                        binding.image.setImageResource(R.drawable.short_notes);
+                    if (Objects.requireNonNull(list.get(position).get("type")).toString().equals("notes")) {
+                        holder.binding.image.setImageResource(R.drawable.short_notes);
                     } else {
-                        binding.image.setVisibility(View.INVISIBLE);
+                        holder.binding.image.setVisibility(View.INVISIBLE);
                     }
                 }
             } else {
-                binding.image.setVisibility(View.INVISIBLE);
+                holder.binding.image.setVisibility(View.INVISIBLE);
             }
-//            LinearLayout.LayoutParams paramscontainer = (LinearLayout.LayoutParams) binding.container.getLayoutParams();
-            ViewGroup.LayoutParams params = binding.container.getLayoutParams();
+//            LinearLayout.LayoutParams paramscontainer = (LinearLayout.LayoutParams) holder.binding.container.getLayoutParams();
+            ViewGroup.LayoutParams params = holder.binding.container.getLayoutParams();
             if (params instanceof ViewGroup.MarginLayoutParams) {
                 ViewGroup.MarginLayoutParams marginParams = (ViewGroup.MarginLayoutParams) params;
-                if (_position == 0) {
+                if (position == 0) {
                     marginParams.setMargins((int) convertToDp(20), (int) convertToDp(10), 0, (int) convertToDp(10));
-                } else if (_position == (_data.size() - 1)) {
+                } else if (position == (list.size() - 1)) {
                     marginParams.setMargins((int) convertToDp(10), (int) convertToDp(10), (int) convertToDp(20), (int) convertToDp(10));
                 } else {
                     marginParams.setMargins((int) convertToDp(10), (int) convertToDp(10), 0, (int) convertToDp(10));
                 }
-                binding.container.setLayoutParams(marginParams);
+                holder.binding.container.setLayoutParams(marginParams);
             }
 
-            binding.container.setOnClickListener(_view1 -> {
-                if (_data.get(_position).containsKey("type")) {
+            holder.binding.container.setOnClickListener(_view1 -> {
+                if (list.get(position).containsKey("type")) {
                     toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
                     toResources.putExtra("user", new Gson().toJson(userData));
                     try {
@@ -1165,100 +1172,99 @@ public class HomepageActivity extends AppCompatActivity {
 
         @Override
         public int getItemCount() {
-            return _data.size();
+            return list.size();
         }
 
         public class ViewHolder extends RecyclerView.ViewHolder {
-            public ViewHolder(View v) {
-                super(v);
+            ResourceItemShortBinding binding;
+            public ViewHolder(ResourceItemShortBinding binding) {
+                super(binding.getRoot());
+                this.binding = binding;
             }
         }
     }
 
     public class RecommendedListAdapter extends RecyclerView.Adapter<RecommendedListAdapter.ViewHolder> {
 
-        ArrayList<HashMap<String, Object>> _data;
+        private final ArrayList<HashMap<String, Object>> list;
 
-        public RecommendedListAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _data = _arr;
+        public RecommendedListAdapter(ArrayList<HashMap<String, Object>> list) {
+            this.list = list;
         }
 
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            LayoutInflater _inflater = getLayoutInflater();
-            View _v = _inflater.inflate(R.layout.resource_item_short, null);
-            RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            _v.setLayoutParams(_lp);
-            return new ViewHolder(_v);
+            ResourceItemShortBinding resourceItemShortBinding = ResourceItemShortBinding.inflate(
+                    LayoutInflater.from(parent.getContext()),
+                    parent,
+                    false
+            );
+
+            return new ViewHolder(resourceItemShortBinding);
         }
 
         @Override
-        public void onBindViewHolder(ViewHolder _holder, final int _position) {
-            View _view = _holder.itemView;
-            ResourceItemShortBinding binding = ResourceItemShortBinding.bind(_view);
-
-            RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            _view.setLayoutParams(_lp);
-            PrepNestUtil.roundViewWithRipple(binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            if (_data.get(_position).containsKey("resource title")) {
-                binding.title.setText(getPrettyResourceTitle(_data.get(_position).get("resource title").toString()));
+        public void onBindViewHolder(@NonNull ViewHolder holder, final int position) {
+            PrepNestUtil.roundViewWithRipple(holder.binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
+            if (list.get(position).containsKey("resource title")) {
+                holder.binding.title.setText(getPrettyResourceTitle(Objects.requireNonNull(list.get(position).get("resource title")).toString()));
             } else {
-                binding.title.setText("No title");
+                holder.binding.title.setText("No title");
             }
-            if (_data.get(_position).containsKey("subject")) {
-                binding.subjectNameTxt.setBackground(new GradientDrawable() {
+            if (list.get(position).containsKey("subject")) {
+                holder.binding.subjectNameTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.subjectNameTxt.setText(_data.get(_position).get("subject").toString());
-                binding.subjectNameTxt.setVisibility(View.VISIBLE);
+                holder.binding.subjectNameTxt.setText(Objects.requireNonNull(list.get(position).get("subject")).toString());
+                holder.binding.subjectNameTxt.setVisibility(View.VISIBLE);
             } else {
-                binding.subjectNameTxt.setVisibility(View.GONE);
+                holder.binding.subjectNameTxt.setVisibility(View.GONE);
             }
-            if (_data.get(_position).containsKey("session")) {
-                binding.sessionTxt.setBackground(new GradientDrawable() {
+            if (list.get(position).containsKey("session")) {
+                holder.binding.sessionTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.sessionTxt.setText(_data.get(_position).get("session").toString());
-                binding.sessionTxt.setVisibility(View.VISIBLE);
+                holder.binding.sessionTxt.setText(Objects.requireNonNull(list.get(position).get("session")).toString());
+                holder.binding.sessionTxt.setVisibility(View.VISIBLE);
             } else {
-                binding.sessionTxt.setVisibility(View.GONE);
+                holder.binding.sessionTxt.setVisibility(View.GONE);
             }
-            if (_data.get(_position).containsKey("type")) {
-                if (_data.get(_position).get("type").toString().equals("paper")) {
-                    binding.image.setImageResource(R.drawable.previous_paper);
+            if (list.get(position).containsKey("type")) {
+                if (Objects.requireNonNull(list.get(position).get("type")).toString().equals("paper")) {
+                    holder.binding.image.setImageResource(R.drawable.previous_paper);
                 } else {
-                    if (_data.get(_position).get("type").toString().equals("notes")) {
-                        binding.image.setImageResource(R.drawable.short_notes);
+                    if (Objects.requireNonNull(list.get(position).get("type")).toString().equals("notes")) {
+                        holder.binding.image.setImageResource(R.drawable.short_notes);
                     } else {
-                        binding.image.setVisibility(View.INVISIBLE);
+                        holder.binding.image.setVisibility(View.INVISIBLE);
                     }
                 }
             } else {
-                binding.image.setVisibility(View.INVISIBLE);
+                holder.binding.image.setVisibility(View.INVISIBLE);
             }
-            ViewGroup.LayoutParams params = binding.container.getLayoutParams();
+            ViewGroup.LayoutParams params = holder.binding.container.getLayoutParams();
             if (params instanceof ViewGroup.MarginLayoutParams) {
                 ViewGroup.MarginLayoutParams marginParams = (ViewGroup.MarginLayoutParams) params;
-                if (_position == 0) {
+                if (position == 0) {
                     marginParams.setMargins((int) convertToDp(20), (int) convertToDp(10), 0, (int) convertToDp(10));
-                } else if (_position == (_data.size() - 1)) {
+                } else if (position == (list.size() - 1)) {
                     marginParams.setMargins((int) convertToDp(10), (int) convertToDp(10), (int) convertToDp(20), (int) convertToDp(10));
                 } else {
                     marginParams.setMargins((int) convertToDp(10), (int) convertToDp(10), 0, (int) convertToDp(10));
                 }
-                binding.container.setLayoutParams(marginParams);
+                holder.binding.container.setLayoutParams(marginParams);
             }
-            binding.container.setOnClickListener(_view1 -> {
-                if (_data.get(_position).containsKey("type")) {
+            holder.binding.container.setOnClickListener(_view1 -> {
+                if (list.get(position).containsKey("type")) {
                     toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
                     toResources.putExtra("user", new Gson().toJson(userData));
                     try {
@@ -1274,101 +1280,100 @@ public class HomepageActivity extends AppCompatActivity {
 
         @Override
         public int getItemCount() {
-            return _data.size();
+            return list.size();
         }
 
         public class ViewHolder extends RecyclerView.ViewHolder {
-            public ViewHolder(View v) {
-                super(v);
+            ResourceItemShortBinding binding;
+            public ViewHolder(ResourceItemShortBinding binding) {
+                super(binding.getRoot());
+                this.binding = binding;
             }
         }
     }
 
     public class BestListAdapter extends RecyclerView.Adapter<BestListAdapter.ViewHolder> {
 
-        ArrayList<HashMap<String, Object>> _data;
+        private final ArrayList<HashMap<String, Object>> list;
 
-        public BestListAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _data = _arr;
+        public BestListAdapter(ArrayList<HashMap<String, Object>> list) {
+            this.list = list;
         }
 
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            LayoutInflater _inflater = getLayoutInflater();
-            View _v = _inflater.inflate(R.layout.resource_item_short, null);
-            RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            _v.setLayoutParams(_lp);
-            return new ViewHolder(_v);
+            ResourceItemShortBinding resourceItemShortBinding = ResourceItemShortBinding.inflate(
+                    LayoutInflater.from(parent.getContext()),
+                    parent,
+                    false
+            );
+
+            return new ViewHolder(resourceItemShortBinding);
         }
 
         @Override
-        public void onBindViewHolder(ViewHolder _holder, final int _position) {
-            View _view = _holder.itemView;
-            ResourceItemShortBinding binding = ResourceItemShortBinding.bind(_view);
-
-            RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            _view.setLayoutParams(_lp);
-            PrepNestUtil.roundViewWithRipple(binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            if (_data.get(_position).containsKey("resource title")) {
-                binding.title.setText(getPrettyResourceTitle(_data.get(_position).get("resource title").toString()));
+        public void onBindViewHolder(@NonNull ViewHolder holder, final int position) {
+            PrepNestUtil.roundViewWithRipple(holder.binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
+            if (list.get(position).containsKey("resource title")) {
+                holder.binding.title.setText(getPrettyResourceTitle(Objects.requireNonNull(list.get(position).get("resource title")).toString()));
             } else {
-                binding.title.setText("No title");
+                holder.binding.title.setText("No title");
             }
-            if (_data.get(_position).containsKey("subject")) {
-                binding.subjectNameTxt.setBackground(new GradientDrawable() {
+            if (list.get(position).containsKey("subject")) {
+                holder.binding.subjectNameTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.subjectNameTxt.setText(_data.get(_position).get("subject").toString());
-                binding.subjectNameTxt.setVisibility(View.VISIBLE);
+                holder.binding.subjectNameTxt.setText(Objects.requireNonNull(list.get(position).get("subject")).toString());
+                holder.binding.subjectNameTxt.setVisibility(View.VISIBLE);
             } else {
-                binding.subjectNameTxt.setVisibility(View.GONE);
+                holder.binding.subjectNameTxt.setVisibility(View.GONE);
             }
-            if (_data.get(_position).containsKey("session")) {
-                binding.sessionTxt.setBackground(new GradientDrawable() {
+            if (list.get(position).containsKey("session")) {
+                holder.binding.sessionTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.sessionTxt.setText(_data.get(_position).get("session").toString());
-                binding.sessionTxt.setVisibility(View.VISIBLE);
+                holder.binding.sessionTxt.setText(Objects.requireNonNull(list.get(position).get("session")).toString());
+                holder.binding.sessionTxt.setVisibility(View.VISIBLE);
             } else {
-                binding.sessionTxt.setVisibility(View.GONE);
+                holder.binding.sessionTxt.setVisibility(View.GONE);
             }
-            if (_data.get(_position).containsKey("type")) {
-                if (_data.get(_position).get("type").toString().equals("paper")) {
-                    binding.image.setImageResource(R.drawable.previous_paper);
+            if (list.get(position).containsKey("type")) {
+                if (Objects.requireNonNull(list.get(position).get("type")).toString().equals("paper")) {
+                    holder.binding.image.setImageResource(R.drawable.previous_paper);
                 } else {
-                    if (_data.get(_position).get("type").toString().equals("notes")) {
-                        binding.image.setImageResource(R.drawable.short_notes);
+                    if (Objects.requireNonNull(list.get(position).get("type")).toString().equals("notes")) {
+                        holder.binding.image.setImageResource(R.drawable.short_notes);
                     } else {
-                        binding.image.setVisibility(View.INVISIBLE);
+                        holder.binding.image.setVisibility(View.INVISIBLE);
                     }
                 }
             } else {
-                binding.image.setVisibility(View.INVISIBLE);
+                holder.binding.image.setVisibility(View.INVISIBLE);
             }
-            ViewGroup.LayoutParams params = binding.container.getLayoutParams();
+            ViewGroup.LayoutParams params = holder.binding.container.getLayoutParams();
             if (params instanceof ViewGroup.MarginLayoutParams) {
                 ViewGroup.MarginLayoutParams marginParams = (ViewGroup.MarginLayoutParams) params;
-                if (_position == 0) {
+                if (position == 0) {
                     marginParams.setMargins((int) convertToDp(20), (int) convertToDp(10), 0, (int) convertToDp(10));
-                } else if (_position == (_data.size() - 1)) {
+                } else if (position == (list.size() - 1)) {
                     marginParams.setMargins((int) convertToDp(10), (int) convertToDp(10), (int) convertToDp(20), (int) convertToDp(10));
                 } else {
                     marginParams.setMargins((int) convertToDp(10), (int) convertToDp(10), 0, (int) convertToDp(10));
                 }
-                binding.container.setLayoutParams(marginParams);
+                holder.binding.container.setLayoutParams(marginParams);
             }
 
-            binding.container.setOnClickListener(_view1 -> {
-                if (_data.get(_position).containsKey("type")) {
+            holder.binding.container.setOnClickListener(_view1 -> {
+                if (list.get(position).containsKey("type")) {
                     toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
                     toResources.putExtra("user", new Gson().toJson(userData));
                     try {
@@ -1384,12 +1389,14 @@ public class HomepageActivity extends AppCompatActivity {
 
         @Override
         public int getItemCount() {
-            return _data.size();
+            return list.size();
         }
 
         public class ViewHolder extends RecyclerView.ViewHolder {
-            public ViewHolder(View v) {
-                super(v);
+            ResourceItemShortBinding binding;
+            public ViewHolder(ResourceItemShortBinding binding) {
+                super(binding.getRoot());
+                this.binding = binding;
             }
         }
     }

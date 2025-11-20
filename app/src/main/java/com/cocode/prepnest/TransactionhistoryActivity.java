@@ -43,7 +43,7 @@ public class TransactionhistoryActivity extends AppCompatActivity {
     private final Intent toNoConnection = new Intent();
     private TransactionhistoryBinding binding;
     private double amount = 0;
-    private History_listviewAdapter adapter;
+    private HistoryListAdapter adapter;
     private ChildEventListener transactionListener;
     private NetworkMonitor networkMonitor;
     private FirebaseAuth auth;
@@ -70,7 +70,7 @@ public class TransactionhistoryActivity extends AppCompatActivity {
     private void initializeLogic() {
         networkMonitor = new NetworkMonitor(this);
         designUI();
-        adapter = new History_listviewAdapter(historyList);
+        adapter = new HistoryListAdapter(historyList);
         binding.historyListview.setLayoutManager(new LinearLayoutManager(this));
         binding.historyListview.setAdapter(adapter);
 
@@ -275,39 +275,38 @@ public class TransactionhistoryActivity extends AppCompatActivity {
         });
     }
 
-    public class History_listviewAdapter extends RecyclerView.Adapter<History_listviewAdapter.ViewHolder> {
+    public class HistoryListAdapter extends RecyclerView.Adapter<HistoryListAdapter.ViewHolder> {
 
-        ArrayList<HashMap<String, Object>> _data;
+        private final ArrayList<HashMap<String, Object>> list;
 
-        public History_listviewAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _data = _arr;
+        public HistoryListAdapter(ArrayList<HashMap<String, Object>> list) {
+            this.list = list;
         }
 
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            LayoutInflater _inflater = getLayoutInflater();
-            View _v = _inflater.inflate(R.layout.trans_history, null);
-            RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            _v.setLayoutParams(_lp);
-            return new ViewHolder(_v);
+            TransHistoryBinding transactionHistoryBinding = TransHistoryBinding.inflate(
+                    LayoutInflater.from(parent.getContext()),
+                    parent,
+                    false
+            );
+            
+            return new ViewHolder(transactionHistoryBinding);
         }
 
         @Override
-        public void onBindViewHolder(ViewHolder _holder, final int _position) {
-            View _view = _holder.itemView;
-            TransHistoryBinding binding = TransHistoryBinding.bind(_view);
-
-            PrepNestUtil.roundViewWithRipple(binding.container, "#FFFFFF", 0, 0, "#FFFFFF", "#E0E0E0");
+        public void onBindViewHolder(@NonNull ViewHolder holder, final int position) {
+            PrepNestUtil.roundViewWithRipple(holder.binding.container, "#FFFFFF", 0, 0, "#FFFFFF", "#E0E0E0");
             String amountType = "";
             String typeValue = "";
-            boolean hasAmount = _data.get(_data.size() - 1 - _position).containsKey("amount");
-            boolean hasType = _data.get(_data.size() - 1 - _position).containsKey("type");
-            boolean hasTime = _data.get(_data.size() - 1 - _position).containsKey("timestamp");
+            boolean hasAmount = list.get(list.size() - 1 - position).containsKey("amount");
+            boolean hasType = list.get(list.size() - 1 - position).containsKey("type");
+            boolean hasTime = list.get(list.size() - 1 - position).containsKey("timestamp");
             if (hasAmount && hasType) {
-                typeValue = _data.get(_data.size() - 1 - _position).get("type").toString();
-                if ((typeValue.equals("purchase") || typeValue.equals("resource_sold")) && _data.get(_data.size() - 1 - _position).containsKey("amount type")) {
-                    amountType = _data.get(_data.size() - 1 - _position).get("amount type").toString();
+                typeValue = list.get(list.size() - 1 - position).get("type").toString();
+                if ((typeValue.equals("purchase") || typeValue.equals("resource_sold")) && list.get(list.size() - 1 - position).containsKey("amount type")) {
+                    amountType = list.get(list.size() - 1 - position).get("amount type").toString();
                 } else {
                     if (typeValue.equals("cash_deduct") || typeValue.equals("cash_add")) {
                         amountType = "cash";
@@ -318,141 +317,143 @@ public class TransactionhistoryActivity extends AppCompatActivity {
                     }
                 }
                 if (!amountType.isEmpty()) {
-                    binding.container.setVisibility(View.VISIBLE);
-                    binding.line.setVisibility(View.VISIBLE);
-                    amount = Double.parseDouble(_data.get(_data.size() - 1 - _position).get("amount").toString());
+                    holder.binding.container.setVisibility(View.VISIBLE);
+                    holder.binding.line.setVisibility(View.VISIBLE);
+                    amount = Double.parseDouble(list.get(list.size() - 1 - position).get("amount").toString());
                 } else {
-                    binding.container.setVisibility(View.GONE);
-                    binding.line.setVisibility(View.GONE);
+                    holder.binding.container.setVisibility(View.GONE);
+                    holder.binding.line.setVisibility(View.GONE);
                 }
             } else {
-                binding.container.setVisibility(View.GONE);
-                binding.line.setVisibility(View.GONE);
+                holder.binding.container.setVisibility(View.GONE);
+                holder.binding.line.setVisibility(View.GONE);
             }
             if (hasType) {
-                binding.container.setVisibility(View.VISIBLE);
-                binding.line.setVisibility(View.VISIBLE);
+                holder.binding.container.setVisibility(View.VISIBLE);
+                holder.binding.line.setVisibility(View.VISIBLE);
                 switch (typeValue) {
                     case "purchase":
-                        binding.amountTxt.setTextColor(0xFFF44336);
-                        binding.type.setText("Resource purchase");
+                        holder.binding.amountTxt.setTextColor(0xFFF44336);
+                        holder.binding.type.setText("Resource purchase");
                         if (amountType.equals("cash")) {
-                            binding.amountTxt.setText("- ₹".concat(String.valueOf((long) (amount))));
+                            holder.binding.amountTxt.setText("- ₹".concat(String.valueOf((long) (amount))));
                         } else {
                             if (amountType.equals("coins")) {
-                                binding.amountTxt.setText("- ".concat(String.valueOf((long) (amount)).concat(" coins")));
+                                holder.binding.amountTxt.setText("- ".concat(String.valueOf((long) (amount)).concat(" coins")));
                             } else {
-                                binding.container.setVisibility(View.GONE);
-                                binding.container.setVisibility(View.GONE);
+                                holder.binding.container.setVisibility(View.GONE);
+                                holder.binding.container.setVisibility(View.GONE);
                             }
                         }
                         break;
                     case "resource_sold":
-                        binding.amountTxt.setTextColor(0xFF4CAF50);
-                        binding.type.setText("Resource sold");
+                        holder.binding.amountTxt.setTextColor(0xFF4CAF50);
+                        holder.binding.type.setText("Resource sold");
                         if (amountType.equals("cash")) {
-                            binding.amountTxt.setText("+ ₹".concat(String.valueOf((long) (amount))));
+                            holder.binding.amountTxt.setText("+ ₹".concat(String.valueOf((long) (amount))));
                         } else {
                             if (amountType.equals("coins")) {
-                                binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
+                                holder.binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
                             } else {
-                                binding.container.setVisibility(View.GONE);
-                                binding.line.setVisibility(View.GONE);
+                                holder.binding.container.setVisibility(View.GONE);
+                                holder.binding.line.setVisibility(View.GONE);
                             }
                         }
                         break;
                     case "cash_deduct":
-                        binding.amountTxt.setTextColor(0xFFF44336);
-                        binding.type.setText("Payout");
-                        binding.amountTxt.setText("- ₹".concat(String.valueOf((long) (amount))));
+                        holder.binding.amountTxt.setTextColor(0xFFF44336);
+                        holder.binding.type.setText("Payout");
+                        holder.binding.amountTxt.setText("- ₹".concat(String.valueOf((long) (amount))));
                         break;
                     case "refer_success":
-                        binding.amountTxt.setTextColor(0xFF4CAF50);
-                        binding.type.setText("Successful refer");
-                        binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
+                        holder.binding.amountTxt.setTextColor(0xFF4CAF50);
+                        holder.binding.type.setText("Successful refer");
+                        holder.binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
                         break;
                     case "refer_reward":
-                        binding.amountTxt.setTextColor(0xFF4CAF50);
-                        binding.type.setText("Referral reward");
-                        binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
+                        holder.binding.amountTxt.setTextColor(0xFF4CAF50);
+                        holder.binding.type.setText("Referral reward");
+                        holder.binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
                         break;
                     case "cash_add":
-                        binding.amountTxt.setTextColor(0xFF4CAF50);
-                        binding.type.setText("Add cash");
-                        binding.amountTxt.setText("+ ₹ ".concat(String.valueOf((long) (amount))));
+                        holder.binding.amountTxt.setTextColor(0xFF4CAF50);
+                        holder.binding.type.setText("Add cash");
+                        holder.binding.amountTxt.setText("+ ₹ ".concat(String.valueOf((long) (amount))));
                         break;
                     case "welcome_bonus":
-                        binding.amountTxt.setTextColor(0xFF4CAF50);
-                        binding.type.setText("Welcome bonus");
-                        binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
+                        holder.binding.amountTxt.setTextColor(0xFF4CAF50);
+                        holder.binding.type.setText("Welcome bonus");
+                        holder.binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
                         break;
                     case "rewarded_ads":
-                        binding.amountTxt.setTextColor(0xFF4CAF50);
-                        binding.type.setText("Rewarded ad");
-                        binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
+                        holder.binding.amountTxt.setTextColor(0xFF4CAF50);
+                        holder.binding.type.setText("Rewarded ad");
+                        holder.binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
                         break;
                     case "purchase_reward":
-                        binding.amountTxt.setTextColor(0xFF4CAF50);
-                        binding.type.setText("Purchase reward");
-                        binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
+                        holder.binding.amountTxt.setTextColor(0xFF4CAF50);
+                        holder.binding.type.setText("Purchase reward");
+                        holder.binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
                         break;
                     case "resource_reward":
-                        binding.amountTxt.setTextColor(0xFF4CAF50);
-                        binding.type.setText("New resource reward");
-                        binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
+                        holder.binding.amountTxt.setTextColor(0xFF4CAF50);
+                        holder.binding.type.setText("New resource reward");
+                        holder.binding.amountTxt.setText("+ ".concat(String.valueOf((long) (amount)).concat(" coins")));
                         break;
                     default:
-                        binding.container.setVisibility(View.GONE);
-                        binding.line.setVisibility(View.GONE);
+                        holder.binding.container.setVisibility(View.GONE);
+                        holder.binding.line.setVisibility(View.GONE);
                         break;
                 }
             } else {
-                binding.container.setVisibility(View.GONE);
-                binding.line.setVisibility(View.GONE);
+                holder.binding.container.setVisibility(View.GONE);
+                holder.binding.line.setVisibility(View.GONE);
             }
             if (hasTime) {
-                binding.container.setVisibility(View.VISIBLE);
-                binding.line.setVisibility(View.VISIBLE);
-                binding.timestamp.setText(formatTimeDifference(_data.get(_data.size() - 1 - _position).get("timestamp").toString()));
-                switch (_data.get(_data.size() - 1 - _position).getOrDefault("status", "").toString()) {
+                holder.binding.container.setVisibility(View.VISIBLE);
+                holder.binding.line.setVisibility(View.VISIBLE);
+                holder.binding.timestamp.setText(formatTimeDifference(list.get(list.size() - 1 - position).get("timestamp").toString()));
+                switch (list.get(list.size() - 1 - position).getOrDefault("status", "").toString()) {
                     case "pending":
-                        binding.status.setVisibility(View.VISIBLE);
-                        binding.status.setTextColor(0xFFFF9800);
-                        binding.amountTxt.setTextColor(0xFFFF9800);
-                        binding.status.setText("• pending");
+                        holder.binding.status.setVisibility(View.VISIBLE);
+                        holder.binding.status.setTextColor(0xFFFF9800);
+                        holder.binding.amountTxt.setTextColor(0xFFFF9800);
+                        holder.binding.status.setText("• pending");
                         break;
                     case "failed":
-                        binding.status.setVisibility(View.VISIBLE);
-                        binding.status.setTextColor(0xFFF44336);
-                        binding.amountTxt.setTextColor(0xFFF44336);
-                        binding.status.setText("• failed");
+                        holder.binding.status.setVisibility(View.VISIBLE);
+                        holder.binding.status.setTextColor(0xFFF44336);
+                        holder.binding.amountTxt.setTextColor(0xFFF44336);
+                        holder.binding.status.setText("• failed");
                         break;
                     default:
-                        binding.status.setVisibility(View.GONE);
+                        holder.binding.status.setVisibility(View.GONE);
                         break;
                 }
             } else {
-                binding.container.setVisibility(View.GONE);
-                binding.line.setVisibility(View.GONE);
+                holder.binding.container.setVisibility(View.GONE);
+                holder.binding.line.setVisibility(View.GONE);
             }
-            if (_position == (historyList.size() - 1)) {
-                binding.line.setVisibility(View.GONE);
+            if (position == (historyList.size() - 1)) {
+                holder.binding.line.setVisibility(View.GONE);
             } else {
-                binding.line.setVisibility(View.VISIBLE);
+                holder.binding.line.setVisibility(View.VISIBLE);
             }
-            binding.container.setOnClickListener(_view1 -> {
+            holder.binding.container.setOnClickListener(_view1 -> {
 
             });
         }
 
         @Override
         public int getItemCount() {
-            return _data.size();
+            return list.size();
         }
 
         public class ViewHolder extends RecyclerView.ViewHolder {
-            public ViewHolder(View v) {
-                super(v);
+            TransHistoryBinding binding;
+            public ViewHolder(TransHistoryBinding binding) {
+                super(binding.getRoot());
+                this.binding = binding;
             }
         }
     }

@@ -59,7 +59,7 @@ public class UserWishlistActivity extends AppCompatActivity {
     private UserWishlistBinding binding;
     private NetworkMonitor networkMonitor;
     private ArrayList<String> resourceIDs = new ArrayList<>();
-    private Items_listAdapter listAdapter;
+    private ItemsListAdapter listAdapter;
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -82,7 +82,7 @@ public class UserWishlistActivity extends AppCompatActivity {
     private void initializeLogic() {
         networkMonitor = new NetworkMonitor(this);
         designUI();
-        listAdapter = new Items_listAdapter(wishlistedResources);
+        listAdapter = new ItemsListAdapter(wishlistedResources);
         binding.itemsList.setAdapter(listAdapter);
         binding.itemsList.setLayoutManager(new LinearLayoutManager(this));
         getUserData();
@@ -527,121 +527,120 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
         resource_purchase_sheet.show();
     }
 
-    public class Items_listAdapter extends RecyclerView.Adapter<Items_listAdapter.ViewHolder> {
+    public class ItemsListAdapter extends RecyclerView.Adapter<ItemsListAdapter.ViewHolder> {
 
-        ArrayList<HashMap<String, Object>> _data;
+        private final ArrayList<HashMap<String, Object>> list;
 
-        public Items_listAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _data = _arr;
+        public ItemsListAdapter(ArrayList<HashMap<String, Object>> list) {
+            this.list = list;
         }
 
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            LayoutInflater _inflater = getLayoutInflater();
-            View _v = _inflater.inflate(R.layout.resource_item_card_full, null);
-            RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            _v.setLayoutParams(_lp);
-            return new ViewHolder(_v);
+            ResourceItemCardFullBinding resourceItemCardFullBinding = ResourceItemCardFullBinding.inflate(
+                    LayoutInflater.from(parent.getContext()),
+                    parent,
+                    false
+            );
+
+            return new ViewHolder(resourceItemCardFullBinding);
         }
 
         @Override
-        public void onBindViewHolder(ViewHolder _holder, final int _position) {
-            View _view = _holder.itemView;
-            ResourceItemCardFullBinding binding = ResourceItemCardFullBinding.bind(_view);
-
-            PrepNestUtil.roundViewWithRipple(binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            if (_data.get(_position).containsKey("resource title")) {
-                binding.title.setText(_data.get(_position).get("resource title").toString());
+        public void onBindViewHolder(@NonNull ViewHolder holder, final int position) {
+            PrepNestUtil.roundViewWithRipple(holder.binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
+            if (list.get(position).containsKey("resource title")) {
+                holder.binding.title.setText(list.get(position).get("resource title").toString());
             } else {
-                binding.title.setText("No title");
+                holder.binding.title.setText("No title");
             }
-            if (_data.get(_position).containsKey("subject")) {
-                binding.subjectNameTxt.setBackground(new GradientDrawable() {
+            if (list.get(position).containsKey("subject")) {
+                holder.binding.subjectNameTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.subjectNameTxt.setText(_data.get(_position).get("subject").toString());
-                binding.subjectNameTxt.setVisibility(View.VISIBLE);
+                holder.binding.subjectNameTxt.setText(list.get(position).get("subject").toString());
+                holder.binding.subjectNameTxt.setVisibility(View.VISIBLE);
             } else {
-                binding.subjectNameTxt.setVisibility(View.GONE);
+                holder.binding.subjectNameTxt.setVisibility(View.GONE);
             }
-            if (_data.get(_position).containsKey("session")) {
-                binding.sessionTxt.setBackground(new GradientDrawable() {
+            if (list.get(position).containsKey("session")) {
+                holder.binding.sessionTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                binding.sessionTxt.setText(_data.get(_position).get("session").toString());
-                binding.sessionTxt.setVisibility(View.VISIBLE);
+                holder.binding.sessionTxt.setText(list.get(position).get("session").toString());
+                holder.binding.sessionTxt.setVisibility(View.VISIBLE);
 
                 ViewGroup.MarginLayoutParams sessionTxtParams =
-                        (ViewGroup.MarginLayoutParams) binding.sessionTxt.getLayoutParams();
+                        (ViewGroup.MarginLayoutParams) holder.binding.sessionTxt.getLayoutParams();
 
-                if (_data.get(_position).get("subject").toString().length() >= 20) {
-                    binding.subAndSessionContainer.setOrientation(LinearLayout.VERTICAL);
+                if (list.get(position).get("subject").toString().length() >= 20) {
+                    holder.binding.subAndSessionContainer.setOrientation(LinearLayout.VERTICAL);
                     sessionTxtParams.setMargins(0, (int) convertToDp(8), 0, 0);
                 } else {
                     sessionTxtParams.setMargins(0, 0, 0, 0);
-                    binding.subAndSessionContainer.setOrientation(LinearLayout.HORIZONTAL);
+                    holder.binding.subAndSessionContainer.setOrientation(LinearLayout.HORIZONTAL);
                 }
-                binding.sessionTxt.setLayoutParams(sessionTxtParams);
+                holder.binding.sessionTxt.setLayoutParams(sessionTxtParams);
             } else {
-                binding.sessionTxt.setVisibility(View.GONE);
+                holder.binding.sessionTxt.setVisibility(View.GONE);
             }
-            if (_data.get(_position).containsKey("best choice")) {
-                if (_data.get(_position).get("best choice").toString().equals("true")) {
-                    binding.bestChoiceTag.setBackground(new GradientDrawable() {
+            if (list.get(position).containsKey("best choice")) {
+                if (list.get(position).get("best choice").toString().equals("true")) {
+                    holder.binding.bestChoiceTag.setBackground(new GradientDrawable() {
                         public GradientDrawable getIns(int a, int b) {
                             this.setCornerRadius(a);
                             this.setColor(b);
                             return this;
                         }
                     }.getIns((int) 360, 0xFF000000));
-                    binding.bestChoiceTag.setVisibility(View.VISIBLE);
+                    holder.binding.bestChoiceTag.setVisibility(View.VISIBLE);
                 } else {
-                    binding.bestChoiceTag.setVisibility(View.GONE);
+                    holder.binding.bestChoiceTag.setVisibility(View.GONE);
                 }
             } else {
-                binding.bestChoiceTag.setVisibility(View.GONE);
+                holder.binding.bestChoiceTag.setVisibility(View.GONE);
             }
-            if (_data.get(_position).containsKey("recommended")) {
-                if (_data.get(_position).get("recommended").toString().equals("true")) {
-                    binding.recommendedTag.setBackground(new GradientDrawable() {
+            if (list.get(position).containsKey("recommended")) {
+                if (list.get(position).get("recommended").toString().equals("true")) {
+                    holder.binding.recommendedTag.setBackground(new GradientDrawable() {
                         public GradientDrawable getIns(int a, int b) {
                             this.setCornerRadius(a);
                             this.setColor(b);
                             return this;
                         }
                     }.getIns((int) 360, 0xFF000000));
-                    binding.recommendedTag.setVisibility(View.VISIBLE);
+                    holder.binding.recommendedTag.setVisibility(View.VISIBLE);
                 } else {
-                    binding.recommendedTag.setVisibility(View.GONE);
+                    holder.binding.recommendedTag.setVisibility(View.GONE);
                 }
             } else {
-                binding.recommendedTag.setVisibility(View.GONE);
+                holder.binding.recommendedTag.setVisibility(View.GONE);
             }
-            if (_data.get(_position).containsKey("type")) {
-                if (_data.get(_position).get("type").toString().equals("paper")) {
-                    binding.image.setImageResource(R.drawable.previous_paper);
+            if (list.get(position).containsKey("type")) {
+                if (list.get(position).get("type").toString().equals("paper")) {
+                    holder.binding.image.setImageResource(R.drawable.previous_paper);
                 } else {
-                    if (_data.get(_position).get("type").toString().equals("notes")) {
-                        binding.image.setImageResource(R.drawable.short_notes);
+                    if (list.get(position).get("type").toString().equals("notes")) {
+                        holder.binding.image.setImageResource(R.drawable.short_notes);
                     } else {
-                        binding.image.setVisibility(View.INVISIBLE);
-                        binding.image.setEnabled(false);
+                        holder.binding.image.setVisibility(View.INVISIBLE);
+                        holder.binding.image.setEnabled(false);
                     }
                 }
             } else {
-                binding.image.setVisibility(View.INVISIBLE);
-                binding.image.setEnabled(false);
+                holder.binding.image.setVisibility(View.INVISIBLE);
+                holder.binding.image.setEnabled(false);
             }
-            ViewGroup.LayoutParams rawParams = binding.container.getLayoutParams();
+            ViewGroup.LayoutParams rawParams = holder.binding.container.getLayoutParams();
             ViewGroup.MarginLayoutParams paramscontainer;
 
             if (rawParams instanceof ViewGroup.MarginLayoutParams) {
@@ -654,7 +653,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 );
             }
 
-            if (_position == (_data.size() - 1)) {
+            if (position == (list.size() - 1)) {
                 paramscontainer.setMargins(
                         (int) convertToDp(20),
                         (int) convertToDp(10),
@@ -673,24 +672,26 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             paramscontainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
             paramscontainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
 
-            binding.container.setLayoutParams(paramscontainer);
+            holder.binding.container.setLayoutParams(paramscontainer);
 
-            binding.container.setOnClickListener(_view1 -> {
-                int pos = _holder.getAdapterPosition();
+            holder.binding.container.setOnClickListener(_view1 -> {
+                int pos = holder.getAdapterPosition();
                 if (pos != RecyclerView.NO_POSITION) {
-                    showPurchaseSheet(_data.get(pos), pos);
+                    showPurchaseSheet(list.get(pos), pos);
                 }
             });
         }
 
         @Override
         public int getItemCount() {
-            return _data.size();
+            return list.size();
         }
 
         public class ViewHolder extends RecyclerView.ViewHolder {
-            public ViewHolder(View v) {
-                super(v);
+            ResourceItemCardFullBinding binding;
+            public ViewHolder(ResourceItemCardFullBinding binding) {
+                super(binding.getRoot());
+                this.binding = binding;
             }
         }
     }

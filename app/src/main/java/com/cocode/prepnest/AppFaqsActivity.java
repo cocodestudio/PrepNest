@@ -17,6 +17,7 @@ import com.google.firebase.FirebaseApp;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Objects;
 
 
 public class AppFaqsActivity extends AppCompatActivity {
@@ -29,12 +30,12 @@ public class AppFaqsActivity extends AppCompatActivity {
         super.onCreate(_savedInstanceState);
         binding = AppFaqsBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        initialize(_savedInstanceState);
+        initialize();
         FirebaseApp.initializeApp(this);
         initializeLogic();
     }
 
-    private void initialize(Bundle _savedInstanceState) {
+    private void initialize() {
 
         binding.backIcon.setOnClickListener(_view -> {
             finish();
@@ -82,49 +83,48 @@ public class AppFaqsActivity extends AppCompatActivity {
         faqItem.put("ques", "Why my uploaded resources showing \"pending\" or \"failed\" status?");
         faqItem.put("extra", "When you upload a resource, it first goes through a verification process to check for authenticity and duplication. Once verified, its status will be updated accordingly.\n\nIf the status shows “Failed”, it could be due to one of the following reasons:\n– The same resource is already available in the app, uploaded by another provider.\n– The resource doesn’t meet our content guidelines or is considered invalid.\n\nMake sure your content is original and follows our submission rules for a successful upload.");
         faqsList.add(faqItem);
-        binding.faqsList.setAdapter(new Faqs_listAdapter(faqsList));
+        binding.faqsList.setAdapter(new FaqsListAdapter(faqsList));
         binding.faqsList.setLayoutManager(new LinearLayoutManager(this));
     }
 
 
-    public class Faqs_listAdapter extends RecyclerView.Adapter<Faqs_listAdapter.ViewHolder> {
+    public class FaqsListAdapter extends RecyclerView.Adapter<FaqsListAdapter.ViewHolder> {
 
-        ArrayList<HashMap<String, Object>> _data;
+        private final ArrayList<HashMap<String, Object>> list;
 
-        public Faqs_listAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _data = _arr;
+        public FaqsListAdapter(ArrayList<HashMap<String, Object>> list) {
+            this.list = list;
         }
 
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            LayoutInflater _inflater = getLayoutInflater();
-            View _v = _inflater.inflate(R.layout.faq_item_layout, null);
-            RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            _v.setLayoutParams(_lp);
-            return new ViewHolder(_v);
+            FaqItemLayoutBinding faqItemLayoutBinding = FaqItemLayoutBinding.inflate(
+                    LayoutInflater.from(parent.getContext()),
+                    parent,
+                    false
+            );
+
+            return new ViewHolder(faqItemLayoutBinding);
         }
 
         @Override
-        public void onBindViewHolder(ViewHolder _holder, final int _position) {
-            View _view = _holder.itemView;
-            FaqItemLayoutBinding binding = FaqItemLayoutBinding.bind(_view);
-
-            PrepNestUtil.roundViewWithRipple(binding.quesContainer, "#FFFFFF", 0, 0, "#FFFFFF", "#F5F5F5");
-            binding.questionTxt.setText(_data.get(_position).get("ques").toString());
-            binding.extraText.setText(_data.get(_position).get("extra").toString());
-            binding.quesContainer.setOnClickListener(_view1 -> {
-                PrepNestUtil.TransitionManager(binding.container, 250);
-                if (binding.extraContentContainer.getVisibility() == View.VISIBLE) {
-                    binding.extraContentContainer.setVisibility(View.GONE);
-                    binding.iconDropDown
+        public void onBindViewHolder(@NonNull ViewHolder holder, final int position) {
+            PrepNestUtil.roundViewWithRipple(holder.binding.quesContainer, "#FFFFFF", 0, 0, "#FFFFFF", "#F5F5F5");
+            holder.binding.questionTxt.setText(Objects.requireNonNull(list.get(position).get("ques")).toString());
+            holder.binding.extraText.setText(Objects.requireNonNull(list.get(position).get("extra")).toString());
+            holder.binding.quesContainer.setOnClickListener(_view1 -> {
+                PrepNestUtil.TransitionManager(holder.binding.container, 250);
+                if (holder.binding.extraContentContainer.getVisibility() == View.VISIBLE) {
+                    holder.binding.extraContentContainer.setVisibility(View.GONE);
+                    holder.binding.iconDropDown
                             .animate()
                             .rotation(0)
                             .setDuration(250)
                             .start();
                 } else {
-                    binding.extraContentContainer.setVisibility(View.VISIBLE);
-                    binding.iconDropDown
+                    holder.binding.extraContentContainer.setVisibility(View.VISIBLE);
+                    holder.binding.iconDropDown
                             .animate()
                             .rotation(180)
                             .setDuration(250)
@@ -135,12 +135,15 @@ public class AppFaqsActivity extends AppCompatActivity {
 
         @Override
         public int getItemCount() {
-            return _data.size();
+            return list.size();
         }
 
         public class ViewHolder extends RecyclerView.ViewHolder {
-            public ViewHolder(View v) {
-                super(v);
+            FaqItemLayoutBinding binding;
+
+            public ViewHolder(FaqItemLayoutBinding binding) {
+                super(binding.getRoot());
+                this.binding = binding;
             }
         }
     }

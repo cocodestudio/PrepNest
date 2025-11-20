@@ -3,7 +3,6 @@ package com.cocode.prepnest;
 import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
-import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.activity.OnBackPressedCallback;
@@ -18,6 +17,7 @@ import com.google.firebase.FirebaseApp;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Objects;
 
 
 public class InfoviewActivity extends AppCompatActivity {
@@ -30,12 +30,12 @@ public class InfoviewActivity extends AppCompatActivity {
         super.onCreate(_savedInstanceState);
         binding = InfoviewBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        initialize(_savedInstanceState);
+        initialize();
         FirebaseApp.initializeApp(this);
         initializeLogic();
     }
 
-    private void initialize(Bundle _savedInstanceState) {
+    private void initialize() {
 
         binding.backIcon.setOnClickListener(_view -> {
             finish();
@@ -62,7 +62,7 @@ public class InfoviewActivity extends AppCompatActivity {
     public void data() {
         if (getIntent().hasExtra("type")) {
             HashMap<String, Object> map;
-            if (getIntent().getStringExtra("type").equals("terms")) {
+            if (Objects.equals(getIntent().getStringExtra("type"), "terms")) {
                 binding.headerTitle.setText("Terms & Conditions");
                 map = new HashMap<>();
                 map.put("title", "Who Can Use PrepNest");
@@ -134,53 +134,54 @@ public class InfoviewActivity extends AppCompatActivity {
 
     public class RecyclerviewAdapter extends RecyclerView.Adapter<RecyclerviewAdapter.ViewHolder> {
 
-        ArrayList<HashMap<String, Object>> _data;
+        private final ArrayList<HashMap<String, Object>> list;
 
-        public RecyclerviewAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _data = _arr;
+        public RecyclerviewAdapter(ArrayList<HashMap<String, Object>> list) {
+            this.list = list;
         }
 
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            LayoutInflater _inflater = getLayoutInflater();
-            View _v = _inflater.inflate(R.layout.information_view_layout, null);
-            RecyclerView.LayoutParams _lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            _v.setLayoutParams(_lp);
-            return new ViewHolder(_v);
+            InformationViewLayoutBinding informationViewLayoutBinding = InformationViewLayoutBinding.inflate(
+                    LayoutInflater.from(parent.getContext()),
+                    parent,
+                    false
+            );
+
+            return new ViewHolder(informationViewLayoutBinding);
         }
 
         @Override
-        public void onBindViewHolder(ViewHolder _holder, final int _position) {
-            View _view = _holder.itemView;
-            InformationViewLayoutBinding binding = InformationViewLayoutBinding.bind(_view);
+        public void onBindViewHolder(@NonNull ViewHolder holder, final int position) {
+            holder.binding.title.setText(String.valueOf((long) (position + 1)).concat(". ".concat(Objects.requireNonNull(list.get(position).get("title")).toString())));
+            holder.binding.subtext.setText(Objects.requireNonNull(list.get(position).get("info")).toString());
 
-            binding.title.setText(String.valueOf((long) (_position + 1)).concat(". ".concat(_data.get(_position).get("title").toString())));
-            binding.subtext.setText(_data.get(_position).get("info").toString());
-
-            ViewGroup.LayoutParams params = binding.container.getLayoutParams();
+            ViewGroup.LayoutParams params = holder.binding.container.getLayoutParams();
             if (params instanceof ViewGroup.MarginLayoutParams) {
                 ViewGroup.MarginLayoutParams marginParams = (ViewGroup.MarginLayoutParams) params;
 
-                if (_position == 0) {
+                if (position == 0) {
                     marginParams.setMargins((int) convertToDp(10), (int) convertToDp(8), (int) convertToDp(10), 0);
-                } else if (_position == (_data.size() - 1)) {
+                } else if (position == (list.size() - 1)) {
                     marginParams.setMargins((int) convertToDp(10), 0, (int) convertToDp(10), (int) convertToDp(8));
                 } else {
                     marginParams.setMargins((int) convertToDp(10), (int) convertToDp(8), (int) convertToDp(10), (int) convertToDp(8));
                 }
-                binding.container.setLayoutParams(marginParams);
+                holder.binding.container.setLayoutParams(marginParams);
             }
         }
 
         @Override
         public int getItemCount() {
-            return _data.size();
+            return list.size();
         }
 
         public class ViewHolder extends RecyclerView.ViewHolder {
-            public ViewHolder(View v) {
-                super(v);
+            InformationViewLayoutBinding binding;
+            public ViewHolder(InformationViewLayoutBinding binding) {
+                super(binding.getRoot());
+                this.binding = binding;
             }
         }
     }
