@@ -25,7 +25,7 @@ public class ImageviewActivity extends AppCompatActivity {
 
     private final List<Uri> imageURIs = new ArrayList<>();
     private ImageviewBinding binding;
-    private SharedPreferences features_visit;
+    private SharedPreferences appFirstVisitSp;
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -38,7 +38,7 @@ public class ImageviewActivity extends AppCompatActivity {
     }
 
     private void initialize(Bundle _savedInstanceState) {
-        features_visit = getSharedPreferences("features visit", Activity.MODE_PRIVATE);
+        appFirstVisitSp = getSharedPreferences("app first visit", Activity.MODE_PRIVATE);
     }
 
     private void initializeLogic() {
@@ -48,14 +48,14 @@ public class ImageviewActivity extends AppCompatActivity {
         initializeAndAttachAdapter();
 //        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
 //        getWindow().setStatusBarColor(0xFFFFFFFF);
-        if (features_visit.contains("features visit")) {
-            HashMap<String, Object> map = new Gson().fromJson(features_visit.getString("features visit", ""), new TypeToken<HashMap<String, Object>>() {
+        if (appFirstVisitSp.contains("app first visit")) {
+            HashMap<String, Object> map = new Gson().fromJson(appFirstVisitSp.getString("app first visit", ""), new TypeToken<HashMap<String, Object>>() {
             }.getType());
             if (map.containsKey("first resource view")) {
                 if (map.get("first resource view").toString().equals("false")) {
                     PrepNestUtil.showToast(ImageviewActivity.this, "Swipe left to see more !");
                     map.put("first resource view", "true");
-                    features_visit.edit().putString("features visit", new Gson().toJson(map)).apply();
+                    appFirstVisitSp.edit().putString("features visit", new Gson().toJson(map)).apply();
                 }
             }
         }

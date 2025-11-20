@@ -92,7 +92,7 @@ public class UploadresourceActivity extends AppCompatActivity {
     private final ArrayList<String> keysList = new ArrayList<>();
     private final ArrayList<HashMap<String, Object>> filesMapList = new ArrayList<>();
     private UploadresourceBinding binding;
-    private HashMap<String, Object> features_visit_map = new HashMap<>();
+    private HashMap<String, Object> appFirstVisit = new HashMap<>();
     private HashMap<String, Object> userData = new HashMap<>();
     private Files_recyclerviewAdapter filesListAdapter;
     private HashMap<String, Object> reqValues = new HashMap<>();
@@ -101,7 +101,7 @@ public class UploadresourceActivity extends AppCompatActivity {
     private String jsonCourseData = "";
     private ArrayList<HashMap<String, Object>> dataList = new ArrayList<>();
 
-    private SharedPreferences features_visit;
+    private SharedPreferences appFirstVisitSp;
 
     private static void createNotificationChannel(Context context) {
         NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "upload progress", NotificationManager.IMPORTANCE_LOW);
@@ -123,7 +123,7 @@ public class UploadresourceActivity extends AppCompatActivity {
     }
 
     private void initialize(Bundle _savedInstanceState) {
-        features_visit = getSharedPreferences("features visit", Activity.MODE_PRIVATE);
+        appFirstVisitSp = getSharedPreferences("app first visit", Activity.MODE_PRIVATE);
 
         binding.backIcon.setOnClickListener(_view -> {
             finish();
@@ -131,7 +131,7 @@ public class UploadresourceActivity extends AppCompatActivity {
         });
 
         binding.guidanceIcon.setOnClickListener(_view -> {
-            features_visit_map.put("upload guidance", "false");
+            appFirstVisit.put("upload guidance", "false");
             showGuidanceSheet();
         });
 
@@ -442,8 +442,8 @@ public class UploadresourceActivity extends AppCompatActivity {
         super.onPostCreate(_savedInstanceState);
         users = fdb.getReference("users");
         designUI();
-        if (features_visit.contains("features visit")) {
-            features_visit_map = new Gson().fromJson(features_visit.getString("features visit", ""), new TypeToken<HashMap<String, Object>>() {
+        if (appFirstVisitSp.contains("app first visit")) {
+            appFirstVisit = new Gson().fromJson(appFirstVisitSp.getString("app first visit", ""), new TypeToken<HashMap<String, Object>>() {
             }.getType());
         }
         showGuidanceSheet();
@@ -530,15 +530,15 @@ public class UploadresourceActivity extends AppCompatActivity {
         sheetbinding.title.setText(getString(R.string.upload_guidance_title));
         sheetbinding.subtext.setText(getString(R.string.upload_guidance_message));
         upload_guidance_sheet.setCancelable(true);
-        if (features_visit_map.containsKey("upload guidance")) {
-            if (features_visit_map.get("upload guidance").toString().equals("false")) {
-                features_visit_map.put("upload guidance", "true");
-                features_visit.edit().putString("features visit", new Gson().toJson(features_visit_map)).apply();
+        if (appFirstVisit.containsKey("upload guidance")) {
+            if (appFirstVisit.get("upload guidance").toString().equals("false")) {
+                appFirstVisit.put("upload guidance", "true");
+                appFirstVisitSp.edit().putString("app first visit", new Gson().toJson(appFirstVisit)).apply();
                 upload_guidance_sheet.show();
             }
         } else {
-            features_visit_map.put("upload guidance", "true");
-            features_visit.edit().putString("features visit", new Gson().toJson(features_visit_map)).apply();
+            appFirstVisit.put("upload guidance", "true");
+            appFirstVisitSp.edit().putString("app first visit", new Gson().toJson(appFirstVisit)).apply();
             upload_guidance_sheet.show();
         }
     }

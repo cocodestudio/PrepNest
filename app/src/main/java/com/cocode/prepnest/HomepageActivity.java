@@ -1,8 +1,10 @@
 package com.cocode.prepnest;
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
@@ -56,30 +58,37 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.takusemba.spotlight.Spotlight;
 import com.takusemba.spotlight.Target;
 import com.takusemba.spotlight.shape.Circle;
 
+import org.json.JSONObject;
+
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 
 public class HomepageActivity extends AppCompatActivity {
 
     private static final int UPDATE_REQUEST_CODE = 123;
+    private String jsonCourseData = "";
     private final Timer _timer = new Timer();
-    private final HashMap<String, Object> userData = new HashMap<>();
+    private HashMap<String, Object> userData = new HashMap<>();
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
-    private final FirebaseDatabase firebase_database = FirebaseDatabase.getInstance();
-    private final DatabaseReference users = firebase_database.getReference("users");
-    private final DatabaseReference requests = firebase_database.getReference("requests/provider_requests");
-    private final DatabaseReference resources = firebase_database.getReference("resources");
-    private final DatabaseReference banners = firebase_database.getReference("other/app_banners");
+    private final FirebaseDatabase database = FirebaseDatabase.getInstance();
+    private final DatabaseReference users = database.getReference("users");
+    private final DatabaseReference requests = database.getReference("requests/provider_requests");
+    private final DatabaseReference resources = database.getReference("resources");
+    private final DatabaseReference banners = database.getReference("other/app_banners");
     private final ArrayList<HashMap<String, Object>> bannersList = new ArrayList<>();
     private final Intent toLogin = new Intent();
     private final Intent toProfile = new Intent();
@@ -100,6 +109,7 @@ public class HomepageActivity extends AppCompatActivity {
     private ArrayList<HashMap<String, Object>> bestList = new ArrayList<>();
     private com.google.android.material.bottomsheet.BottomSheetDialog provider_verification_status_sheet;
     private AppUpdateManager appUpdateManager;
+    private SharedPreferences cachedData;
     private Spotlight spotlight;
     private View overlay;
 
@@ -128,6 +138,7 @@ public class HomepageActivity extends AppCompatActivity {
 //        binding.drawerLayout.addDrawerListener(_toggle);
 //        _toggle.syncState();
 
+        cachedData = getSharedPreferences("userCachedData", Activity.MODE_PRIVATE);
 
         binding.menuIcon.setOnClickListener(_view -> binding.drawerLayout.openDrawer(GravityCompat.START));
 
@@ -295,6 +306,7 @@ public class HomepageActivity extends AppCompatActivity {
         appUpdateManager = AppUpdateManagerFactory.create(this);
         checkForAppUpdate();
         loadBannerAd();
+        loadCourses();
     }
 
     private void startTutorialOnViewReady() {
@@ -393,7 +405,7 @@ public class HomepageActivity extends AppCompatActivity {
     public void onResume() {
         super.onResume();
         networkMonitor.register();
-        getUserData();
+        loadUserDataFromSP();
 
         appUpdateManager.getAppUpdateInfo().addOnSuccessListener(appUpdateInfo -> {
             if (appUpdateInfo.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
@@ -499,74 +511,7 @@ public class HomepageActivity extends AppCompatActivity {
                         userData.put(child.getKey(), child.getValue());
                     }
 
-                    if ((Boolean) userData.getOrDefault("banned", false)) {
-                        PrepNestUtil.showToast(HomepageActivity.this, "Your account has been banned.");
-                        finishAffinity();
-                    }
-                    if (userData.containsKey("course id")) {
-                        FirebaseMessaging.getInstance().subscribeToTopic(Objects.requireNonNull(userData.get("course id")).toString());
-                    }
-
-                    if (userData.containsKey("profile")) {
-                        if (Objects.requireNonNull(userData.get("profile")).toString().equals("null")) {
-                            binding.drawer.userProfilePicture.setVisibility(View.GONE);
-                            binding.drawer.defaultProfileTitle.setVisibility(View.VISIBLE);
-                        } else {
-                            binding.drawer.defaultProfileTitle.setVisibility(View.GONE);
-                            binding.drawer.userProfilePicture.setVisibility(View.VISIBLE);
-                            Glide.with(getApplicationContext()).load(Uri.parse(Objects.requireNonNull(userData.get("profile")).toString())).into(binding.drawer.userProfilePicture);
-                        }
-                    } else {
-                        binding.drawer.userProfilePicture.setVisibility(View.GONE);
-                        binding.drawer.defaultProfileTitle.setVisibility(View.VISIBLE);
-                    }
-                    if (userData.containsKey("name")) {
-                        binding.drawer.userNameTxt.setText(Objects.requireNonNull(userData.get("name")).toString());
-                        binding.drawer.defaultProfileTitle.setText(generateDefaultName(Objects.requireNonNull(userData.get("name")).toString()).toUpperCase());
-                    } else {
-                        binding.drawer.defaultProfileTitle.setText("U");
-                        binding.drawer.userNameTxt.setText("User");
-                    }
-                    if (userData.containsKey("cash")) {
-                        Object value = userData.get("cash");
-                        long money;
-
-                        if (value instanceof Long) {
-                            money = (Long) value;
-                        } else if (value instanceof Double) {
-                            money = ((Double) value).longValue();
-                        } else if (value instanceof Integer) {
-                            money = ((Integer) value).longValue();
-                        } else {
-                            money = 0L;
-                        }
-                        binding.cashAmountTxt.setText(String.valueOf(money));
-                    } else {
-                        binding.cashAmountTxt.setText("0");
-                    }
-                    if (userData.containsKey("provider")) {
-                        if ((Boolean) userData.get("provider")) {
-                            binding.drawer.becomeProviderOp.setVisibility(View.GONE);
-                        } else {
-                            binding.drawer.becomeProviderOp.setVisibility(View.VISIBLE);
-                        }
-                    } else {
-                        binding.drawer.becomeProviderOp.setVisibility(View.VISIBLE);
-                    }
-                    if (userData.containsKey("provider verification status")) {
-                        if (Objects.requireNonNull(userData.get("provider verification status")).toString().equals("pending")) {
-                            binding.drawer.providerPendingIcon.setVisibility(View.VISIBLE);
-                        } else {
-                            if (Objects.requireNonNull(userData.get("provider verification status")).toString().equals("failed")) {
-                                binding.drawer.providerPendingIcon.setImageResource(R.drawable.icon_error);
-                            } else {
-                                binding.drawer.providerPendingIcon.setVisibility(View.GONE);
-                            }
-                        }
-                    } else {
-                        binding.drawer.providerPendingIcon.setVisibility(View.GONE);
-                    }
-                    loadResources();
+                    loadUserDataToUI();
                 } else {
                     binding.drawer.defaultProfileTitle.setText("U");
                     binding.drawer.userNameTxt.setText("User");
@@ -585,6 +530,244 @@ public class HomepageActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    public void loadUserDataFromSP() {
+        if (cachedData.contains("userData")) {
+            userData = new Gson()
+                    .fromJson(cachedData.getString("userData", ""),
+                            new TypeToken<HashMap<String, Object>>() {}
+                                    .getType()
+                    );
+
+            binding.cashProgressbar.setVisibility(View.GONE);
+            binding.cashAmountTxt.setVisibility(View.VISIBLE);
+            loadUserDataToUI();
+        } else {
+            getUserData();
+        }
+    }
+
+    public void loadUserDataToUI() {
+        if (Boolean.parseBoolean(Objects.requireNonNull(userData.getOrDefault("banned", false)).toString())) {
+            PrepNestUtil.showToast(this, "Your account has been banned.");
+            finishAffinity();
+        }
+        if (userData.containsKey("course id")) {
+            FirebaseMessaging.getInstance().subscribeToTopic(Objects.requireNonNull(userData.get("course id")).toString());
+        }
+
+        if (userData.containsKey("profile")) {
+            if (Objects.requireNonNull(userData.get("profile")).toString().equals("null")) {
+                binding.drawer.userProfilePicture.setVisibility(View.GONE);
+                binding.drawer.defaultProfileTitle.setVisibility(View.VISIBLE);
+            } else {
+                binding.drawer.defaultProfileTitle.setVisibility(View.GONE);
+                binding.drawer.userProfilePicture.setVisibility(View.VISIBLE);
+                Glide.with(getApplicationContext()).load(Uri.parse(Objects.requireNonNull(userData.get("profile")).toString())).into(binding.drawer.userProfilePicture);
+            }
+        } else {
+            binding.drawer.userProfilePicture.setVisibility(View.GONE);
+            binding.drawer.defaultProfileTitle.setVisibility(View.VISIBLE);
+        }
+        if (userData.containsKey("name")) {
+            binding.drawer.userNameTxt.setText(Objects.requireNonNull(userData.get("name")).toString());
+            binding.drawer.defaultProfileTitle.setText(generateDefaultName(Objects.requireNonNull(userData.get("name")).toString()).toUpperCase());
+        } else {
+            binding.drawer.defaultProfileTitle.setText("U");
+            binding.drawer.userNameTxt.setText("User");
+        }
+        if (userData.containsKey("cash")) {
+            Object value = userData.get("cash");
+            long money;
+
+            if (value instanceof Long) {
+                money = (Long) value;
+            } else if (value instanceof Double) {
+                money = ((Double) value).longValue();
+            } else if (value instanceof Integer) {
+                money = ((Integer) value).longValue();
+            } else {
+                money = 0L;
+            }
+            binding.cashAmountTxt.setText(String.valueOf(money));
+        } else {
+            binding.cashAmountTxt.setText("0");
+        }
+        if (userData.containsKey("provider")) {
+            if (Boolean.parseBoolean(Objects.requireNonNull(userData.get("provider")).toString())) {
+                binding.drawer.becomeProviderOp.setVisibility(View.GONE);
+            } else {
+                binding.drawer.becomeProviderOp.setVisibility(View.VISIBLE);
+            }
+        } else {
+            binding.drawer.becomeProviderOp.setVisibility(View.VISIBLE);
+        }
+        if (userData.containsKey("provider verification status")) {
+            if (Objects.requireNonNull(userData.get("provider verification status")).toString().equals("pending")) {
+                binding.drawer.providerPendingIcon.setVisibility(View.VISIBLE);
+            } else {
+                if (Objects.requireNonNull(userData.get("provider verification status")).toString().equals("failed")) {
+                    binding.drawer.providerPendingIcon.setImageResource(R.drawable.icon_error);
+                } else {
+                    binding.drawer.providerPendingIcon.setVisibility(View.GONE);
+                }
+            }
+        } else {
+            binding.drawer.providerPendingIcon.setVisibility(View.GONE);
+        }
+//        loadResources();
+        cachedData.edit().putString("userData", new Gson().toJson(userData)).apply();
+        loadAllResources();
+    }
+
+    public void loadCourses() {
+        if (jsonCourseData.isEmpty()) {
+            try {
+                InputStream is = getAssets().open("courses.json");
+                int size = is.available();
+                byte[] buffer = new byte[size];
+                is.read(buffer);
+                is.close();
+                jsonCourseData = new String(buffer, "UTF-8");
+            } catch (IOException ex) {
+                PrepNestUtil.showToast(getApplicationContext(), ex.toString());
+            }
+        }
+    }
+
+    public int getCourseMaxSemesters(final String courseID) {
+        try {
+            JSONObject allCourses = new JSONObject(jsonCourseData);
+            JSONObject course = allCourses.getJSONObject(courseID);
+            return course.getInt("duration") * 2;
+        } catch (Exception e) {
+            PrepNestUtil.showToast(getApplicationContext(), e.toString());
+        }
+        return 0;
+    }
+
+    public void loadAllResources() {
+        ArrayList<HashMap<String, Object>> tempList = new ArrayList<>();
+        final int currentSemester = (int)Float.parseFloat(Objects.requireNonNull(userData.get("semester")).toString());
+        final int maxSemester = getCourseMaxSemesters(Objects.requireNonNull(userData.get("course id")).toString());
+
+//        Log.d("CURRENT SEMESTER", String.valueOf(currentSemester));
+//        Log.d("MAX SEMESTER", String.valueOf(maxSemester));
+
+        int difference = maxSemester - currentSemester;
+
+        if (difference <= 0) {
+            difference = 1; // load at least 1 semester
+        }
+
+        final int MAX = Math.min(difference, 3);
+//        Log.d("MAX", String.valueOf(MAX));
+        AtomicInteger loadedCount = new AtomicInteger(0);
+
+        for (int semValue = currentSemester; semValue < (currentSemester + MAX); semValue++) {
+            resources
+                    .child(Objects.requireNonNull(userData.get("course id")).toString())
+                    .orderByChild("semester")
+                    .equalTo(semValue)
+                    .addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot snapshot) {
+                            if (!snapshot.exists()) {
+                                if (loadedCount.incrementAndGet() == MAX) {
+                                    filterResources(tempList);
+                                }
+                                return;
+                            }
+
+                            for (DataSnapshot childSnapshot : snapshot.getChildren()) {
+                                HashMap<String, Object> item = (HashMap<String, Object>) childSnapshot.getValue();
+                                tempList.add(item);
+                            }
+
+                            if (loadedCount.incrementAndGet() == MAX) {
+                                filterResources(tempList);
+                            }
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+                            PrepNestUtil.showToast(HomepageActivity.this, error.getMessage());
+                        }
+                    });
+        }
+
+    }
+
+    public void loadRecommendedResources() {
+        ArrayList<HashMap<String, Object>> tempList = new ArrayList<>();
+
+        resources
+                .child(Objects.requireNonNull(userData.get("course id")).toString())
+                .orderByChild("recommended")
+                .equalTo(true)
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        if (!snapshot.exists()) {
+                            filterRecommendedResources(tempList);
+                            toggleRecommendedListEmptyState(!tempList.isEmpty());
+                            loadBestResources();
+                            return;
+                        }
+
+                        Log.d("DATA", snapshot.toString());
+
+                        for (DataSnapshot childSnapshot : snapshot.getChildren()) {
+                            HashMap<String, Object> item = (HashMap<String, Object>) childSnapshot.getValue();
+                            tempList.add(item);
+                        }
+
+                        Log.d("RECOMMENDED", tempList.toString());
+                        filterRecommendedResources(tempList);
+                        toggleRecommendedListEmptyState(!tempList.isEmpty());
+                        loadBestResources();
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        PrepNestUtil.showToast(HomepageActivity.this, error.getMessage());
+                    }
+                });
+
+    }
+
+    public void loadBestResources() {
+        ArrayList<HashMap<String, Object>> tempList = new ArrayList<>();
+
+        resources
+                .child(Objects.requireNonNull(userData.get("course id")).toString())
+                .orderByChild("best choice")
+                .equalTo(true)
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        if (!snapshot.exists()) {
+                            filterBestResources(tempList);
+                            toggleBestListEmptyState(!tempList.isEmpty());
+                            return;
+                        }
+
+                        for (DataSnapshot childSnapshot : snapshot.getChildren()) {
+                            HashMap<String, Object> item = (HashMap<String, Object>) childSnapshot.getValue();
+                            tempList.add(item);
+                        }
+
+                        filterBestResources(tempList);
+                        toggleBestListEmptyState(!tempList.isEmpty());
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        PrepNestUtil.showToast(HomepageActivity.this, error.getMessage());
+                    }
+                });
+
     }
 
 
@@ -824,9 +1007,36 @@ public class HomepageActivity extends AppCompatActivity {
         return matchesSemester && isActive;
     }
 
+    public void filterRecentlyAddedResources(final ArrayList<HashMap<String, Object>> list) {
+        ArrayList<HashMap<String, Object>> sortedList = new ArrayList<>(list);
+        ListMapUtils.sortListByKey(sortedList, "date of verification", true, ListMapUtils.SortType.TIMESTAMP_STRING);
+        recentlyAddedList = sortedList.stream().limit(3).collect(Collectors.toCollection(ArrayList::new));
+
+        binding.recentlyAddedList.setAdapter(new RecentlyAddedListAdapter(recentlyAddedList));
+        toggleRecentListEmptyState(!recentlyAddedList.isEmpty());
+    }
+
+    public void filterRecommendedResources(final ArrayList<HashMap<String, Object>> list) {
+        ArrayList<HashMap<String, Object>> sortedList = new ArrayList<>(list);
+        ListMapUtils.sortListByKey(sortedList, "date of verification", true, ListMapUtils.SortType.TIMESTAMP_STRING);
+        recommendedList = sortedList.stream().limit(3).collect(Collectors.toCollection(ArrayList::new));
+
+        binding.recommendedList.setAdapter(new RecommendedListAdapter(recommendedList));
+        toggleRecommendedListEmptyState(!recommendedList.isEmpty());
+    }
+
+    public void filterBestResources(final ArrayList<HashMap<String, Object>> list) {
+        ArrayList<HashMap<String, Object>> sortedList = new ArrayList<>(list);
+        ListMapUtils.sortListByKey(sortedList, "date of verification", true, ListMapUtils.SortType.TIMESTAMP_STRING);
+        bestList = sortedList.stream().limit(3).collect(Collectors.toCollection(ArrayList::new));
+
+        binding.bestList.setAdapter(new BestListAdapter(bestList));
+        toggleBestListEmptyState(!bestList.isEmpty());
+    }
+
     public void filterResources(final ArrayList<HashMap<String, Object>> _list) {
         ArrayList<HashMap<String, Object>> sortedList = new ArrayList<>(_list);
-        ListMapUtils.sortListByKey(sortedList, "session", true, ListMapUtils.SortType.SESSION);
+        ListMapUtils.sortListByKey(sortedList, "date of verification", true, ListMapUtils.SortType.TIMESTAMP_STRING);
         recentlyAddedList = sortedList.stream().limit(3).collect(Collectors.toCollection(ArrayList::new));
         binding.recentlyAddedList.setAdapter(new RecentlyAddedListAdapter(recentlyAddedList));
         toggleRecentListEmptyState(!recentlyAddedList.isEmpty());
@@ -878,7 +1088,7 @@ public class HomepageActivity extends AppCompatActivity {
     }
 
     public void checkAppMaintenance() {
-        DatabaseReference appMaintenance = firebase_database.getReference("other/app_maintenance/closed");
+        DatabaseReference appMaintenance = database.getReference("other/app_maintenance/closed");
 
         appMaintenance.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -1177,6 +1387,7 @@ public class HomepageActivity extends AppCompatActivity {
 
         public class ViewHolder extends RecyclerView.ViewHolder {
             ResourceItemShortBinding binding;
+
             public ViewHolder(ResourceItemShortBinding binding) {
                 super(binding.getRoot());
                 this.binding = binding;
@@ -1285,6 +1496,7 @@ public class HomepageActivity extends AppCompatActivity {
 
         public class ViewHolder extends RecyclerView.ViewHolder {
             ResourceItemShortBinding binding;
+
             public ViewHolder(ResourceItemShortBinding binding) {
                 super(binding.getRoot());
                 this.binding = binding;
@@ -1394,6 +1606,7 @@ public class HomepageActivity extends AppCompatActivity {
 
         public class ViewHolder extends RecyclerView.ViewHolder {
             ResourceItemShortBinding binding;
+
             public ViewHolder(ResourceItemShortBinding binding) {
                 super(binding.getRoot());
                 this.binding = binding;

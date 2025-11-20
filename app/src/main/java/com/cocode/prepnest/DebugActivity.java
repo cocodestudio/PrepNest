@@ -1,5 +1,7 @@
 package com.cocode.prepnest;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.os.Bundle;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -38,7 +40,7 @@ public class DebugActivity extends AppCompatActivity {
         networkMonitor = new NetworkMonitor(this);
         PrepNestUtil.roundViewWithRipple(binding.btnSendReport, "#000000", 15, 0, "#000000", "#212121");
         PrepNestUtil.roundViewWithRipple(binding.btnExitApp, "#FAFAFA", 15, 0, "#000000", "#E0E0E0");
-//        ((ClipboardManager) getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("clipboard", getIntent().getStringExtra("error")));
+        ((ClipboardManager) getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("clipboard", getIntent().getStringExtra("error")));
         PrepNestUtil.setLightStatusBar(this);
         PrepNestUtil.changeNavBarColor(this, true);
     }

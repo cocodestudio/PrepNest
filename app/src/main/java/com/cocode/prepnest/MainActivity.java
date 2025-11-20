@@ -28,9 +28,9 @@ public class MainActivity extends AppCompatActivity {
     private final Intent toNoConnection = new Intent();
     private MainBinding binding;
     private NetworkMonitor networkMonitor;
-    private HashMap<String, Object> features_visit_map = new HashMap<>();
+    private HashMap<String, Object> appFirstVisit = new HashMap<>();
     private TimerTask timer;
-    private SharedPreferences features_visit;
+    private SharedPreferences appFirstVisitSp;
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -43,7 +43,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initialize(Bundle _savedInstanceState) {
-        features_visit = getSharedPreferences("features visit", Activity.MODE_PRIVATE);
+        appFirstVisitSp = getSharedPreferences("app first visit", Activity.MODE_PRIVATE);
     }
 
     private void initializeLogic() {
@@ -88,7 +88,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void run() {
                         runOnUiThread(() -> {
-                            if (features_visit_map.get("onboarding").toString().equals("false")) {
+                            if (appFirstVisit.get("onboarding").toString().equals("false")) {
                                 toOnboarding.setClass(MainActivity.this, OnboardingActivity.class);
                                 startActivity(toOnboarding);
                             } else {
@@ -117,16 +117,16 @@ public class MainActivity extends AppCompatActivity {
 
 
     public void initializeFirstVisit() {
-        if (features_visit.contains("features visit")) {
-            features_visit_map = new Gson().fromJson(features_visit.getString("features visit", ""), new TypeToken<HashMap<String, Object>>() {
+        if (appFirstVisitSp.contains("features visit")) {
+            appFirstVisit = new Gson().fromJson(appFirstVisitSp.getString("features visit", ""), new TypeToken<HashMap<String, Object>>() {
             }.getType());
         } else {
-            features_visit_map = new HashMap<>();
-            features_visit_map.put("onboarding", "false");
-            features_visit_map.put("provider overview", "false");
-            features_visit_map.put("upload guidance", "false");
-            features_visit_map.put("first resource view", "false");
-            features_visit.edit().putString("features visit", new Gson().toJson(features_visit_map)).apply();
+            appFirstVisit = new HashMap<>();
+            appFirstVisit.put("onboarding", "false");
+            appFirstVisit.put("provider overview", "false");
+            appFirstVisit.put("upload guidance", "false");
+            appFirstVisit.put("first resource view", "false");
+            appFirstVisitSp.edit().putString("features visit", new Gson().toJson(appFirstVisit)).apply();
         }
     }
 

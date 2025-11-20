@@ -70,7 +70,8 @@ public class SignupActivity extends AppCompatActivity {
     private ArrayList<HashMap<String, Object>> allCoursesList = new ArrayList<>();
     private FirebaseAuth auth;
     private OnCompleteListener<AuthResult> _auth_create_user_listener;
-    private SharedPreferences user_credentials;
+    private SharedPreferences userCredentials;
+    private SharedPreferences cachedData;
     private int selectedPosition = -1;
     private int selectedCoursePosition = -1;
     private int selectedSemesterPosition = -1;
@@ -87,7 +88,8 @@ public class SignupActivity extends AppCompatActivity {
 
     private void initialize(Bundle _savedInstanceState) {
         auth = FirebaseAuth.getInstance();
-        user_credentials = getSharedPreferences("credentials", Activity.MODE_PRIVATE);
+        userCredentials = getSharedPreferences("credentials", Activity.MODE_PRIVATE);
+        cachedData = getSharedPreferences("userCachedData", Activity.MODE_PRIVATE);
 
         binding.signupBtn.setOnClickListener(_view -> {
             Rect r = new Rect();
@@ -447,6 +449,14 @@ public class SignupActivity extends AppCompatActivity {
 //                addUser.put("referred by", "");
 //                addWelcomeBonusToUser(addUser);
                 createNewUser(addUser);
+                // SAVING USER CREDENTIALS
+                HashMap<String, Object> credentialsMap = new HashMap<>();
+                credentialsMap.put("email", binding.emailEdittext.getText().toString());
+                credentialsMap.put("password", binding.confirmPwdEdittext.getText().toString());
+                userCredentials.edit().putString("user credentials", new Gson().toJson(credentialsMap)).apply();
+
+                // SAVING USER DATA
+                cachedData.edit().putString("userData", new Gson().toJson(addUser)).apply();
             } else {
                 PrepNestUtil.showLoadingDialog(SignupActivity.this, false);
                 if (task.getException() instanceof FirebaseAuthException) {
@@ -644,7 +654,7 @@ public class SignupActivity extends AppCompatActivity {
                 userCredentials = new HashMap<>();
                 userCredentials.put("email", FirebaseAuth.getInstance().getCurrentUser().getEmail());
                 userCredentials.put("password", binding.confirmPwdEdittext.getText().toString().trim());
-                user_credentials.edit().putString("credentials", new Gson().toJson(userCredentials)).apply();
+//                userCredentials.edit().putString("credentials", new Gson().toJson(userCredentials)).apply();
                 userRef.child("coins").setValue(Long.parseLong(temp)).addOnCompleteListener(addBonus -> {
                     if (addBonus.isSuccessful()) {
                         DatabaseReference historyRef = transaction_history.child(auth.getCurrentUser().getUid());

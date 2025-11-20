@@ -51,11 +51,11 @@ public class BecomeproviderActivity extends AppCompatActivity {
     private boolean hasPhnNumber = false;
     private boolean isEmailVerified = false;
     private boolean isEligible = false;
-    private HashMap<String, Object> features_visit_map = new HashMap<>();
+    private HashMap<String, Object> appFirstVisit = new HashMap<>();
     private NetworkMonitor networkMonitor;
     private com.google.android.material.bottomsheet.BottomSheetDialog eligibility_issues_sheet;
     private com.google.android.material.bottomsheet.BottomSheetDialog provider_overview_sheet;
-    private SharedPreferences features_visit;
+    private SharedPreferences appFirstVisitSp;
     private FirebaseAuth auth;
 
     @Override
@@ -69,7 +69,7 @@ public class BecomeproviderActivity extends AppCompatActivity {
     }
 
     private void initialize(Bundle _savedInstanceState) {
-        features_visit = getSharedPreferences("features visit", Activity.MODE_PRIVATE);
+        appFirstVisitSp = getSharedPreferences("app first visit", Activity.MODE_PRIVATE);
         auth = FirebaseAuth.getInstance();
 
         binding.backIcon.setOnClickListener(_view -> {
@@ -188,12 +188,12 @@ isPhnVerified = true;
 
 
     public void showOverviewSheet() {
-        if (features_visit.contains("features visit")) {
-            features_visit_map = new Gson().fromJson(features_visit.getString("features visit", ""), new TypeToken<HashMap<String, Object>>() {
+        if (appFirstVisitSp.contains("app first visit")) {
+            appFirstVisit = new Gson().fromJson(appFirstVisitSp.getString("app first visit", ""), new TypeToken<HashMap<String, Object>>() {
             }.getType());
         }
-        if (features_visit_map.containsKey("provider overview")) {
-            if (features_visit_map.get("provider overview").toString().equals("false")) {
+        if (appFirstVisit.containsKey("provider overview")) {
+            if (appFirstVisit.get("provider overview").toString().equals("false")) {
                 addProviderOverviewItems();
                 provider_overview_sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(BecomeproviderActivity.this);
                 OverviewSheetBinding sheetbinding = OverviewSheetBinding.inflate(getLayoutInflater());
@@ -324,8 +324,8 @@ isPhnVerified = true;
                         if (sheetbinding.viewpager.getCurrentItem() == 1) {
                             sheetbinding.viewpager.setCurrentItem(2);
                         } else {
-                            features_visit_map.put("provider overview", "true");
-                            features_visit.edit().putString("features visit", new Gson().toJson(features_visit_map)).apply();
+                            appFirstVisit.put("provider overview", "true");
+                            appFirstVisitSp.edit().putString("app first visit", new Gson().toJson(appFirstVisit)).apply();
                             provider_overview_sheet.dismiss();
                         }
                     }

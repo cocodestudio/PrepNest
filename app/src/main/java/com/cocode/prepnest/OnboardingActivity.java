@@ -30,8 +30,8 @@ public class OnboardingActivity extends AppCompatActivity {
     private final Intent toLogin = new Intent();
     private final Intent toSignup = new Intent();
     private OnboardingBinding binding;
-    private HashMap<String, Object> features_visit_map = new HashMap<>();
-    private SharedPreferences features_visit;
+    private HashMap<String, Object> appFirstVisit = new HashMap<>();
+    private SharedPreferences appFirstVisitSp;
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -44,7 +44,7 @@ public class OnboardingActivity extends AppCompatActivity {
     }
 
     private void initialize() {
-        features_visit = getSharedPreferences("features visit", Activity.MODE_PRIVATE);
+        appFirstVisitSp = getSharedPreferences("app first visit", Activity.MODE_PRIVATE);
 
         binding.viewpager.addOnPageChangeListener(new OnPageChangeListener() {
             @Override
@@ -55,10 +55,10 @@ public class OnboardingActivity extends AppCompatActivity {
             @Override
             public void onPageSelected(int _position) {
                 if (_position == (datalist.size() - 1)) {
-                    features_visit_map = new Gson().fromJson(features_visit.getString("features visit", ""), new TypeToken<HashMap<String, Object>>() {
+                    appFirstVisit = new Gson().fromJson(appFirstVisitSp.getString("app first visit", ""), new TypeToken<HashMap<String, Object>>() {
                     }.getType());
-                    features_visit_map.put("onboarding", "true");
-                    features_visit.edit().putString("features visit", new Gson().toJson(features_visit_map)).apply();
+                    appFirstVisit.put("onboarding", "true");
+                    appFirstVisitSp.edit().putString("app first visit", new Gson().toJson(appFirstVisit)).apply();
                     PrepNestUtil.TransitionManager(binding.btnsContainer, 200);
                     binding.moveToNextBtn.setVisibility(View.GONE);
                     binding.accountBtnsContainer.setVisibility(View.VISIBLE);
