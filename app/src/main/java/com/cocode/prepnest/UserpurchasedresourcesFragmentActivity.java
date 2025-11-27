@@ -40,10 +40,11 @@ import com.google.firebase.storage.StorageReference;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -106,7 +107,7 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
     private void initializeLogic() {
         attachAdapterToRecyclerView();
         getPurchasedResourcesIDs();
-        loadCourses();
+        loadAllCoursesFromJson(requireContext());
 
         PrepNestUtil.changeNavBarColor(requireActivity(), true);
     }
@@ -556,30 +557,30 @@ sheetBinding.ratingContainer.setVisibility(View.GONE);
         resource_details_sheet.show();
     }
 
-    public void loadCourses() {
-        if (jsonCourseData == null || jsonCourseData.isEmpty()) {
-            try {
-                InputStream is = Objects.requireNonNull(getContext()).getAssets().open("courses.json");
-                int size = is.available();
-                byte[] buffer = new byte[size];
-                is.read(buffer);
-                is.close();
-                jsonCourseData = new String(buffer, StandardCharsets.UTF_8);
-            } catch (IOException ex) {
-                PrepNestUtil.showToast(requireContext(), ex.toString());
+    public void loadAllCoursesFromJson(Context context) {
+        try (InputStream is = context.getAssets().open("courses.json");
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[1024];
+            int length;
+
+            while ((length = is.read(buffer)) != -1) {
+                bos.write(buffer, 0, length);
             }
+
+            jsonCourseData = bos.toString(StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
-    public String getCourseName(final String _courseID) {
+    public String getCourseName(String courseId) {
+        JSONObject jsonObject = null;
         try {
-            JSONObject allCourses = new JSONObject(jsonCourseData);
-            JSONObject course = allCourses.getJSONObject(_courseID);
-            return course.getString("name");
-        } catch (Exception e) {
-            PrepNestUtil.showToast(requireContext(), e.toString());
+            jsonObject = new JSONObject(jsonCourseData);
+            return jsonObject.getJSONObject(courseId).getString("name");
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
         }
-        return "None";
     }
 
     public void navigateToResourceView(final HashMap<String, Object> _item) {
