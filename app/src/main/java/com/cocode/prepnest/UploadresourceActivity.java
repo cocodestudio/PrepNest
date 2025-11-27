@@ -11,12 +11,12 @@ import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.ImageDecoder;
 import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -27,11 +27,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
-import android.widget.BaseAdapter;
 import android.widget.EditText;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
@@ -45,9 +41,8 @@ import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.cocode.prepnest.databinding.DetailsSelectSheetBinding;
+import com.cocode.prepnest.databinding.FileChipCardBinding;
 import com.cocode.prepnest.databinding.GuidanceSheetLayoutBinding;
-import com.cocode.prepnest.databinding.SheetSingleItemSelectBinding;
 import com.cocode.prepnest.databinding.StatusViewBinding;
 import com.cocode.prepnest.databinding.UploadresourceBinding;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -64,6 +59,7 @@ import com.google.firebase.storage.StorageReference;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
@@ -71,6 +67,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Year;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -81,26 +78,28 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
-public class UploadresourceActivity extends AppCompatActivity {
+public class UploadresourceActivity extends AppCompatActivity implements ItemListSheetFragment.BottomSheetListener {
 
     private static final String CHANNEL_ID = "files_upload";
     private static final int NOTIFICATION_ID = 1010;
-    private static String selectedKey;
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
     private final FirebaseDatabase fdb = FirebaseDatabase.getInstance();
-    private final DatabaseReference requests = fdb.getReference("requests/new_resources_requests");
-    private final ArrayList<String> keysList = new ArrayList<>();
+    private final DatabaseReference requests = fdb.getReference("requests/newResourcesRequests");
     private final ArrayList<HashMap<String, Object>> filesMapList = new ArrayList<>();
+    private final int IMAGE_PICK_CODE = 1102;
+    private ArrayList<HashMap<String, Object>> itemsList = new ArrayList<>();
     private UploadresourceBinding binding;
     private HashMap<String, Object> appFirstVisit = new HashMap<>();
+    private HashMap<String, Object> dataPayload = new HashMap<>();
     private HashMap<String, Object> userData = new HashMap<>();
-    private Files_recyclerviewAdapter filesListAdapter;
-    private HashMap<String, Object> reqValues = new HashMap<>();
+    private FilesListAdapter filesListAdapter;
     private DatabaseReference users;
     private NetworkMonitor networkMonitor;
-    private String jsonCourseData = "";
-    private ArrayList<HashMap<String, Object>> dataList = new ArrayList<>();
-
+    private String jsonCourseData = null;
+    private String selectedCourseId = "-1";
+    private String selectedSemesterId = "-1";
+    private String selectedSessionId = "-1";
+    private int selectedSemester = 0;
     private SharedPreferences appFirstVisitSp;
 
     private static void createNotificationChannel(Context context) {
@@ -123,7 +122,7 @@ public class UploadresourceActivity extends AppCompatActivity {
     }
 
     private void initialize(Bundle _savedInstanceState) {
-        appFirstVisitSp = getSharedPreferences("app first visit", Activity.MODE_PRIVATE);
+        appFirstVisitSp = getSharedPreferences("appFirstVisit", Activity.MODE_PRIVATE);
 
         binding.backIcon.setOnClickListener(_view -> {
             finish();
@@ -131,17 +130,14 @@ public class UploadresourceActivity extends AppCompatActivity {
         });
 
         binding.guidanceIcon.setOnClickListener(_view -> {
-            appFirstVisit.put("upload guidance", "false");
+            appFirstVisit.put("uploadGuidance", false);
             showGuidanceSheet();
         });
 
         binding.subjectEdittext.addTextChangedListener(new TextWatcher() {
             @Override
             public void onTextChanged(CharSequence _param1, int _param2, int _param3, int _param4) {
-                PrepNestUtil.TransitionManager(binding.background, 150);
-                if (binding.subjectErrorTxt.getVisibility() == View.VISIBLE) {
-                    binding.subjectErrorTxt.setVisibility(View.GONE);
-                }
+
             }
 
             @Override
@@ -151,62 +147,31 @@ public class UploadresourceActivity extends AppCompatActivity {
 
             @Override
             public void afterTextChanged(Editable _param1) {
-
+                PrepNestUtil.TransitionManager(binding.background, 150);
+                if (binding.subjectErrorTxt.getVisibility() == View.VISIBLE) {
+                    binding.subjectErrorTxt.setVisibility(View.GONE);
+                }
             }
         });
 
         binding.sessionContainer.setOnClickListener(_view -> {
             Rect r = new Rect();
             binding.background.getWindowVisibleDisplayFrame(r);
-            int screenheight = binding.background.getRootView().getHeight();
-            int keypadheight = screenheight - r.bottom;
-            if (keypadheight > (screenheight * 0.15d)) {
+            int screenHeight = binding.background.getRootView().getHeight();
+            int keypadHeight = screenHeight - r.bottom;
+            if (keypadHeight > (screenHeight * 0.15d)) {
                 PrepNestUtil.hideKeyboard(UploadresourceActivity.this);
             }
-            BottomSheetDialog details_sheet;
-            details_sheet = new BottomSheetDialog(UploadresourceActivity.this);
-            DetailsSelectSheetBinding sheetbinding = DetailsSelectSheetBinding.inflate(getLayoutInflater());
 
-            details_sheet.setContentView(sheetbinding.getRoot());
+            createSessionsList();
 
-            details_sheet.setOnShowListener(dialog -> {
-                BottomSheetDialog d = (BottomSheetDialog) dialog;
-                View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
-                if (bottomSheet != null) {
-                    bottomSheet.setBackgroundResource(android.R.color.transparent);
-                }
-            });
+            dataPayload = new HashMap<>();
+            dataPayload.put("type", ItemListSheetFragment.SheetType.SESSION.toString());
+            dataPayload.put("list", new ArrayList<>(itemsList));
+            dataPayload.put("selectedItemId", selectedSessionId);
 
-
-            ViewGroup.LayoutParams paramscontainer = sheetbinding.container.getLayoutParams();
-            paramscontainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
-            paramscontainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-            sheetbinding.container.setLayoutParams(paramscontainer);
-
-            selectedKey = "session";
-
-            GradientDrawable gd = new GradientDrawable();
-            gd.setColor(Color.parseColor("#FFFFFF"));
-            gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-            sheetbinding.container.setBackground(gd);
-            sheetbinding.searchContainer.setVisibility(View.GONE);
-            sheetbinding.itemsList.setHorizontalScrollBarEnabled(false);
-            sheetbinding.itemsList.setVerticalScrollBarEnabled(false);
-            dataList = new Gson().fromJson(reqValues.get("sessions_json").toString(), new TypeToken<ArrayList<HashMap<String, Object>>>() {
-            }.getType());
-            sheetbinding.itemsList.setAdapter(new ItemsAdapter(dataList));
-
-            ((BaseAdapter) sheetbinding.itemsList.getAdapter()).notifyDataSetChanged();
-            sheetbinding.itemsList.setOnItemClickListener((_param1, _param2, _param3, _param4) -> {
-                binding.sessionText.setText(((HashMap<String, Object>) _param1.getItemAtPosition(_param3)).get("session").toString());
-                if (binding.sessionErrorTxt.getVisibility() == View.VISIBLE) {
-                    PrepNestUtil.TransitionManager(binding.background, 150);
-                    binding.sessionErrorTxt.setVisibility(View.GONE);
-                }
-                details_sheet.dismiss();
-            });
-            details_sheet.setCancelable(true);
-            details_sheet.show();
+            final ItemListSheetFragment sessionSheet = ItemListSheetFragment.newInstance(dataPayload);
+            sessionSheet.show(getSupportFragmentManager(), "sessionSheet");
         });
 
         binding.uploadBtn.setOnClickListener(_view -> {
@@ -229,8 +194,8 @@ public class UploadresourceActivity extends AppCompatActivity {
                                 binding.sessionErrorTxt.setText("Select the session");
                                 binding.sessionErrorTxt.setVisibility(View.VISIBLE);
                             } else {
-                                if (filesMapList.size() == 0) {
-                                    PrepNestUtil.showToast(UploadresourceActivity.this, "Select atleast one image file");
+                                if (filesMapList.isEmpty()) {
+                                    PrepNestUtil.showToast(UploadresourceActivity.this, "Select at least one image file");
                                 } else {
                                     showUploadConfirmationSheet();
                                 }
@@ -244,141 +209,41 @@ public class UploadresourceActivity extends AppCompatActivity {
         binding.courseSelectContainer.setOnClickListener(_view -> {
             Rect r = new Rect();
             binding.background.getWindowVisibleDisplayFrame(r);
-            int screenheight = binding.background.getRootView().getHeight();
-            int keypadheight = screenheight - r.bottom;
-            if (keypadheight > (screenheight * 0.15d)) {
+            int screenHeight = binding.background.getRootView().getHeight();
+            int keypadHeight = screenHeight - r.bottom;
+            if (keypadHeight > (screenHeight * 0.15d)) {
                 PrepNestUtil.hideKeyboard(UploadresourceActivity.this);
             }
-            BottomSheetDialog details_sheet;
-            details_sheet = new BottomSheetDialog(UploadresourceActivity.this);
-            DetailsSelectSheetBinding sheetbinding = DetailsSelectSheetBinding.inflate(getLayoutInflater());
+            List<String> courseIds = getCourseIds();
+            createCoursesList(courseIds);
 
-            details_sheet.setContentView(sheetbinding.getRoot());
+            dataPayload = new HashMap<>();
+            dataPayload.put("type", ItemListSheetFragment.SheetType.COURSE.toString());
+            dataPayload.put("list", new ArrayList<>(itemsList));
+            dataPayload.put("selectedItemId", selectedCourseId);
 
-            details_sheet.setOnShowListener(dialog -> {
-                BottomSheetDialog d = (BottomSheetDialog) dialog;
-                View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
-                if (bottomSheet != null) {
-                    bottomSheet.setBackgroundResource(android.R.color.transparent);
-                }
-            });
-
-            ViewGroup.LayoutParams paramscontainer = sheetbinding.container.getLayoutParams();
-            paramscontainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
-            paramscontainer.height = (int) convertToDp(500);
-            sheetbinding.container.setLayoutParams(paramscontainer);
-
-            GradientDrawable gd = new GradientDrawable();
-            gd.setColor(Color.parseColor("#FFFFFF"));
-            gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-            sheetbinding.container.setBackground(gd);
-            sheetbinding.searchContainer.setVisibility(View.VISIBLE);
-            sheetbinding.itemsList.setHorizontalScrollBarEnabled(false);
-            sheetbinding.itemsList.setVerticalScrollBarEnabled(false);
-            sheetbinding.searchEdittext.setFocusableInTouchMode(true);
-            sheetbinding.searchEdittext.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void onTextChanged(CharSequence _param1, int _param2, int _param3, int _param4) {
-                    final String _charSeq = _param1.toString();
-                    dataList = new Gson().fromJson(reqValues.get("courses_json").toString(), new TypeToken<ArrayList<HashMap<String, Object>>>() {
-                    }.getType());
-                    int lengthOfCoursesList = dataList.size();
-                    int index = lengthOfCoursesList - 1;
-                    for (int _repeat34 = 0; _repeat34 < lengthOfCoursesList; _repeat34++) {
-                        if (!(_charSeq.length() > dataList.get(index).get("name").toString().length()) && dataList.get(index).get("name").toString().toLowerCase().contains(_charSeq.toLowerCase())) {
-
-                        } else {
-                            dataList.remove(index);
-                        }
-                        index--;
-                    }
-                    sheetbinding.itemsList.setAdapter(new ItemsAdapter(dataList));
-
-                    ((BaseAdapter) sheetbinding.itemsList.getAdapter()).notifyDataSetChanged();
-                }
-
-                @Override
-                public void beforeTextChanged(CharSequence _param1, int _param2, int _param3, int _param4) {
-
-                }
-
-                @Override
-                public void afterTextChanged(Editable _param1) {
-
-                }
-            });
-            dataList = new Gson().fromJson(reqValues.get("courses_json").toString(), new TypeToken<ArrayList<HashMap<String, Object>>>() {
-            }.getType());
-            sheetbinding.itemsList.setAdapter(new ItemsAdapter(dataList));
-
-            selectedKey = "course";
-
-            ((BaseAdapter) sheetbinding.itemsList.getAdapter()).notifyDataSetChanged();
-            sheetbinding.itemsList.setOnItemClickListener((_param1, _param2, _param3, _param4) -> {
-                reqValues.put("selected_course_id", keysList.get(_param3));
-                int spaceIndex = dataList.get(_param3).get("name").toString().indexOf(" ");
-                if (spaceIndex != -1) {
-                    binding.courseTxt.setText(dataList.get(_param3).get("name").toString().substring(0, spaceIndex));
-                } else {
-                    binding.courseTxt.setText(dataList.get(_param3).get("name").toString());
-                }
-                binding.semesterTxt.setText("Semester");
-                reqValues.put("selected_semester", 0);
-                addTotalSemesters(Double.parseDouble(fetchCourseData(keysList.get(_param3)).get("duration").toString()));
-                details_sheet.dismiss();
-            });
-            details_sheet.setCancelable(true);
-            details_sheet.show();
+            final ItemListSheetFragment courseSheet = ItemListSheetFragment.newInstance(dataPayload);
+            courseSheet.show(getSupportFragmentManager(), "courseSheet");
         });
 
         binding.semesterSelectContainer.setOnClickListener(_view -> {
             Rect r = new Rect();
             binding.background.getWindowVisibleDisplayFrame(r);
-            int screenheight = binding.background.getRootView().getHeight();
-            int keypadheight = screenheight - r.bottom;
-            if (keypadheight > (screenheight * 0.15d)) {
+            int screenHeight = binding.background.getRootView().getHeight();
+            int keypadHeight = screenHeight - r.bottom;
+            if (keypadHeight > (screenHeight * 0.15d)) {
                 PrepNestUtil.hideKeyboard(UploadresourceActivity.this);
             }
-            BottomSheetDialog details_sheet;
-            details_sheet = new BottomSheetDialog(UploadresourceActivity.this);
-            DetailsSelectSheetBinding sheetbinding = DetailsSelectSheetBinding.inflate(getLayoutInflater());
 
-            details_sheet.setContentView(sheetbinding.getRoot());
+            createSemestersList(selectedCourseId);
 
-            details_sheet.setOnShowListener(dialog -> {
-                BottomSheetDialog d = (BottomSheetDialog) dialog;
-                View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
-                if (bottomSheet != null) {
-                    bottomSheet.setBackgroundResource(android.R.color.transparent);
-                }
-            });
+            dataPayload = new HashMap<>();
+            dataPayload.put("type", ItemListSheetFragment.SheetType.SEMESTER.toString());
+            dataPayload.put("list", new ArrayList<>(itemsList));
+            dataPayload.put("selectedItemId", selectedSemesterId);
 
-            ViewGroup.LayoutParams paramscontainer = sheetbinding.container.getLayoutParams();
-            paramscontainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
-            paramscontainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-            sheetbinding.container.setLayoutParams(paramscontainer);
-
-            GradientDrawable gd = new GradientDrawable();
-            gd.setColor(Color.parseColor("#FFFFFF"));
-            gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-            sheetbinding.container.setBackground(gd);
-            sheetbinding.searchContainer.setVisibility(View.GONE);
-            sheetbinding.itemsList.setVerticalScrollBarEnabled(false);
-            sheetbinding.itemsList.setVerticalScrollBarEnabled(false);
-            dataList = new Gson().fromJson(reqValues.get("semesters_json").toString(), new TypeToken<ArrayList<HashMap<String, Object>>>() {
-            }.getType());
-            sheetbinding.itemsList.setAdapter(new ItemsAdapter(dataList));
-
-            selectedKey = "semester";
-
-            ((BaseAdapter) sheetbinding.itemsList.getAdapter()).notifyDataSetChanged();
-            sheetbinding.itemsList.setOnItemClickListener((_param1, _param2, _param3, _param4) -> {
-                reqValues.put("selected_semester", Integer.parseInt(dataList.get(_param3).get("semester").toString()));
-                binding.semesterTxt.setText(getFormattedNumber(Double.parseDouble(dataList.get(_param3).get("semester").toString())).concat(" semester"));
-                details_sheet.dismiss();
-            });
-            details_sheet.setCancelable(true);
-            details_sheet.show();
+            final ItemListSheetFragment semSheet = ItemListSheetFragment.newInstance(dataPayload);
+            semSheet.show(getSupportFragmentManager(), "semSheet");
         });
 
         binding.iconAddFiles.setOnClickListener(_view -> pickImageFromGallery());
@@ -415,21 +280,22 @@ public class UploadresourceActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onActivityResult(int _requestCode, int _resultCode, Intent _data) {
-        super.onActivityResult(_requestCode, _resultCode, _data);
-        if ((_requestCode == (int) reqValues.get("IMAGE_PICK_CODE")) && ((_resultCode == RESULT_OK) && _data != null)) {
-            Uri imageUri = _data.getData();
+    protected void onActivityResult(int _requestCode, int _resultCode, Intent list) {
+        super.onActivityResult(_requestCode, _resultCode, list);
+        if ((_requestCode == IMAGE_PICK_CODE) && ((_resultCode == RESULT_OK) && list != null)) {
+            Uri imageUri = list.getData();
             if (imageUri != null) {
                 Uri compressedUri = compressImageAndSaveToCache(imageUri);
                 if (compressedUri != null) {
                     {
                         HashMap<String, Object> _item = new HashMap<>();
-                        _item.put("file uri", compressedUri.toString());
+                        _item.put("fileUri", compressedUri.toString());
                         filesMapList.add(_item);
                     }
                     filesListAdapter.notifyItemInserted(filesMapList.size() - 1);
                     filesListAdapter.notifyDataSetChanged();
-                    if (filesMapList.size() == Double.parseDouble(reqValues.get("IMAGES_LIMIT").toString())) {
+                    double IMAGES_LIMIT = 4;
+                    if (filesMapList.size() == IMAGES_LIMIT) {
                         addFileIconVisibility(false);
                     }
                 }
@@ -442,13 +308,14 @@ public class UploadresourceActivity extends AppCompatActivity {
         super.onPostCreate(_savedInstanceState);
         users = fdb.getReference("users");
         designUI();
-        if (appFirstVisitSp.contains("app first visit")) {
-            appFirstVisit = new Gson().fromJson(appFirstVisitSp.getString("app first visit", ""), new TypeToken<HashMap<String, Object>>() {
+        if (appFirstVisitSp.contains("appFirstVisit")) {
+            appFirstVisit = new Gson().fromJson(appFirstVisitSp.getString("appFirstVisit", ""), new TypeToken<HashMap<String, Object>>() {
             }.getType());
         }
         showGuidanceSheet();
         attachAdapterToRecyclerView();
-        initializeRequiredValues();
+//        initializeRequiredValues();
+        loadAllCoursesFromJson(this);
         getUserData();
         radioGroupsHandling();
     }
@@ -481,41 +348,118 @@ public class UploadresourceActivity extends AppCompatActivity {
                 getResources().getDisplayMetrics());
     }
 
-    public HashMap<String, Object> fetchCourseData(final String _id) {
-        HashMap<String, Object> courseData = new HashMap<>();
-        if (jsonCourseData.isEmpty()) {
-            try {
-                InputStream is = getAssets().open("courses.json");
-                int size = is.available();
-                byte[] buffer = new byte[size];
-                is.read(buffer);
-                is.close();
-                jsonCourseData = new String(buffer, "UTF-8");
-            } catch (IOException ex) {
-                PrepNestUtil.showToast(UploadresourceActivity.this, ex.toString());
-                return courseData;
+    public void loadAllCoursesFromJson(Context context) {
+        try (InputStream is = context.getAssets().open("courses.json");
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[1024];
+            int length;
+
+            while ((length = is.read(buffer)) != -1) {
+                bos.write(buffer, 0, length);
             }
-        }
-        try {
-            JSONObject allCourses = new JSONObject(jsonCourseData);
-            JSONObject course = allCourses.getJSONObject(_id);
-            courseData = new Gson().fromJson(course.toString(), new TypeToken<HashMap<String, Object>>() {
-            }.getType());
-            return courseData;
+
+            jsonCourseData = bos.toString(StandardCharsets.UTF_8);
         } catch (Exception e) {
-            PrepNestUtil.showToast(UploadresourceActivity.this, e.toString());
-            return courseData;
+            e.printStackTrace();
         }
     }
 
+    public List<String> getCourseIds() {
+        List<String> idsList = new ArrayList<>();
+        JSONObject jsonObject = null;
+        try {
+            jsonObject = new JSONObject(jsonCourseData);
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
+        Iterator<String> ids = jsonObject.keys();
+
+        while (ids.hasNext()) {
+            idsList.add(ids.next());
+        }
+
+        return idsList;
+    }
+
+    public String getCourseName(String courseId) {
+        JSONObject jsonObject = null;
+        try {
+            jsonObject = new JSONObject(jsonCourseData);
+            return jsonObject.getJSONObject(courseId).getString("name");
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public double getCourseDuration(String courseId) {
+        JSONObject jsonObject = null;
+        try {
+            jsonObject = new JSONObject(jsonCourseData);
+            return jsonObject.getJSONObject(courseId).getDouble("duration");
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void createCoursesList(List<String> courseIds) {
+        itemsList = new ArrayList<>();
+
+        for (int index = 0; index < courseIds.size(); index++) {
+            HashMap<String, Object> courseMap = new HashMap<>();
+            courseMap.put("id", courseIds.get(index));
+            courseMap.put("text", getCourseName(courseIds.get(index)));
+
+            itemsList.add(courseMap);
+        }
+    }
+
+    public void createSemestersList(String courseId) {
+        final double courseMaxDuration = getCourseDuration(courseId);
+        final int courseMaxSemesters = (int) (courseMaxDuration * 2);
+        itemsList = new ArrayList<>();
+
+
+        for (int sem = 1; sem <= courseMaxSemesters; sem++) {
+            HashMap<String, Object> semesterMap = new HashMap<>();
+            semesterMap.put("id", String.valueOf(sem));
+            semesterMap.put("text", PrepNestUtil.getFormattedNumber(sem).concat(" semester"));
+
+            itemsList.add(semesterMap);
+        }
+    }
+
+    public void createSessionsList() {
+        itemsList = new ArrayList<>();
+        int currentYear = Year.now().getValue() + 1;
+        for (int year = currentYear - 5; year <= currentYear - 1; year++) {
+            {
+                HashMap<String, Object> sessionMap = new HashMap<>();
+                sessionMap.put("id", String.valueOf(year));
+                sessionMap.put("text", String.valueOf((long) (year)).concat("-".concat(String.valueOf((long) ((year + 1) - 2000)))));
+                itemsList.add(sessionMap);
+            }
+        }
+    }
+
+    public String setCourseName(String courseId) {
+        final String courseName = getCourseName(courseId);
+        int spaceIndex = courseName.indexOf(" ");
+
+        if (spaceIndex == -1) {
+            return courseName;
+        }
+
+        return courseName.substring(0, spaceIndex);
+    }
+
     public void showGuidanceSheet() {
-        com.google.android.material.bottomsheet.BottomSheetDialog upload_guidance_sheet;
-        upload_guidance_sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(UploadresourceActivity.this);
-        GuidanceSheetLayoutBinding sheetbinding = GuidanceSheetLayoutBinding.inflate(getLayoutInflater());
+        com.google.android.material.bottomsheet.BottomSheetDialog uploadGuidanceSheet;
+        uploadGuidanceSheet = new com.google.android.material.bottomsheet.BottomSheetDialog(UploadresourceActivity.this);
+        GuidanceSheetLayoutBinding sheetBinding = GuidanceSheetLayoutBinding.inflate(getLayoutInflater());
 
-        upload_guidance_sheet.setContentView(sheetbinding.getRoot());
+        uploadGuidanceSheet.setContentView(sheetBinding.getRoot());
 
-        upload_guidance_sheet.setOnShowListener(dialog -> {
+        uploadGuidanceSheet.setOnShowListener(dialog -> {
             BottomSheetDialog d = (BottomSheetDialog) dialog;
             View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheet != null) {
@@ -526,25 +470,26 @@ public class UploadresourceActivity extends AppCompatActivity {
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor("#FFFFFF"));
         gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-        sheetbinding.container.setBackground(gd);
-        sheetbinding.title.setText(getString(R.string.upload_guidance_title));
-        sheetbinding.subtext.setText(getString(R.string.upload_guidance_message));
-        upload_guidance_sheet.setCancelable(true);
-        if (appFirstVisit.containsKey("upload guidance")) {
-            if (appFirstVisit.get("upload guidance").toString().equals("false")) {
-                appFirstVisit.put("upload guidance", "true");
-                appFirstVisitSp.edit().putString("app first visit", new Gson().toJson(appFirstVisit)).apply();
-                upload_guidance_sheet.show();
+        sheetBinding.container.setBackground(gd);
+        sheetBinding.title.setText(getString(R.string.upload_guidance_title));
+        sheetBinding.subtext.setText(getString(R.string.upload_guidance_message));
+        uploadGuidanceSheet.setCancelable(true);
+        if (appFirstVisit.containsKey("uploadGuidance")) {
+            if (!Boolean.parseBoolean(Objects.requireNonNull(appFirstVisit.get("uploadGuidance")).toString())) {
+                appFirstVisit.put("uploadGuidance", true);
+                appFirstVisitSp.edit().putString("appFirstVisit", new Gson().toJson(appFirstVisit)).apply();
+                uploadGuidanceSheet.show();
             }
         } else {
-            appFirstVisit.put("upload guidance", "true");
-            appFirstVisitSp.edit().putString("app first visit", new Gson().toJson(appFirstVisit)).apply();
-            upload_guidance_sheet.show();
+            appFirstVisit.put("uploadGuidance", true);
+            appFirstVisitSp.edit().putString("appFirstVisit", new Gson().toJson(appFirstVisit)).apply();
+            uploadGuidanceSheet.show();
         }
     }
 
     public void getUserData() {
         PrepNestUtil.showLoadingDialog(this, true);
+        assert auth.getCurrentUser() != null;
         users.child(auth.getCurrentUser().getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
@@ -552,40 +497,13 @@ public class UploadresourceActivity extends AppCompatActivity {
                 });
 
                 if (userData != null) {
-                    if (userData.containsKey("course id")) {
-                        userData.put("course duration", Double.parseDouble(fetchCourseData(userData.get("course id").toString()).get("duration").toString()));
-                        HashMap<String, Object> courseId = fetchCourseData(userData.get("course id").toString());
-                        String courseName = courseId.get("name").toString();
-                        int spaceIndex = courseName.indexOf(" ");
-                        if (spaceIndex != -1) {
-                            binding.courseTxt.setText(courseName.substring(0, spaceIndex));
-                        } else {
-                            binding.courseTxt.setText(courseName);
-                        }
-                        reqValues.put("selected_course_id", userData.get("course id").toString());
-                    } else {
-                        userData.put("course duration", null);
-                        binding.courseTxt.setText("Course");
-                    }
-                    if (userData.containsKey("semester")) {
-                        reqValues.put("selected_semester", ((Number) userData.get("semester")).intValue());
-                        binding.semesterTxt.setText(getFormattedNumber(((Number) userData.get("semester")).intValue()).concat(" semester"));
-                    } else {
-                        binding.semesterTxt.setText("Semester");
-                    }
-                    if ((userData.get("course duration") == null)) {
-                        addTotalSemesters(5.5d);
-                    } else {
-                        addTotalSemesters(((Number) userData.get("course duration")).doubleValue());
-                    }
-                    loadCourses();
+                    loadUserDataToUI();
                 } else {
                     PrepNestUtil.showToast(UploadresourceActivity.this, "Failed to load data, please login again!");
                     auth.signOut();
                     finishAffinity();
                 }
                 PrepNestUtil.showLoadingDialog(UploadresourceActivity.this, false);
-                addSessions();
 
             }
 
@@ -603,43 +521,34 @@ public class UploadresourceActivity extends AppCompatActivity {
         });
     }
 
-    public void loadCourses() {
-        ArrayList<HashMap<String, Object>> _temp = new ArrayList<>();
-        try {
-            JSONObject allCourses = new JSONObject(jsonCourseData);
-            Iterator<String> keys = allCourses.keys();
-            while (keys.hasNext()) {
-                keysList.add(keys.next());
+    public void loadUserDataToUI() {
+        if (userData.containsKey("courseId")) {
+            selectedCourseId = Objects.requireNonNull(userData.get("courseId")).toString();
+            userData.put("courseDuration", getCourseDuration(selectedCourseId));
+            String courseName = Objects.requireNonNull(getCourseName(selectedCourseId));
+            int spaceIndex = courseName.indexOf(" ");
+            if (spaceIndex != -1) {
+                binding.courseTxt.setText(courseName.substring(0, spaceIndex));
+            } else {
+                binding.courseTxt.setText(courseName);
             }
-            for (int pos = 0; pos < keysList.size(); pos++) {
-                JSONObject course = allCourses.getJSONObject(keysList.get(pos));
-                {
-                    HashMap<String, Object> _item = new HashMap<>();
-                    _item.put("name", course.getString("name"));
-                    _temp.add(_item);
-                }
-                _temp.get(_temp.size() - 1).put("duration", String.valueOf(course.getInt("duration")));
-            }
-            reqValues.put("courses_json", new Gson().toJson(_temp));
-        } catch (Exception ignored) {
-
+        } else {
+            userData.put("courseDuration", null);
+            binding.courseTxt.setText("Course");
+        }
+        if (userData.containsKey("semester")) {
+            selectedSemester = ((Number) Objects.requireNonNull(userData.get("semester"))).intValue();
+            selectedSemesterId = String.valueOf(selectedSemester);
+            binding.semesterTxt.setText(PrepNestUtil.getFormattedNumber(selectedSemester).concat(" semester"));
+        } else {
+            binding.semesterTxt.setText("Semester");
+        }
+        if ((userData.get("courseDuration") == null)) {
+            createSemestersList("BON6SOM");
+        } else {
+            createSemestersList(selectedCourseId);
         }
     }
-
-
-    public void addSessions() {
-        ArrayList<HashMap<String, Object>> _temp = new ArrayList<>();
-        int currentYear = Year.now().getValue() + 1;
-        for (int year = currentYear - 5; year <= currentYear - 1; year++) {
-            {
-                HashMap<String, Object> _item = new HashMap<>();
-                _item.put("session", String.valueOf((long) (year)).concat("-".concat(String.valueOf((long) ((year + 1) - 2000)))));
-                _temp.add(_item);
-            }
-        }
-        reqValues.put("sessions_json", new Gson().toJson(_temp));
-    }
-
 
     public void radioGroupsHandling() {
         binding.pyqTypeRadiogroup.setOnCheckedChangeListener((group, checkedId) -> {
@@ -655,19 +564,19 @@ public class UploadresourceActivity extends AppCompatActivity {
                 binding.midtermTypeRadiogroup.setVisibility(View.VISIBLE);
             }
         });
-		
+
 		/*
 binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
 	@Override
 	public void onCheckedChanged(RadioGroup group, int checkedId) {
 		PrepNestUtil.TransitionManager(binding.background, 250);
-		
+
 		if (binding.iconAddFiles.getVisibility() == View.INVISIBLE) {
 			binding.iconAddFiles.setVisibility(View.VISIBLE);
 			binding.iconAddFiles.setEnabled(true);
 		}
         filesListAdapter.clearList();
-		
+
 		if (checkedId == binding.pyqRadiobutton.getId()) {
 			binding.sessionContainer.setVisibility(View.VISIBLE);
 			binding.pyqTypeTitle.setVisibility(View.VISIBLE);
@@ -677,9 +586,9 @@ binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheck
 				binding.midtermTypeTitle.setVisibility(View.VISIBLE);
 				binding.midtermTypeRadiogroup.setVisibility(View.VISIBLE);
 			}
-			
+
 		} else if (checkedId == binding.notesRadiobutton.getId()) {
-			
+
 			binding.sessionContainer.setVisibility(View.GONE);
 			binding.sessionErrorTxt.setVisibility(View.GONE);
 			binding.pyqTypeTitle.setVisibility(View.GONE);
@@ -699,7 +608,7 @@ binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheck
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.setType("image/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        startActivityForResult(intent, (int) reqValues.get("IMAGE_PICK_CODE"));
+        startActivityForResult(intent, IMAGE_PICK_CODE);
     }
 
 
@@ -717,28 +626,36 @@ binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheck
 
     private Uri compressImageAndSaveToCache(final Uri sourceUri) {
         try {
-            // Get bitmap from uri
-            Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), sourceUri);
-            // Compress the bitmap to JPEG with 70% quality
+            // Decode bitmap using ImageDecoder (Android 10+)
+            ImageDecoder.Source source =
+                    ImageDecoder.createSource(getContentResolver(), sourceUri);
+            Bitmap bitmap = ImageDecoder.decodeBitmap(source);
+
+            // Compress to JPEG (70% quality)
             ByteArrayOutputStream outStream = new ByteArrayOutputStream();
             bitmap.compress(Bitmap.CompressFormat.JPEG, 70, outStream);
             byte[] imageData = outStream.toByteArray();
-            //Create a file in cache directory
+
+            // Create a file inside app cache directory
             File cacheDir = getCacheDir();
             String fileName = getFileNameFromURI(sourceUri);
             if (fileName == null) return null;
+
             File outputFile = new File(cacheDir, fileName);
-            // Writes compressed data to file
+
+            // Write compressed bytes to file
             FileOutputStream fos = new FileOutputStream(outputFile);
             fos.write(imageData);
             fos.flush();
             fos.close();
-            // Return the file uri
+
+            // Return FileProvider URI for the compressed file
             return FileProvider.getUriForFile(
                     this,
-                    UploadresourceActivity.this.getPackageName() + ".provider",
+                    getPackageName() + ".provider",
                     outputFile
             );
+
         } catch (IOException e) {
             PrepNestUtil.showToast(UploadresourceActivity.this, "Failed to process image, try again");
             return null;
@@ -746,7 +663,7 @@ binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheck
     }
 
     public void attachAdapterToRecyclerView() {
-        filesListAdapter = new Files_recyclerviewAdapter(filesMapList);
+        filesListAdapter = new FilesListAdapter(filesMapList);
         binding.filesRecyclerview.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         binding.filesRecyclerview.setAdapter(filesListAdapter);
         binding.filesRecyclerview.setItemAnimator(new DefaultItemAnimator());
@@ -767,42 +684,6 @@ binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheck
         }
     }
 
-    public void initializeRequiredValues() {
-        reqValues = new HashMap<>();
-        reqValues.put("courses_json", "");
-        reqValues.put("semesters_json", "");
-        reqValues.put("sessions_json", "");
-        reqValues.put("selected_course_id", "");
-        reqValues.put("selected_semester", 0);
-        reqValues.put("IMAGE_PICK_CODE", 1002);
-        reqValues.put("IMAGES_LIMIT", "3");
-    }
-
-    public String getFormattedNumber(final double _value) {
-        if (_value == 1) {
-            return "1st";
-        }
-        if (_value == 2) {
-            return "2nd";
-        }
-        if (_value == 3) {
-            return "3rd";
-        }
-        return String.valueOf((long) _value).concat("th");
-    }
-
-    public void addTotalSemesters(final double _duration) {
-        ArrayList<HashMap<String, Object>> _temp = new ArrayList<>();
-        int maxSemesters = (int) (_duration * 2);
-        for (int sem = 1; sem <= maxSemesters; sem++) {
-            {
-                HashMap<String, Object> _item = new HashMap<>();
-                _item.put("semester", String.valueOf((long) (sem)));
-                _temp.add(_item);
-            }
-        }
-        reqValues.put("semesters_json", new Gson().toJson(_temp));
-    }
 
     public String capitalizeString(final String _input) {
         if (_input == null || _input.isEmpty()) return _input;
@@ -811,13 +692,13 @@ binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheck
     }
 
     public void showUploadConfirmationSheet() {
-        com.google.android.material.bottomsheet.BottomSheetDialog confirmation_sheet;
-        confirmation_sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(UploadresourceActivity.this);
-        StatusViewBinding sheetbinding = StatusViewBinding.inflate(getLayoutInflater());
+        com.google.android.material.bottomsheet.BottomSheetDialog confirmationSheet;
+        confirmationSheet = new com.google.android.material.bottomsheet.BottomSheetDialog(UploadresourceActivity.this);
+        StatusViewBinding sheetBinding = StatusViewBinding.inflate(getLayoutInflater());
 
-        confirmation_sheet.setContentView(sheetbinding.getRoot());
+        confirmationSheet.setContentView(sheetBinding.getRoot());
 
-        confirmation_sheet.setOnShowListener(dialog -> {
+        confirmationSheet.setOnShowListener(dialog -> {
             BottomSheetDialog d = (BottomSheetDialog) dialog;
             View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheet != null) {
@@ -828,37 +709,38 @@ binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheck
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor("#FFFFFF"));
         gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-        sheetbinding.bg.setBackground(gd);
-        sheetbinding.title.setTextSize(16);
-        sheetbinding.subtext.setTextSize(11);
-//        sheetbinding.imageContainer.setBackground(new GradientDrawable() {
+        sheetBinding.bg.setBackground(gd);
+        sheetBinding.title.setTextSize(16);
+        sheetBinding.subtext.setTextSize(11);
+//        sheetBinding.imageContainer.setBackground(new GradientDrawable() {
 //            public GradientDrawable getIns(int a, int b) {
 //                this.setCornerRadius(a);
 //                this.setColor(b);
 //                return this;
 //            }
 //        }.getIns((int) 360, 0xFFFAFAFA));
-        sheetbinding.image.setImageResource(R.drawable.icon_upload_3d);
-        sheetbinding.title.setText("Confirmation!");
-        sheetbinding.subtext.setText("Please review all your details carefully before uploading. Once submitted, you won’t be able to make any changes.");
-        PrepNestUtil.roundViewWithRipple(sheetbinding.btnOk, "#000000", 15, 0, "#000000", "#212121");
-        PrepNestUtil.roundViewWithRipple(sheetbinding.btnCancel, "#F5F5F5", 15, 0, "#000000", "#E0E0E0");
-        sheetbinding.btnOkTxt.setText("Confirm");
-        sheetbinding.btnCancelTxt.setText("Cancel");
-        sheetbinding.btnOk.setOnClickListener(_view -> {
+        sheetBinding.image.setImageResource(R.drawable.icon_upload_3d);
+        sheetBinding.title.setText("Confirmation!");
+        sheetBinding.subtext.setText("Please review all your details carefully before uploading. Once submitted, you won’t be able to make any changes.");
+        PrepNestUtil.roundViewWithRipple(sheetBinding.btnOk, "#000000", 15, 0, "#000000", "#212121");
+        PrepNestUtil.roundViewWithRipple(sheetBinding.btnCancel, "#F5F5F5", 15, 0, "#000000", "#E0E0E0");
+        sheetBinding.btnOkTxt.setText("Confirm");
+        sheetBinding.btnCancelTxt.setText("Cancel");
+        sheetBinding.btnOk.setOnClickListener(_view -> {
             uploadAllData();
-            confirmation_sheet.dismiss();
+            confirmationSheet.dismiss();
         });
-        sheetbinding.btnCancel.setOnClickListener(_view -> confirmation_sheet.dismiss());
-        confirmation_sheet.setCancelable(true);
-        confirmation_sheet.show();
+        sheetBinding.btnCancel.setOnClickListener(_view -> confirmationSheet.dismiss());
+        confirmationSheet.setCancelable(true);
+        confirmationSheet.show();
     }
 
     public void uploadAllData() {
         List<String> URIs = new ArrayList<>();
+        assert auth.getCurrentUser() != null;
         DatabaseReference requestRef = requests.child(auth.getCurrentUser().getUid());
         for (HashMap<String, Object> uriMap : filesMapList) {
-            URIs.add(uriMap.get("file uri").toString());
+            URIs.add(Objects.requireNonNull(uriMap.get("fileUri")).toString());
         }
 
         PrepNestUtil.showLoadingDialog(this, true);
@@ -870,12 +752,12 @@ binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheck
                 HashMap<String, Object> addResource = new HashMap<>();
                 String resourceID = requestRef.push().getKey();
                 addResource.put("subject", binding.subjectEdittext.getText().toString().trim());
-                addResource.put("course id", reqValues.get("selected_course_id").toString());
-                addResource.put("semester", ((Number) reqValues.get("selected_semester")).intValue());
-                addResource.put("uploader uid", auth.getCurrentUser().getUid());
-                addResource.put("date of upload", String.valueOf(System.currentTimeMillis()));
-                addResource.put("resource id", resourceID);
-                addResource.put("resource urls", new Gson().toJson(downloadURLs));
+                addResource.put("courseId", selectedCourseId);
+                addResource.put("semester", selectedSemester);
+                addResource.put("uploaderUid", auth.getCurrentUser().getUid());
+                addResource.put("dateOfUpload", System.currentTimeMillis());
+                addResource.put("resourceId", resourceID);
+                addResource.put("resourceUrls", new Gson().toJson(downloadURLs));
                 addResource.put("session", binding.sessionText.getText().toString().trim());
                 addResource.put("type", "paper");
                 if (binding.semesterPyqRadiobutton.isChecked()) {
@@ -895,12 +777,13 @@ binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheck
                         }
                     }
                 }
-                String resourceTitle = capitalizeString(addResource.get("subtype").toString()).concat(" ");
-                if (addResource.get("subtype").toString().equals("midterm")) {
+                String resourceTitle = capitalizeString(Objects.requireNonNull(addResource.get("subtype")).toString()).concat(" ");
+                if (Objects.requireNonNull(addResource.get("subtype")).toString().equals("midterm")) {
                     resourceTitle += midtermType + " ";
                 }
                 resourceTitle += "Paper";
-                addResource.put("resource title", resourceTitle);
+                addResource.put("resourceTitle", resourceTitle);
+                assert resourceID != null;
                 requestRef.child(resourceID).setValue(addResource).addOnCompleteListener(uploadTask -> {
                     if (uploadTask.isSuccessful()) {
                         PrepNestUtil.showLoadingDialog(UploadresourceActivity.this, false);
@@ -922,6 +805,29 @@ binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheck
             }
         });
 
+    }
+
+    @Override
+    public void onDataReturned(HashMap<String, Object> updatedMap) {
+        if (updatedMap.containsKey("type") && updatedMap.containsKey("id") && updatedMap.containsKey("text")) {
+            final String type = Objects.requireNonNull(updatedMap.get("type")).toString();
+            if (type.equals(ItemListSheetFragment.SheetType.COURSE.toString())) {
+                selectedCourseId = Objects.requireNonNull(updatedMap.get("id")).toString();
+                selectedSemesterId = "-1";
+                binding.courseTxt.setText(setCourseName(selectedCourseId));
+            } else if (type.equals(ItemListSheetFragment.SheetType.SEMESTER.toString())) {
+                selectedSemesterId = Objects.requireNonNull(updatedMap.get("id")).toString();
+                selectedSemester = Integer.parseInt(selectedSemesterId);
+                binding.semesterTxt.setText(PrepNestUtil.getFormattedNumber(selectedSemester).concat(" semester"));
+            } else if (type.equals(ItemListSheetFragment.SheetType.SESSION.toString())) {
+                selectedSessionId = Objects.requireNonNull(updatedMap.get("id")).toString();
+                binding.sessionText.setText(Objects.requireNonNull(updatedMap.get("text")).toString());
+                if (binding.sessionErrorTxt.getVisibility() == View.VISIBLE) {
+                    PrepNestUtil.TransitionManager(binding.background, 150);
+                    binding.sessionErrorTxt.setVisibility(View.GONE);
+                }
+            }
+        }
     }
 
     public static class FileUploader {
@@ -1011,120 +917,60 @@ binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheck
         }
     }
 
-    public class ItemsAdapter extends BaseAdapter {
+    public class FilesListAdapter extends RecyclerView.Adapter<FilesListAdapter.ViewHolder> {
 
-        ArrayList<HashMap<String, Object>> _data;
-
-        public ItemsAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _data = _arr;
-        }
-
-        @Override
-        public int getCount() {
-            return _data.size();
-        }
-
-        @Override
-        public HashMap<String, Object> getItem(int _index) {
-            return _data.get(_index);
-        }
-
-        @Override
-        public long getItemId(int _index) {
-            return _index;
-        }
-
-        @Override
-        public View getView(final int _position, View _v, ViewGroup _container) {
-            SheetSingleItemSelectBinding ListBinding = SheetSingleItemSelectBinding.inflate(getLayoutInflater());
-            View _view = ListBinding.getRoot();
-            if (_data.get(_position).containsKey("name")) {
-                ListBinding.text.setText(_data.get(_position).get("name").toString());
-            }
-            if (_data.get(_position).containsKey("semester")) {
-                ListBinding.text.setText(getFormattedNumber(Double.parseDouble(_data.get(_position).get("semester").toString())).concat(" semester"));
-            }
-            if (_data.get(_position).containsKey("session")) {
-                ListBinding.text.setText(_data.get(_position).get("session").toString());
-            }
-            if (Objects.equals(selectedKey, "session")) {
-                if (_data.get(_position).get("session").toString().equals(binding.sessionText.getText().toString())) {
-                    ListBinding.selectedCircle.setVisibility(View.VISIBLE);
-                } else {
-                    ListBinding.selectedCircle.setVisibility(View.GONE);
-                }
-            } else if (Objects.equals(selectedKey, "course")) {
-                if (fetchCourseData(reqValues.get("selected_course_id").toString()).get("name").toString().equals(_data.get(_position).get("name").toString())) {
-                    ListBinding.selectedCircle.setVisibility(View.VISIBLE);
-                } else {
-                    ListBinding.selectedCircle.setVisibility(View.GONE);
-                }
-            } else {
-                if (reqValues.get("selected_semester").toString().equals(_data.get(_position).get("semester").toString())) {
-                    ListBinding.selectedCircle.setVisibility(View.VISIBLE);
-                } else {
-                    ListBinding.selectedCircle.setVisibility(View.GONE);
-                }
-            }
-            return _view;
-        }
-    }
-
-    public class Files_recyclerviewAdapter extends RecyclerView.Adapter<Files_recyclerviewAdapter.ViewHolder> {
-
-        ArrayList<HashMap<String, Object>> _data;
+        ArrayList<HashMap<String, Object>> list;
         private int _lastPosition = -1; // Used to track animations
 
-        public Files_recyclerviewAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _data = _arr;
+        public FilesListAdapter(ArrayList<HashMap<String, Object>> list) {
+            this.list = list;
         }
 
         @NonNull
         @Override
-        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            LayoutInflater _inflater = LayoutInflater.from(parent.getContext());
-            View _v = _inflater.inflate(R.layout.file_chip_card, parent, false);
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            FileChipCardBinding fileChipCardBinding = FileChipCardBinding.inflate(
+                    LayoutInflater.from(parent.getContext()),
+                    parent,
+                    false
+            );
 
-            return new ViewHolder(_v);
+            return new ViewHolder(fileChipCardBinding);
         }
 
         @Override
-        public void onBindViewHolder(ViewHolder _holder, final int _position) {
-            View _view = _holder.itemView;
-            final LinearLayout container = _view.findViewById(R.id.container);
-            final TextView file_title = _view.findViewById(R.id.file_title);
-            final ImageView icon_remove = _view.findViewById(R.id.icon_remove);
-            PrepNestUtil.roundViewWithRipple(container, "#F5F5F5", 360, 0, "#000000", "#E0E0E0");
+        public void onBindViewHolder(@NonNull ViewHolder holder, final int position) {
+            PrepNestUtil.roundViewWithRipple(holder.binding.container, "#F5F5F5", 360, 0, "#000000", "#E0E0E0");
 
-            if (_data.get(_position).containsKey("file uri")) {
-                String fileUri = _data.get(_position).get("file uri").toString();
+            if (list.get(position).containsKey("fileUri")) {
+                String fileUri = Objects.requireNonNull(list.get(position).get("fileUri")).toString();
 
-                file_title.setText(getFileNameFromURI(Uri.parse(fileUri)));
+                holder.binding.fileTitle.setText(getFileNameFromURI(Uri.parse(fileUri)));
 
                 if (fileUri.length() > 12) {
                     Uri uri = Uri.parse(fileUri);
-                    file_title.setText(getFileNameFromURI(uri).substring(0, 12).concat("..."));
+                    holder.binding.fileTitle.setText(getFileNameFromURI(uri).substring(0, 12).concat("..."));
                 }
             } else {
-                file_title.setText("File");
+                holder.binding.fileTitle.setText("File");
             }
 
 
-            setAnimation(_view, _position);
-            icon_remove.setOnClickListener(_view1 -> {
-                int _currentPos = _holder.getAdapterPosition();
-                if (_currentPos != RecyclerView.NO_POSITION) {
-                    _data.remove(_currentPos);
-                    notifyItemRemoved(_currentPos);
-                    notifyItemRangeChanged(_currentPos, _data.size());
+            setAnimation(holder.itemView, position);
+            holder.binding.iconRemove.setOnClickListener(_view1 -> {
+                int currentPos = holder.getAdapterPosition();
+                if (currentPos != RecyclerView.NO_POSITION) {
+                    list.remove(currentPos);
+                    notifyItemRemoved(currentPos);
+                    notifyItemRangeChanged(currentPos, list.size());
                     addFileIconVisibility(true);
                 }
             });
 
-            container.setOnClickListener(_view2 -> {
+            holder.binding.container.setOnClickListener(_view2 -> {
                 Intent toImageView = new Intent();
                 toImageView.setClass(UploadresourceActivity.this, ImageviewActivity.class);
-                toImageView.putExtra("uri", _data.get(_position).get("file uri").toString());
+                toImageView.putExtra("uri", Objects.requireNonNull(list.get(position).get("fileUri")).toString());
                 toImageView.putExtra("id", "null");
                 startActivity(toImageView);
                 overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
@@ -1133,7 +979,7 @@ binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheck
 
         @Override
         public int getItemCount() {
-            return _data.size();
+            return list.size();
         }
 
         // Custom animation method
@@ -1145,18 +991,6 @@ binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheck
             }
         }
 
-        // Custom clear list method with animation
-        private void clearList() {
-            int size = _data.size();
-
-            if (size > 0) {
-                for (int i = size - 1; i >= 0; i--) {
-                    _data.remove(i);
-                    notifyItemRemoved(i);
-                }
-            }
-        }
-
         // Optional: clear animation on view detached (prevents flickering)
         @Override
         public void onViewDetachedFromWindow(ViewHolder holder) {
@@ -1164,8 +998,11 @@ binding.resourceTypeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheck
         }
 
         public class ViewHolder extends RecyclerView.ViewHolder {
-            public ViewHolder(View v) {
-                super(v);
+            FileChipCardBinding binding;
+
+            public ViewHolder(FileChipCardBinding binding) {
+                super(binding.getRoot());
+                this.binding = binding;
             }
         }
     }

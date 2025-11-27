@@ -13,6 +13,8 @@ import com.cocode.prepnest.databinding.ManageresourcesBinding;
 import com.google.android.material.tabs.TabLayoutMediator;
 import com.google.firebase.FirebaseApp;
 
+import java.util.Objects;
+
 
 public class ManageresourcesActivity extends AppCompatActivity {
 
@@ -42,8 +44,8 @@ public class ManageresourcesActivity extends AppCompatActivity {
         networkMonitor = new NetworkMonitor(this);
         logFile.addActivity();
         designUI();
-        if (getIntent().hasExtra("navigation type")) {
-            if (getIntent().getStringExtra("navigation type").equals("owner")) {
+        if (getIntent().hasExtra("navigationType")) {
+            if (Objects.equals(getIntent().getStringExtra("navigationType"), "owner")) {
                 binding.layoutsPager.setCurrentItem(1);
             }
         }

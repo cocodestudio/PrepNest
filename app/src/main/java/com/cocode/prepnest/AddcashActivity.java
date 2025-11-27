@@ -1,5 +1,6 @@
 package com.cocode.prepnest;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
 import android.database.Cursor;
@@ -29,6 +30,7 @@ import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
 import java.util.HashMap;
+import java.util.Objects;
 
 import androidmads.library.qrgenearator.QRGContents;
 import androidmads.library.qrgenearator.QRGEncoder;
@@ -228,11 +230,9 @@ public class AddcashActivity extends AppCompatActivity {
 
     public void uploadPhotoToStorage(final Uri _uri) {
         PrepNestUtil.showLoadingDialog(this, true);
-        StorageReference fileRef = FirebaseStorage.getInstance().getReference("other/add_cash_screenshots").child(auth.getCurrentUser().getUid()).child(System.currentTimeMillis() + ".jpg");
+        StorageReference fileRef = FirebaseStorage.getInstance().getReference("other/add_cash_screenshots").child(Objects.requireNonNull(auth.getCurrentUser()).getUid()).child(System.currentTimeMillis() + ".jpg");
         UploadTask fileUpload = fileRef.putFile(_uri);
-        fileUpload.addOnSuccessListener(taskSnapshot -> {
-            fileRef.getDownloadUrl().addOnSuccessListener(uri -> sendRequest(uri.toString()));
-        });
+        fileUpload.addOnSuccessListener(taskSnapshot -> fileRef.getDownloadUrl().addOnSuccessListener(uri -> sendRequest(uri.toString())));
         fileUpload.addOnFailureListener(exception -> {
             PrepNestUtil.showToast(AddcashActivity.this, "An unknown error occurred : ".concat(exception.toString()));
             PrepNestUtil.showLoadingDialog(this, false);
@@ -240,23 +240,28 @@ public class AddcashActivity extends AppCompatActivity {
     }
 
 
+    @SuppressLint("SetTextI18n")
     public void sendRequest(final String _url) {
-        DatabaseReference addCashRef = FirebaseDatabase.getInstance().getReference("requests/add_cash_requests").child(auth.getCurrentUser().getUid());
-        String key = addCashRef.push().getKey();
+        DatabaseReference addCashRef = FirebaseDatabase.getInstance().getReference("requests/addCashRequests").child(Objects.requireNonNull(auth.getCurrentUser()).getUid());
+        String dataKey = addCashRef.push().getKey();
         HashMap<String, Object> dataMap = new HashMap<>();
-        dataMap.put("photo url", _url);
-        dataMap.put("timestamp", String.valueOf(System.currentTimeMillis()));
-        addCashRef.child(key).setValue(dataMap).addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                screenshotUri = null;
-                fileName = "";
-                PrepNestUtil.showToast(AddcashActivity.this, "Request sent successfully.");
-                binding.ssFileName.setText("Select screenshot");
-                PrepNestUtil.showLoadingDialog(this, false);
-            } else {
-                PrepNestUtil.showLoadingDialog(this, false);
-                PrepNestUtil.showToast(AddcashActivity.this, "An unknown error occurred.");
-            }
-        });
+        dataMap.put("photoUrl", _url);
+        dataMap.put("timestamp", System.currentTimeMillis());
+        assert dataKey != null;
+        addCashRef
+                .child(dataKey)
+                .setValue(dataMap)
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        screenshotUri = null;
+                        fileName = "";
+                        PrepNestUtil.showToast(AddcashActivity.this, "Request sent successfully.");
+                        binding.ssFileName.setText("Select screenshot");
+                        PrepNestUtil.showLoadingDialog(this, false);
+                    } else {
+                        PrepNestUtil.showLoadingDialog(this, false);
+                        PrepNestUtil.showToast(AddcashActivity.this, "An unknown error occurred.");
+                    }
+                });
     }
 }

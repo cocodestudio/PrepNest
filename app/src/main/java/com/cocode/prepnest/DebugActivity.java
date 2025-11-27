@@ -13,6 +13,7 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 
 import java.util.HashMap;
+import java.util.Objects;
 
 public class DebugActivity extends AppCompatActivity {
 
@@ -87,7 +88,7 @@ public class DebugActivity extends AppCompatActivity {
 
     public void sendErrorReport() {
         PrepNestUtil.showLoadingDialog(this, true);
-        DatabaseReference reports = FirebaseDatabase.getInstance().getReference("reports/error_reports");
+        DatabaseReference reports = FirebaseDatabase.getInstance().getReference("reports/errorReports");
         HashMap<String, Object> errorMap = new HashMap<>();
         errorMap.put("error", getIntent().getStringExtra("error"));
         if (FirebaseAuth.getInstance().getCurrentUser() != null) {
@@ -95,8 +96,8 @@ public class DebugActivity extends AppCompatActivity {
         } else {
             errorMap.put("user", "null");
         }
-        errorMap.put("timestamp", String.valueOf(System.currentTimeMillis()));
-        reports.child(reports.push().getKey()).setValue(errorMap).addOnCompleteListener(task -> {
+        errorMap.put("timestamp", System.currentTimeMillis());
+        reports.child(Objects.requireNonNull(reports.push().getKey())).setValue(errorMap).addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
                 PrepNestUtil.showLoadingDialog(this, false);
                 PrepNestUtil.showToast(DebugActivity.this, "Sent successfully!");

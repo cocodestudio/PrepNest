@@ -13,8 +13,8 @@ import java.util.Date;
 import java.util.Locale;
 
 public class LogUtils {
-    private Context context;
-    private File logFile;
+    private final Context context;
+    private final File logFile;
     private Fragment fragment;
 
     public LogUtils(Context context) {

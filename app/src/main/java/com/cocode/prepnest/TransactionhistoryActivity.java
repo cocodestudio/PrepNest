@@ -2,6 +2,7 @@ package com.cocode.prepnest;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -33,13 +34,14 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Objects;
 
 
 public class TransactionhistoryActivity extends AppCompatActivity {
 
-    private final FirebaseDatabase _firebase = FirebaseDatabase.getInstance();
+    private final FirebaseDatabase database = FirebaseDatabase.getInstance();
     private final ArrayList<HashMap<String, Object>> historyList = new ArrayList<>();
-    private final DatabaseReference transaction_history = _firebase.getReference("transactions_history");
+    private final DatabaseReference transactionHistory = database.getReference("transactionsHistory");
     private final Intent toNoConnection = new Intent();
     private TransactionhistoryBinding binding;
     private double amount = 0;
@@ -108,7 +110,8 @@ public class TransactionhistoryActivity extends AppCompatActivity {
     public void onStop() {
         super.onStop();
         if (transactionListener != null) {
-            transaction_history.child(auth.getCurrentUser().getUid()).removeEventListener(transactionListener);
+            assert auth.getCurrentUser() != null;
+            transactionHistory.child(auth.getCurrentUser().getUid()).removeEventListener(transactionListener);
             transactionListener = null;
             historyList.clear();
         }
@@ -200,11 +203,13 @@ public class TransactionhistoryActivity extends AppCompatActivity {
                 public void onCancelled(@NonNull DatabaseError error) {
                     showProgressBar(false);
                     PrepNestUtil.showToast(getApplicationContext(), "Failed to load data, try again later.");
+                    Log.d("HISTORY ERROR", error.getMessage());
                 }
             };
 
         }
-        transaction_history.child(auth.getCurrentUser().getUid()).addChildEventListener(transactionListener);
+        assert auth.getCurrentUser() != null;
+        transactionHistory.child(auth.getCurrentUser().getUid()).addChildEventListener(transactionListener);
     }
 
     public void showProgressBar(boolean show) {
@@ -229,7 +234,8 @@ public class TransactionhistoryActivity extends AppCompatActivity {
 
 
     public void reloadAllData() {
-        transaction_history.child(auth.getCurrentUser().getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
+        assert auth.getCurrentUser() != null;
+        transactionHistory.child(auth.getCurrentUser().getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot _dataSnapshot) {
                 historyList.clear();
@@ -258,7 +264,8 @@ public class TransactionhistoryActivity extends AppCompatActivity {
 
 
     public void checkDataExistence() {
-        transaction_history.child(auth.getCurrentUser().getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
+        assert auth.getCurrentUser() != null;
+        transactionHistory.child(auth.getCurrentUser().getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot _dataSnapshot) {
                 if (!_dataSnapshot.exists() || !_dataSnapshot.hasChildren()) {
@@ -291,7 +298,7 @@ public class TransactionhistoryActivity extends AppCompatActivity {
                     parent,
                     false
             );
-            
+
             return new ViewHolder(transactionHistoryBinding);
         }
 
@@ -304,9 +311,9 @@ public class TransactionhistoryActivity extends AppCompatActivity {
             boolean hasType = list.get(list.size() - 1 - position).containsKey("type");
             boolean hasTime = list.get(list.size() - 1 - position).containsKey("timestamp");
             if (hasAmount && hasType) {
-                typeValue = list.get(list.size() - 1 - position).get("type").toString();
-                if ((typeValue.equals("purchase") || typeValue.equals("resource_sold")) && list.get(list.size() - 1 - position).containsKey("amount type")) {
-                    amountType = list.get(list.size() - 1 - position).get("amount type").toString();
+                typeValue = Objects.requireNonNull(list.get(list.size() - 1 - position).get("type")).toString();
+                if ((typeValue.equals("purchase") || typeValue.equals("resource_sold")) && list.get(list.size() - 1 - position).containsKey("amountType")) {
+                    amountType = Objects.requireNonNull(list.get(list.size() - 1 - position).get("amountType")).toString();
                 } else {
                     if (typeValue.equals("cash_deduct") || typeValue.equals("cash_add")) {
                         amountType = "cash";
@@ -319,7 +326,7 @@ public class TransactionhistoryActivity extends AppCompatActivity {
                 if (!amountType.isEmpty()) {
                     holder.binding.container.setVisibility(View.VISIBLE);
                     holder.binding.line.setVisibility(View.VISIBLE);
-                    amount = Double.parseDouble(list.get(list.size() - 1 - position).get("amount").toString());
+                    amount = Double.parseDouble(Objects.requireNonNull(list.get(list.size() - 1 - position).get("amount")).toString());
                 } else {
                     holder.binding.container.setVisibility(View.GONE);
                     holder.binding.line.setVisibility(View.GONE);
@@ -412,8 +419,8 @@ public class TransactionhistoryActivity extends AppCompatActivity {
             if (hasTime) {
                 holder.binding.container.setVisibility(View.VISIBLE);
                 holder.binding.line.setVisibility(View.VISIBLE);
-                holder.binding.timestamp.setText(formatTimeDifference(list.get(list.size() - 1 - position).get("timestamp").toString()));
-                switch (list.get(list.size() - 1 - position).getOrDefault("status", "").toString()) {
+                holder.binding.timestamp.setText(formatTimeDifference(Objects.requireNonNull(list.get(list.size() - 1 - position).get("timestamp")).toString()));
+                switch (Objects.requireNonNull(list.get(list.size() - 1 - position).getOrDefault("status", "")).toString()) {
                     case "pending":
                         holder.binding.status.setVisibility(View.VISIBLE);
                         holder.binding.status.setTextColor(0xFFFF9800);
@@ -451,6 +458,7 @@ public class TransactionhistoryActivity extends AppCompatActivity {
 
         public class ViewHolder extends RecyclerView.ViewHolder {
             TransHistoryBinding binding;
+
             public ViewHolder(TransHistoryBinding binding) {
                 super(binding.getRoot());
                 this.binding = binding;

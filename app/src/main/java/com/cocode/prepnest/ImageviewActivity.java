@@ -19,6 +19,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 
 
 public class ImageviewActivity extends AppCompatActivity {
@@ -38,7 +39,7 @@ public class ImageviewActivity extends AppCompatActivity {
     }
 
     private void initialize(Bundle _savedInstanceState) {
-        appFirstVisitSp = getSharedPreferences("app first visit", Activity.MODE_PRIVATE);
+        appFirstVisitSp = getSharedPreferences("appFirstVisit", Activity.MODE_PRIVATE);
     }
 
     private void initializeLogic() {
@@ -48,14 +49,14 @@ public class ImageviewActivity extends AppCompatActivity {
         initializeAndAttachAdapter();
 //        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
 //        getWindow().setStatusBarColor(0xFFFFFFFF);
-        if (appFirstVisitSp.contains("app first visit")) {
-            HashMap<String, Object> map = new Gson().fromJson(appFirstVisitSp.getString("app first visit", ""), new TypeToken<HashMap<String, Object>>() {
+        if (appFirstVisitSp.contains("appFirstVisit")) {
+            HashMap<String, Object> map = new Gson().fromJson(appFirstVisitSp.getString("appFirstVisit", ""), new TypeToken<HashMap<String, Object>>() {
             }.getType());
-            if (map.containsKey("first resource view")) {
-                if (map.get("first resource view").toString().equals("false")) {
+            if (map.containsKey("firstResourceView")) {
+                if (!Boolean.parseBoolean(Objects.requireNonNull(map.get("firstResourceView")).toString())) {
                     PrepNestUtil.showToast(ImageviewActivity.this, "Swipe left to see more !");
-                    map.put("first resource view", "true");
-                    appFirstVisitSp.edit().putString("features visit", new Gson().toJson(map)).apply();
+                    map.put("firstResourceView", true);
+                    appFirstVisitSp.edit().putString("appFirstVisit", new Gson().toJson(map)).apply();
                 }
             }
         }

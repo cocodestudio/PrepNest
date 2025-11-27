@@ -1,8 +1,10 @@
 package com.cocode.prepnest;
 
+import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 
 import androidx.activity.OnBackPressedCallback;
@@ -14,6 +16,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -23,9 +26,12 @@ public class ReferpageActivity extends AppCompatActivity {
     private ReferpageBinding binding;
     private HashMap<String, Object> userData = new HashMap<>();
     private NetworkMonitor networkMonitor;
-
     private ArrayList<String> referredUsers = new ArrayList<>();
+    private SharedPreferences cachedData;
 
+    public static <T> T getValue(HashMap<String, Object> map, String key) {
+        return (T) map.get(key);
+    }
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -38,6 +44,8 @@ public class ReferpageActivity extends AppCompatActivity {
     }
 
     private void initialize(Bundle _savedInstanceState) {
+        cachedData = getSharedPreferences("userCachedData", Activity.MODE_PRIVATE);
+
         binding.backIcon.setOnClickListener(_view -> {
             finish();
             overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
@@ -56,7 +64,7 @@ public class ReferpageActivity extends AppCompatActivity {
         designUI();
         if ((FirebaseAuth.getInstance().getCurrentUser() != null)) {
             binding.referCode.setText(FirebaseAuth.getInstance().getCurrentUser().getUid().substring(0, 7));
-            fetchReferData();
+            loadUserDataFromSP();
         } else {
             PrepNestUtil.showToast(ReferpageActivity.this, "Error: please login again");
             FirebaseAuth.getInstance().signOut();
@@ -88,6 +96,30 @@ public class ReferpageActivity extends AppCompatActivity {
         PrepNestUtil.changeNavBarColor(this, true);
     }
 
+    public void loadUserDataFromSP() {
+        if (cachedData.contains("userData")) {
+            Gson gson = new Gson();
+            Type typeHashMap = new TypeToken<HashMap<String, Object>>() {
+            }.getType();
+
+            userData = gson.fromJson(cachedData.getString("userData", ""), typeHashMap);
+
+            if (userData.containsKey("referredUsers")) {
+                referredUsers = getValue(userData, "referredUsers");
+
+                if (referredUsers != null && !referredUsers.isEmpty()) {
+                    binding.totalReferredAmountTxt.setText(String.valueOf((long) (referredUsers.size())));
+                } else {
+                    binding.totalReferredAmountTxt.setText("0");
+                }
+            } else {
+                binding.totalReferredAmountTxt.setText("0");
+            }
+        } else {
+            PrepNestUtil.showToast(this, "An unknown error occurred, try again!");
+            finish();
+        }
+    }
 
     public void fetchReferData() {
         userData.clear();
@@ -105,7 +137,6 @@ public class ReferpageActivity extends AppCompatActivity {
                     binding.totalReferredAmountTxt.setText(String.valueOf((long) (referredUsers.size())));
                 } else {
                     binding.totalReferredAmountTxt.setText("0");
-
                 }
             } else {
                 binding.totalReferredAmountTxt.setText("0");

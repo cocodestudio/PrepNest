@@ -1,5 +1,6 @@
 package com.cocode.prepnest;
 
+import android.annotation.SuppressLint;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
@@ -48,6 +49,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -56,6 +58,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
@@ -70,7 +73,7 @@ public class UseruploadedresourcesFragmentActivity extends Fragment {
     private final Map<String, ValueEventListener> listeners = new HashMap<>();
     private final FirebaseDatabase firebase_database = FirebaseDatabase.getInstance();
     private final DatabaseReference users = firebase_database.getReference("users");
-    private final DatabaseReference requests = firebase_database.getReference("requests/new_resources_requests");
+    private final DatabaseReference requests = firebase_database.getReference("requests/newResourcesRequests");
     private final DatabaseReference resources = firebase_database.getReference("resources");
     private final ArrayList<HashMap<String, Object>> requestedResources = new ArrayList<>();
     private final ArrayList<HashMap<String, Object>> verifiedResources = new ArrayList<>();
@@ -83,7 +86,7 @@ public class UseruploadedresourcesFragmentActivity extends Fragment {
     private HashMap<String, Object> userData = new HashMap<>();
     private resourcesAdapter listAdapter;
     private DatabaseReference userRequestedResources;
-    private String jsonCourseData = "";
+    private String jsonCourseData = null;
     private ArrayList<String> resourceIDs = new ArrayList<>();
     private ProgressDialog progress_dialog;
 
@@ -93,7 +96,7 @@ public class UseruploadedresourcesFragmentActivity extends Fragment {
             Matcher matcher = pattern.matcher(url);
             if (matcher.find()) {
                 String encodedPath = matcher.group(1);
-                return URLDecoder.decode(encodedPath, "UTF-8");
+                return URLDecoder.decode(encodedPath, StandardCharsets.UTF_8);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -101,12 +104,17 @@ public class UseruploadedresourcesFragmentActivity extends Fragment {
         return null;
     }
 
+    @SuppressWarnings("unchecked")
+    public static <T> T getValue(HashMap<String, Object> map, String key) {
+        return (T) map.get(key);
+    }
+
     @NonNull
     @Override
     public View onCreateView(@NonNull LayoutInflater _inflater, @Nullable ViewGroup _container, @Nullable Bundle _savedInstanceState) {
         binding = UseruploadedresourcesFragmentBinding.inflate(_inflater, _container, false);
         initialize(_savedInstanceState, binding.getRoot());
-        FirebaseApp.initializeApp(getContext());
+        FirebaseApp.initializeApp(requireContext());
         initializeLogic();
         return binding.getRoot();
     }
@@ -131,6 +139,7 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
     }
 
     private void initializeLogic() {
+        assert auth.getCurrentUser() != null;
         userRequestedResources = requests.child(auth.getCurrentUser().getUid());
         attachAdapterToRecyclerView();
         requestedResourcesLoaded.set(false);
@@ -145,7 +154,7 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
     public void onDestroy() {
         super.onDestroy();
         for (String id : listeners.keySet()) {
-            userRequestedResources.child(id).removeEventListener(listeners.get(id));
+            userRequestedResources.child(id).removeEventListener(Objects.requireNonNull(listeners.get(id)));
         }
     }
 
@@ -167,6 +176,7 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
     }
 
     public void getUploadedResources() {
+        assert auth.getCurrentUser() != null;
         DatabaseReference dataRef = users.child(auth.getCurrentUser().getUid());
         dataRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -175,16 +185,15 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                 });
 
                 if (dataSnapshot.exists()) {
-                    if (userData.containsKey("provider")) {
-                        if ((Boolean) userData.get("provider")) {
+                    if (userData.containsKey("isProvider")) {
+                        if (Boolean.parseBoolean(Objects.requireNonNull(userData.get("isProvider")).toString())) {
                             binding.btnFab.setVisibility(View.VISIBLE);
                             resourceIDs = new ArrayList<>();
-                            if (userData.containsKey("uploaded resources")) {
-                                if ((userData.get("uploaded resources") == null) || userData.get("uploaded resources").toString().isEmpty()) {
+                            if (userData.containsKey("uploadedResources")) {
+                                if ((userData.get("uploadedResources") == null) || Objects.requireNonNull(userData.get("uploadedResources")).toString().isEmpty()) {
                                     toggleState(R.drawable.icon_empty_box, getString(R.string.no_uploaded_resource_message), true, false);
                                 } else {
-                                    resourceIDs = new Gson().fromJson(userData.get("uploaded resources").toString(), new TypeToken<ArrayList<String>>() {
-                                    }.getType());
+                                    resourceIDs = getValue(userData, "uploadedResources");
                                     toggleState(R.drawable.icon_empty_box, getString(R.string.no_uploaded_resource_message), false, false);
                                 }
                             } else {
@@ -194,12 +203,12 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                             getRequestedResources();
                         } else {
                             binding.btnFab.setVisibility(View.GONE);
-                            if (userData.containsKey("provider verification status")) {
-                                if (userData.get("provider verification status").toString().equals("pending")) {
+                            if (userData.containsKey("providerVerificationStatus")) {
+                                if (Objects.requireNonNull(userData.get("providerVerificationStatus")).toString().equals("pending")) {
                                     toggleState(R.drawable.icon_hourglass, getString(R.string.pending_provider_verification_message), true, false);
                                     binding.progressBarLayout.setVisibility(View.GONE);
                                 } else {
-                                    if (userData.get("provider verification status").toString().equals("failed")) {
+                                    if (Objects.requireNonNull(userData.get("providerVerificationStatus")).toString().equals("failed")) {
                                         toggleState(R.drawable.icon_failed_error, getString(R.string.resend_provider_verification_message), true, false);
                                         binding.progressBarLayout.setVisibility(View.GONE);
                                     } else {
@@ -276,23 +285,31 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         if (getActivity() == null) return;
         getActivity().runOnUiThread(() -> {
             synchronized (allResources) {
-                ArrayList<HashMap<String, Object>> updatedList = new ArrayList<>();
-
-                for (int index = requestedResources.size() - 1; index >= 0; index--) {
-                    HashMap<String, Object> item = requestedResources.get(index);
-                    updatedList.add(item);
-                }
-
-                for (int index = verifiedResources.size() - 1; index >= 0; index--) {
-                    HashMap<String, Object> item = verifiedResources.get(index);
-                    updatedList.add(item);
-                }
+                ArrayList<HashMap<String, Object>> updatedList = getUpdatedList();
 
                 allResources.clear();
                 allResources.addAll(updatedList);
+                ListMapUtils.sortListByKey(allResources, "dateOfUpload", false, ListMapUtils.SortType.NUMBER);
                 listAdapter.updateData(new ArrayList<>(allResources));
+                listAdapter.notifyItemInserted(0);
             }
         });
+    }
+
+    @NonNull
+    private ArrayList<HashMap<String, Object>> getUpdatedList() {
+        ArrayList<HashMap<String, Object>> updatedList = new ArrayList<>();
+
+        for (int index = requestedResources.size() - 1; index >= 0; index--) {
+            HashMap<String, Object> item = requestedResources.get(index);
+            updatedList.add(item);
+        }
+
+        for (int index = verifiedResources.size() - 1; index >= 0; index--) {
+            HashMap<String, Object> item = verifiedResources.get(index);
+            updatedList.add(item);
+        }
+        return updatedList;
     }
 
     public void getRequestedResources() {
@@ -349,96 +366,60 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         AtomicInteger loadedCount = new AtomicInteger(0);
 
         for (String id : _childNodes) {
-
             final String finalId = id;
+            DatabaseReference resourceRef = resources.child(id);
 
-            Log.d("VERIFIED", "VERIFIED RESOURCES LOADING ID : " + finalId);
+            ValueEventListener listener = new ValueEventListener() {
 
-            DatabaseReference lookupRef = firebase_database.getReference("other")
-                    .child("resource_lookup")
-                    .child(finalId);
+                boolean firstLoad = true;
 
-            lookupRef.addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
-                public void onDataChange(@NonNull DataSnapshot lookupSnap) {
+                public void onDataChange(@NonNull DataSnapshot resSnap) {
 
-                    if (!lookupSnap.exists()) {
-                        // Still count it as loaded to avoid blocking the UI
-                        if (loadedCount.incrementAndGet() == _childNodes.size()) {
-                            verifiedResourcesLoaded.set(true);
-                            checkIfBothLoaded();
-                        }
-                        return;
-                    }
+                    synchronized (verifiedResources) {
 
-                    String courseId = lookupSnap.child("course id").getValue(String.class);
+                        // Remove old entry of same ID
+                        verifiedResources.removeIf(map -> finalId.equals(map.get("id")));
 
-                    if (courseId == null || courseId.trim().isEmpty()) {
-                        if (loadedCount.incrementAndGet() == _childNodes.size()) {
-                            verifiedResourcesLoaded.set(true);
-                            checkIfBothLoaded();
-                        }
-                        return;
-                    }
-
-                    DatabaseReference resourceRef = resources.child(courseId).child(finalId);
-
-                    // Track whether we counted this ID
-                    final boolean[] counted = {false};
-
-                    ValueEventListener listener = new ValueEventListener() {
-                        @Override
-                        public void onDataChange(@NonNull DataSnapshot resSnap) {
-
-                            synchronized (verifiedResources) {
-
-                                // Remove old entry of same ID
-                                verifiedResources.removeIf(map -> finalId.equals(map.get("id")));
-
-                                if (resSnap.exists()) {
-                                    Map<String, Object> data = (Map<String, Object>) resSnap.getValue();
-                                    if (data != null) {
-                                        data.put("id", finalId);
-                                        verifiedResources.add(new HashMap<>(data));
-                                    }
-                                }
-
-                                // COUNT ONLY FIRST DATA LOAD
-                                if (!counted[0]) {
-                                    if (loadedCount.incrementAndGet() == _childNodes.size()) {
-                                        verifiedResourcesLoaded.set(true);
-                                        checkIfBothLoaded();
-                                    }
-                                    counted[0] = true;
-                                }
-
-                                // Now update combined list if both lists are done
-                                if (requestedResourcesLoaded.get() && verifiedResourcesLoaded.get()) {
-                                    updateCombinedList();
-                                }
+                        if (resSnap.exists()) {
+                            Map<String, Object> data = (Map<String, Object>) resSnap.getValue();
+                            if (data != null) {
+                                data.put("id", finalId);
+                                verifiedResources.add(new HashMap<>(data));
                             }
                         }
 
-                        @Override
-                        public void onCancelled(@NonNull DatabaseError error) {
-                            if (isAdded()) {
-                                PrepNestUtil.showToast(requireActivity(),
-                                        "Error loading data for " + finalId + ": " + error.getMessage());
+                        // COUNT ONLY FIRST DATA LOAD
+                        if (firstLoad) {
+                            if (loadedCount.incrementAndGet() == _childNodes.size()) {
+                                verifiedResourcesLoaded.set(true);
+                                checkIfBothLoaded();
                             }
+                            firstLoad = false;
                         }
-                    };
 
-                    // Use ADD VALUE LISTENER (real-time updates)
-                    resourceRef.addValueEventListener(listener);
-
-                    // Store for future removal
-                    listeners.put(finalId, listener);
+                        // Now update combined list if both lists are done
+                        if (requestedResourcesLoaded.get() && verifiedResourcesLoaded.get()) {
+                            updateCombinedList();
+                        }
+                    }
                 }
 
                 @Override
                 public void onCancelled(@NonNull DatabaseError error) {
+                    if (isAdded()) {
+                        PrepNestUtil.showToast(requireActivity(),
+                                "Error loading data for " + finalId + ": " + error.getMessage());
+                    }
                 }
-            });
+            };
+
+            // Use ADD VALUE LISTENER (real-time updates)
+            resourceRef.addValueEventListener(listener);
+
+            // Store for future removal
+            listeners.put(finalId, listener);
+
         }
     }
 
@@ -472,7 +453,7 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
 
                 progress_dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
 
-                progress_dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                Objects.requireNonNull(progress_dialog.getWindow()).setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
 
             }
 
@@ -486,13 +467,13 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
     }
 
     public void showResourceOptionsSheet(final HashMap<String, Object> _item) {
-        com.google.android.material.bottomsheet.BottomSheetDialog resource_options;
-        resource_options = new com.google.android.material.bottomsheet.BottomSheetDialog(requireActivity());
-        UserResourceOptionsSheetLayoutBinding sheetbinding = UserResourceOptionsSheetLayoutBinding.inflate(getActivity().getLayoutInflater());
+        com.google.android.material.bottomsheet.BottomSheetDialog resourceOptions;
+        resourceOptions = new com.google.android.material.bottomsheet.BottomSheetDialog(requireActivity());
+        UserResourceOptionsSheetLayoutBinding sheetBinding = UserResourceOptionsSheetLayoutBinding.inflate(requireActivity().getLayoutInflater());
 
-        resource_options.setContentView(sheetbinding.getRoot());
+        resourceOptions.setContentView(sheetBinding.getRoot());
 
-        resource_options.setOnShowListener(dialog -> {
+        resourceOptions.setOnShowListener(dialog -> {
             BottomSheetDialog d = (BottomSheetDialog) dialog;
             View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheet != null) {
@@ -503,63 +484,63 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor("#FFFFFF"));
         gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-        sheetbinding.container.setBackground(gd);
-        PrepNestUtil.roundViewWithRipple(sheetbinding.deleteOption, "#FFFFFF", 0, 0, "#000000", "#EEEEEE");
-        PrepNestUtil.roundViewWithRipple(sheetbinding.discontinueOption, "#FFFFFF", 0, 0, "#000000", "#EEEEEE");
-        PrepNestUtil.roundViewWithRipple(sheetbinding.showDetailsOption, "#FFFFFF", 0, 0, "#000000", "#EEEEEE");
+        sheetBinding.container.setBackground(gd);
+        PrepNestUtil.roundViewWithRipple(sheetBinding.deleteOption, "#FFFFFF", 0, 0, "#000000", "#EEEEEE");
+        PrepNestUtil.roundViewWithRipple(sheetBinding.discontinueOption, "#FFFFFF", 0, 0, "#000000", "#EEEEEE");
+        PrepNestUtil.roundViewWithRipple(sheetBinding.showDetailsOption, "#FFFFFF", 0, 0, "#000000", "#EEEEEE");
         if (_item.containsKey("status")) {
-            if (_item.get("status").toString().equals("verified")) {
-                sheetbinding.deleteOption.setVisibility(View.GONE);
-                sheetbinding.discontinueOption.setVisibility(View.VISIBLE);
+            if (Objects.requireNonNull(_item.get("status")).toString().equals("verified")) {
+                sheetBinding.deleteOption.setVisibility(View.GONE);
+                sheetBinding.discontinueOption.setVisibility(View.VISIBLE);
             } else {
-                sheetbinding.deleteOption.setVisibility(View.VISIBLE);
-                sheetbinding.discontinueOption.setVisibility(View.GONE);
+                sheetBinding.deleteOption.setVisibility(View.VISIBLE);
+                sheetBinding.discontinueOption.setVisibility(View.GONE);
             }
         } else {
-            sheetbinding.deleteOption.setVisibility(View.VISIBLE);
-            sheetbinding.discontinueOption.setVisibility(View.GONE);
+            sheetBinding.deleteOption.setVisibility(View.VISIBLE);
+            sheetBinding.discontinueOption.setVisibility(View.GONE);
         }
-        if (_item.containsKey("discontinue")) {
-            if ((Boolean) _item.get("discontinue")) {
-                sheetbinding.discontinueTxt.setText("Continue");
+        if (_item.containsKey("isDiscontinue")) {
+            if (Boolean.parseBoolean(Objects.requireNonNull(_item.get("isDiscontinue")).toString())) {
+                sheetBinding.discontinueTxt.setText("Continue");
             } else {
-                sheetbinding.discontinueTxt.setText("Discontinue");
+                sheetBinding.discontinueTxt.setText("Discontinue");
             }
         } else {
-            sheetbinding.discontinueTxt.setText("Discontinue");
+            sheetBinding.discontinueTxt.setText("Discontinue");
         }
-        sheetbinding.deleteOption.setOnClickListener(_view -> {
+        sheetBinding.deleteOption.setOnClickListener(_view -> {
             showLoadingDialog(true);
-            resource_options.dismiss();
+            resourceOptions.dismiss();
             deleteItemFromFirebase(_item);
         });
-        sheetbinding.discontinueOption.setOnClickListener(_view -> {
+        sheetBinding.discontinueOption.setOnClickListener(_view -> {
             showLoadingDialog(true);
             changeResourceStatus(_item);
-            resource_options.dismiss();
+            resourceOptions.dismiss();
         });
-        sheetbinding.showDetailsOption.setOnClickListener(_view -> {
+        sheetBinding.showDetailsOption.setOnClickListener(_view -> {
             showResourceDetailsSheet(_item);
-            resource_options.dismiss();
+            resourceOptions.dismiss();
         });
-        resource_options.setCancelable(true);
-        resource_options.show();
+        resourceOptions.setCancelable(true);
+        resourceOptions.show();
     }
 
     public void deleteItemFromFirebase(final HashMap<String, Object> _item) {
         String id = String.valueOf(_item.get("id"));
         int length = allResources.size();
-        if (!resourceIDs.contains(_item.get("id").toString())) {
+        if (!resourceIDs.contains(Objects.requireNonNull(_item.get("id")).toString())) {
             userRequestedResources.child(id).removeValue().addOnCompleteListener(aVoid -> {
                 List<String> fileURLs;
-                fileURLs = new Gson().fromJson(_item.get("resource urls").toString(), new TypeToken<ArrayList<String>>() {
+                fileURLs = new Gson().fromJson(Objects.requireNonNull(_item.get("resourceUrls")).toString(), new TypeToken<ArrayList<String>>() {
                 }.getType());
                 FirebaseFileDeleter.deleteFilesFromStorage(fileURLs, requireActivity(), new FirebaseFileDeleter.DeletionCallback() {
                     @Override
                     public void onAllDeleted() {
                         if (allResources.size() == length) {
                             allResources.remove(_item);
-                            listAdapter.updateData(new ArrayList<>(allResources));
+                            listAdapter.notifyItemRemoved(Integer.parseInt(Objects.requireNonNull(_item.get("position")).toString()));
                         }
                         showLoadingDialog(false);
                         PrepNestUtil.showToast(requireActivity(), "Deleted successfully!");
@@ -581,8 +562,8 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
     }
 
     public void openResource(final HashMap<String, Object> _item) {
-        File internalDir = getContext().getFilesDir();
-        String folderName = _item.get("id").toString();
+        File internalDir = requireContext().getFilesDir();
+        String folderName = Objects.requireNonNull(_item.get("id")).toString();
         File targetFolder = new File(internalDir, folderName);
         if (targetFolder.exists()) {
             navigateToResourceView(_item);
@@ -593,9 +574,9 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
             if (created) {
 
                 List<String> fileURLs;
-                fileURLs = new Gson().fromJson(_item.get("resource urls").toString(), new TypeToken<ArrayList<String>>() {
+                fileURLs = new Gson().fromJson(Objects.requireNonNull(_item.get("resourceUrls")).toString(), new TypeToken<ArrayList<String>>() {
                 }.getType());
-                FilesDownloader.downloadFiles(getContext(), fileURLs, folderName, new FilesDownloader.DownloadCallback() {
+                FilesDownloader.downloadFiles(requireContext(), fileURLs, folderName, new FilesDownloader.DownloadCallback() {
                     @Override
                     public void onDownloadComplete() {
                         showLoadingDialog(false);
@@ -605,8 +586,8 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
                     @Override
                     public void onDownloadFailed(Exception e) {
                         showLoadingDialog(false);
-                        boolean success = FolderUtils.deleteFolder(getContext(), folderName);
-                        PrepNestUtil.showToast(getContext(), e.getCause().toString());
+                        boolean success = FolderUtils.deleteFolder(requireContext(), folderName);
+                        PrepNestUtil.showToast(requireContext(), Objects.requireNonNull(e.getCause()).toString());
                     }
                 });
             } else {
@@ -617,32 +598,34 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         }
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     public void changeResourceStatus(final HashMap<String, Object> _item) {
-        String id = _item.get("id").toString();
+        String id = Objects.requireNonNull(_item.get("id")).toString();
         DatabaseReference resourceItem = resources.child(id);
         boolean status = false;
-        if (_item.containsKey("discontinue")) {
-            status = (Boolean) _item.get("discontinue");
+        if (_item.containsKey("isDiscontinue")) {
+            status = Boolean.parseBoolean(Objects.requireNonNull(_item.get("isDiscontinue")).toString());
         }
-        resourceItem.child("discontinue").setValue(!status).addOnCompleteListener(task -> {
+        resourceItem.child("isDiscontinue").setValue(!status).addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
                 showLoadingDialog(false);
                 PrepNestUtil.showToast(getContext(), "Successfully updated!");
+                listAdapter.notifyItemChanged(Integer.parseInt(Objects.requireNonNull(_item.get("position")).toString()));
             } else {
                 showLoadingDialog(false);
-                PrepNestUtil.showToast(getContext(), task.getException() != null ? task.getException().getCause().toString() : "An unknown error occurred");
+                PrepNestUtil.showToast(getContext(), task.getException() != null ? Objects.requireNonNull(task.getException().getCause()).toString() : "An unknown error occurred");
             }
         });
     }
 
     public void showResourceDetailsSheet(final HashMap<String, Object> _item) {
-        com.google.android.material.bottomsheet.BottomSheetDialog resource_details_sheet;
-        resource_details_sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(requireActivity());
-        ResourceDetailsSheetLayoutBinding sheetbinding = ResourceDetailsSheetLayoutBinding.inflate(getActivity().getLayoutInflater());
+        com.google.android.material.bottomsheet.BottomSheetDialog resourceDetailsSheet;
+        resourceDetailsSheet = new com.google.android.material.bottomsheet.BottomSheetDialog(requireActivity());
+        ResourceDetailsSheetLayoutBinding sheetBinding = ResourceDetailsSheetLayoutBinding.inflate(requireActivity().getLayoutInflater());
 
-        resource_details_sheet.setContentView(sheetbinding.getRoot());
+        resourceDetailsSheet.setContentView(sheetBinding.getRoot());
 
-        resource_details_sheet.setOnShowListener(dialog -> {
+        resourceDetailsSheet.setOnShowListener(dialog -> {
             BottomSheetDialog d = (BottomSheetDialog) dialog;
             View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheet != null) {
@@ -653,85 +636,85 @@ toUploadResource.setClass(requireContext(), UploadActivity.class);
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor("#FFFFFF"));
         gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-        sheetbinding.container.setBackground(gd);
-        if (_item.containsKey("resource title")) {
-            sheetbinding.resourceTitle.setText(_item.get("resource title").toString());
+        sheetBinding.container.setBackground(gd);
+        if (_item.containsKey("resourceTitle")) {
+            sheetBinding.resourceTitle.setText(Objects.requireNonNull(_item.get("resourceTitle")).toString());
         } else {
-            sheetbinding.resourceTitle.setText("No title");
+            sheetBinding.resourceTitle.setText("No title");
         }
-        if (_item.containsKey("course id")) {
-            sheetbinding.resourceCourse.setText(getCourseName(_item.get("course id").toString()));
+        if (_item.containsKey("courseId")) {
+            sheetBinding.resourceCourse.setText(getCourseName(Objects.requireNonNull(_item.get("courseId")).toString()));
         } else {
-            sheetbinding.resourceCourse.setText("None");
+            sheetBinding.resourceCourse.setText("None");
         }
         if (_item.containsKey("session")) {
-            sheetbinding.sessionValueTxt.setBackground(new GradientDrawable() {
+            sheetBinding.sessionValueTxt.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            sheetbinding.sessionValueTxt.setText(_item.get("session").toString());
+            sheetBinding.sessionValueTxt.setText(Objects.requireNonNull(_item.get("session")).toString());
         } else {
-            sheetbinding.sessionContainer.setVisibility(View.GONE);
+            sheetBinding.sessionContainer.setVisibility(View.GONE);
         }
         if (_item.containsKey("semester")) {
-            sheetbinding.semesterValueTxt.setBackground(new GradientDrawable() {
+            sheetBinding.semesterValueTxt.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            sheetbinding.semesterValueTxt.setText(getFormattedNumber(((Number) _item.get("semester")).doubleValue()).concat(" semester"));
+            sheetBinding.semesterValueTxt.setText(getFormattedNumber(((Number) Objects.requireNonNull(_item.get("semester"))).doubleValue()).concat(" semester"));
         } else {
-            sheetbinding.semesterContainer.setVisibility(View.GONE);
+            sheetBinding.semesterContainer.setVisibility(View.GONE);
         }
         if (_item.containsKey("subject")) {
-            sheetbinding.subjectValue.setBackground(new GradientDrawable() {
+            sheetBinding.subjectValue.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            sheetbinding.subjectValue.setText(_item.get("subject").toString());
+            sheetBinding.subjectValue.setText(Objects.requireNonNull(_item.get("subject")).toString());
         } else {
-            sheetbinding.subjectContainer.setVisibility(View.GONE);
+            sheetBinding.subjectContainer.setVisibility(View.GONE);
         }
         if (_item.containsKey("subtype")) {
-            sheetbinding.subtypeValue.setBackground(new GradientDrawable() {
+            sheetBinding.subtypeValue.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            if (_item.get("subtype").toString().equals("midtem")) {
-                sheetbinding.subtypeValue.setText("Midterm");
+            if (Objects.requireNonNull(_item.get("subtype")).toString().equals("midterm")) {
+                sheetBinding.subtypeValue.setText("Midterm");
             } else {
-                if (_item.get("subtype").toString().equals("notes")) {
-                    sheetbinding.subtypeValue.setText("Semester");
+                if (Objects.requireNonNull(_item.get("subtype")).toString().equals("semester")) {
+                    sheetBinding.subtypeValue.setText("Semester");
                 } else {
-                    sheetbinding.subtypeContainer.setVisibility(View.GONE);
+                    sheetBinding.subtypeContainer.setVisibility(View.GONE);
                 }
             }
         } else {
-            sheetbinding.subtypeContainer.setVisibility(View.GONE);
+            sheetBinding.subtypeContainer.setVisibility(View.GONE);
         }
 		/*
 if (_item.containsKey("rating")) {
-sheetbinding.ratingContainer.setBackground(new GradientDrawable() { public GradientDrawable getIns(int a, int b) { this.setCornerRadius(a); this.setColor(b); return this; } }.getIns((int)360, 0xFFFFF3E0));
-sheetbinding.ratingTxt.setText(_item.get("rating").toString());
+sheetBinding.ratingContainer.setBackground(new GradientDrawable() { public GradientDrawable getIns(int a, int b) { this.setCornerRadius(a); this.setColor(b); return this; } }.getIns((int)360, 0xFFFFF3E0));
+sheetBinding.ratingTxt.setText(_item.get("rating").toString());
 } else {
-sheetbinding.ratingTitle.setVisibility(View.GONE);
-sheetbinding.ratingContainer.setVisibility(View.GONE);
+sheetBinding.ratingTitle.setVisibility(View.GONE);
+sheetBinding.ratingContainer.setVisibility(View.GONE);
 }
 */
-        if (_item.containsKey("date of upload")) {
-            sheetbinding.dateOfUploadValue.setText(formatTimeDifference(_item.get("date of upload").toString()));
-            sheetbinding.dateOfUploadValue.setBackground(new GradientDrawable() {
+        if (_item.containsKey("dateOfUpload")) {
+            sheetBinding.dateOfUploadValue.setText(formatTimeDifference(Objects.requireNonNull(_item.get("dateOfUpload")).toString()));
+            sheetBinding.dateOfUploadValue.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
@@ -739,76 +722,76 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
         } else {
-            sheetbinding.dateOfUploadTitle.setVisibility(View.GONE);
-            sheetbinding.dateOfUploadValue.setVisibility(View.GONE);
+            sheetBinding.dateOfUploadTitle.setVisibility(View.GONE);
+            sheetBinding.dateOfUploadValue.setVisibility(View.GONE);
         }
-        if (_item.containsKey("best choice")) {
-            if ((Boolean) _item.get("best choice")) {
-                sheetbinding.bestChoiceTag.setBackground(new GradientDrawable() {
+        if (_item.containsKey("isBestChoice")) {
+            if (Boolean.parseBoolean(Objects.requireNonNull(_item.get("isBestChoice")).toString())) {
+                sheetBinding.bestChoiceTag.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFF000000));
-                sheetbinding.bestChoiceTag.setVisibility(View.VISIBLE);
+                sheetBinding.bestChoiceTag.setVisibility(View.VISIBLE);
             } else {
-                sheetbinding.bestChoiceTag.setVisibility(View.GONE);
+                sheetBinding.bestChoiceTag.setVisibility(View.GONE);
             }
         } else {
-            sheetbinding.bestChoiceTag.setVisibility(View.GONE);
+            sheetBinding.bestChoiceTag.setVisibility(View.GONE);
         }
-        if (_item.containsKey("recommended")) {
-            if ((Boolean) _item.get("recommended")) {
-                sheetbinding.recommendedTag.setBackground(new GradientDrawable() {
+        if (_item.containsKey("isRecommended")) {
+            if (Boolean.parseBoolean(Objects.requireNonNull(_item.get("isRecommended")).toString())) {
+                sheetBinding.recommendedTag.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFF000000));
-                sheetbinding.recommendedTag.setVisibility(View.VISIBLE);
+                sheetBinding.recommendedTag.setVisibility(View.VISIBLE);
             } else {
-                sheetbinding.recommendedTag.setVisibility(View.GONE);
+                sheetBinding.recommendedTag.setVisibility(View.GONE);
             }
         } else {
-            sheetbinding.recommendedTag.setVisibility(View.GONE);
+            sheetBinding.recommendedTag.setVisibility(View.GONE);
         }
         if (_item.containsKey("price")) {
-            sheetbinding.cashValue.setBackground(new GradientDrawable() {
+            sheetBinding.cashValue.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            sheetbinding.coinsValue.setBackground(new GradientDrawable() {
+            sheetBinding.coinsValue.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            sheetbinding.cashValue.setText("₹".concat(String.valueOf(((Number) _item.get("price")).longValue())));
-            sheetbinding.coinsValue.setText(String.valueOf(((Number) _item.get("price")).longValue() * 5).concat(" coins"));
+            sheetBinding.cashValue.setText("₹".concat(String.valueOf(((Number) Objects.requireNonNull(_item.get("price"))).longValue())));
+            sheetBinding.coinsValue.setText(String.valueOf(((Number) Objects.requireNonNull(_item.get("price"))).longValue() * 5).concat(" coins"));
         } else {
-            sheetbinding.priceTitle.setVisibility(View.GONE);
-            sheetbinding.cashValue.setVisibility(View.GONE);
-            sheetbinding.coinsValue.setVisibility(View.GONE);
-            sheetbinding.slash.setVisibility(View.GONE);
+            sheetBinding.priceTitle.setVisibility(View.GONE);
+            sheetBinding.cashValue.setVisibility(View.GONE);
+            sheetBinding.coinsValue.setVisibility(View.GONE);
+            sheetBinding.slash.setVisibility(View.GONE);
         }
-        resource_details_sheet.show();
+        resourceDetailsSheet.show();
     }
 
     public void loadCourses() {
-        if (jsonCourseData.isEmpty()) {
+        if (jsonCourseData == null || jsonCourseData.isEmpty()) {
             try {
-                InputStream is = getContext().getAssets().open("courses.json");
+                InputStream is = requireContext().getAssets().open("courses.json");
                 int size = is.available();
                 byte[] buffer = new byte[size];
                 is.read(buffer);
                 is.close();
-                jsonCourseData = new String(buffer, "UTF-8");
+                jsonCourseData = new String(buffer, StandardCharsets.UTF_8);
             } catch (IOException ex) {
                 PrepNestUtil.showToast(requireContext(), ex.toString());
             }
@@ -828,12 +811,12 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
     public void navigateToResourceView(final HashMap<String, Object> _item) {
         if (_item.containsKey("type")) {
-            if (_item.get("type").toString().equals("paper")) {
+            if (Objects.requireNonNull(_item.get("type")).toString().equals("paper")) {
                 toImageView.setClass(requireContext(), ImageviewActivity.class);
-                toImageView.putExtra("id", _item.get("id").toString());
+                toImageView.putExtra("id", Objects.requireNonNull(_item.get("id")).toString());
                 startActivity(toImageView);
             } else {
-                toPDFView.putExtra("id", _item.get("id").toString());
+                toPDFView.putExtra("id", Objects.requireNonNull(_item.get("id")).toString());
                 startActivity(toPDFView);
             }
         }
@@ -871,7 +854,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
             for (String url : urlList) {
                 try {
-                    StorageReference fileRef = firebase_storage.getReference().child(extractStoragePathFromURL(url));
+                    StorageReference fileRef = firebase_storage.getReference().child(Objects.requireNonNull(extractStoragePathFromURL(url)));
                     staticLog.addLog("RESOURCE DELETE", "DELETING : ".concat(fileRef.getPath()));
                     fileRef.delete().addOnSuccessListener(unused -> {
                         if (deleteCount.incrementAndGet() == urlList.size()) {
@@ -905,6 +888,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
             for (String url : fileURLsList) {
                 String storagePath = extractStoragePathFromURL(url);
+                assert storagePath != null;
                 StorageReference fileRef = storage.getReference().child(storagePath);
 
                 staticLog.addLog("RESOURCE DOWNLOAD", "DOWNLOADING RESOURCE : ".concat(storagePath));
@@ -1026,9 +1010,9 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             HashMap<String, Object> item = list.get(position);
 
             if (item.containsKey("status")) {
-                holder.binding.statusTxt.setText(item.get("status").toString());
+                holder.binding.statusTxt.setText(Objects.requireNonNull(item.get("status")).toString());
                 holder.binding.statusTxt.setVisibility(View.VISIBLE);
-                switch (item.get("status").toString()) {
+                switch (Objects.requireNonNull(item.get("status")).toString()) {
                     case "pending":
                         holder.binding.statusTxt.setTextColor(0xFFF57C00);
                         holder.binding.statusTxt.setBackground(new GradientDrawable() {
@@ -1052,8 +1036,8 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                         break;
 
                     case "verified":
-                        if (item.containsKey("discontinue")) {
-                            if (item.get("discontinue").toString().equals("true")) {
+                        if (item.containsKey("isDiscontinue")) {
+                            if (Boolean.parseBoolean(Objects.requireNonNull(item.get("isDiscontinue")).toString())) {
                                 holder.binding.statusTxt.setBackground(new GradientDrawable() {
                                     public GradientDrawable getIns(int a, int b) {
                                         this.setCornerRadius(a);
@@ -1062,7 +1046,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                                     }
                                 }.getIns((int) 360, 0xFFF5F5F5));
                                 holder.binding.statusTxt.setTextColor(0xFF757575);
-                                holder.binding.statusTxt.setText("discontinue");
+                                holder.binding.statusTxt.setText("Discontinue");
                                 holder.binding.statusTxt.setVisibility(View.VISIBLE);
                             } else {
                                 holder.binding.statusTxt.setVisibility(View.GONE);
@@ -1090,7 +1074,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             }
 
             if (item.containsKey("subject")) {
-                holder.binding.subjectNameTxt.setText(item.get("subject").toString());
+                holder.binding.subjectNameTxt.setText(Objects.requireNonNull(item.get("subject")).toString());
                 holder.binding.subjectNameTxt.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
@@ -1103,7 +1087,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 ViewGroup.MarginLayoutParams bottomContainerParams =
                         (ViewGroup.MarginLayoutParams) holder.binding.statusAndDateContainer.getLayoutParams();
 
-                if (item.get("subject").toString().length() >= 20) {
+                if (Objects.requireNonNull(item.get("subject")).toString().length() >= 20) {
                     holder.binding.metaDataContainer.setOrientation(LinearLayout.VERTICAL);
                     bottomContainerParams.setMargins(0, (int) convertToDp(8), 0, 0);
                 } else {
@@ -1117,14 +1101,14 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             }
 
 
-            if (item.containsKey("resource title")) {
-                holder.binding.title.setText(item.get("resource title").toString());
+            if (item.containsKey("resourceTitle")) {
+                holder.binding.title.setText(Objects.requireNonNull(item.get("resourceTitle")).toString());
             } else {
                 holder.binding.title.setText("No name");
             }
 
             if (item.containsKey("type")) {
-                if (item.get("type").toString().equals("paper")) {
+                if (Objects.requireNonNull(item.get("type")).toString().equals("paper")) {
                     holder.binding.image.setImageResource(R.drawable.previous_paper);
                 } else {
                     holder.binding.image.setImageResource(R.drawable.short_notes);
@@ -1132,8 +1116,8 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             } else {
                 holder.binding.image.setVisibility(View.INVISIBLE);
             }
-            if (item.containsKey("best choice")) {
-                if (item.get("best choice").toString().equals("true")) {
+            if (item.containsKey("isBestChoice")) {
+                if (Boolean.parseBoolean(Objects.requireNonNull(item.get("isBestChoice")).toString())) {
                     holder.binding.bestChoiceTag.setVisibility(View.VISIBLE);
                 } else {
                     holder.binding.bestChoiceTag.setVisibility(View.GONE);
@@ -1141,8 +1125,8 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             } else {
                 holder.binding.bestChoiceTag.setVisibility(View.GONE);
             }
-            if (item.containsKey("recommended")) {
-                if (item.get("recommended").toString().equals("true")) {
+            if (item.containsKey("isRecommended")) {
+                if (Boolean.parseBoolean(Objects.requireNonNull(item.get("isRecommended")).toString())) {
                     holder.binding.recommendedTag.setVisibility(View.VISIBLE);
                 } else {
                     holder.binding.recommendedTag.setVisibility(View.GONE);
@@ -1150,26 +1134,26 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             } else {
                 holder.binding.recommendedTag.setVisibility(View.GONE);
             }
-            if (item.containsKey("date of upload")) {
-                holder.binding.uploadDateTxt.setText(formatTimeDifference(item.get("date of upload").toString()));
+            if (item.containsKey("dateOfUpload")) {
+                holder.binding.uploadDateTxt.setText(formatTimeDifference(Objects.requireNonNull(item.get("dateOfUpload")).toString()));
                 holder.binding.uploadDateTxt.setVisibility(View.VISIBLE);
             } else {
                 holder.binding.uploadDateTxt.setVisibility(View.GONE);
             }
 
 
-            ViewGroup.MarginLayoutParams paramscontainer =
+            ViewGroup.MarginLayoutParams paramsContainer =
                     (ViewGroup.MarginLayoutParams) holder.binding.container.getLayoutParams();
 
             if (position == (list.size() - 1)) {
-                paramscontainer.setMargins(
+                paramsContainer.setMargins(
                         (int) convertToDp(20),
                         (int) convertToDp(10),
                         (int) convertToDp(20),
                         (int) convertToDp(10)
                 );
             } else {
-                paramscontainer.setMargins(
+                paramsContainer.setMargins(
                         (int) convertToDp(20),
                         (int) convertToDp(10),
                         (int) convertToDp(20),
@@ -1177,16 +1161,18 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 );
             }
 
-            paramscontainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
-            paramscontainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            paramsContainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            paramsContainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
 
-            holder.binding.container.setLayoutParams(paramscontainer);
+            holder.binding.container.setLayoutParams(paramsContainer);
 
 
             holder.binding.iconMoreOptions.setOnClickListener(v -> {
                 int pos = holder.getAdapterPosition();
                 if (pos != RecyclerView.NO_POSITION && listener != null) {
-                    listener.showOptions(list.get(pos));
+                    HashMap<String, Object> itemTemp = list.get(pos);
+                    itemTemp.put("position", pos);
+                    listener.showOptions(itemTemp);
                 }
             });
 
@@ -1221,6 +1207,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
         public class ViewHolder extends RecyclerView.ViewHolder {
             ResourceItemCardFullBinding binding;
+
             public ViewHolder(ResourceItemCardFullBinding binding) {
                 super(binding.getRoot());
                 this.binding = binding;

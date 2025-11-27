@@ -26,6 +26,7 @@ import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
 import java.util.HashMap;
+import java.util.Objects;
 
 public class ReportIssueActivity extends AppCompatActivity {
 
@@ -50,9 +51,7 @@ public class ReportIssueActivity extends AppCompatActivity {
             }
         });
 
-        binding.backIcon.setOnClickListener(_view -> {
-            finish();
-        });
+        binding.backIcon.setOnClickListener(_view -> finish());
 
         binding.attachContainer.setOnClickListener(_view -> {
             Intent openDoc = new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -70,7 +69,7 @@ public class ReportIssueActivity extends AppCompatActivity {
                 if (imageURI != null) {
                     uploadImage();
                 } else {
-                    sendReport(binding.edittext.getText().toString(), null);
+                    sendReport(null);
                 }
             }
         });
@@ -162,42 +161,45 @@ public class ReportIssueActivity extends AppCompatActivity {
 
     public void uploadImage() {
         PrepNestUtil.showLoadingDialog(this, true);
-        StorageReference fileRef = FirebaseStorage.getInstance().getReference("other/reports/error_reports/").child(FirebaseAuth.getInstance().getCurrentUser().getUid()).child(System.currentTimeMillis() + ".jpg");
+        StorageReference fileRef = FirebaseStorage
+                .getInstance()
+                .getReference("other/reports/errorReports/")
+                .child(Objects.requireNonNull(FirebaseAuth.getInstance().getCurrentUser()).getUid())
+                .child(System.currentTimeMillis() + ".jpg");
         UploadTask uploadTask = fileRef.putFile(imageURI);
-        uploadTask.addOnSuccessListener(taskSnapshot -> {
-            fileRef.getDownloadUrl().addOnSuccessListener(uri -> {
-                sendReport(binding.edittext.getText().toString(), uri.toString());
-            });
-        }).addOnFailureListener(exception -> {
+        uploadTask.addOnSuccessListener(taskSnapshot -> fileRef.getDownloadUrl().addOnSuccessListener(uri -> sendReport(uri.toString()))).addOnFailureListener(exception -> {
             PrepNestUtil.showToast(ReportIssueActivity.this, "An unknown error occurred : ".concat(exception.toString()));
             PrepNestUtil.showLoadingDialog(ReportIssueActivity.this, false);
         });
     }
 
-    public void sendReport(String issue, String imageURL) {
-        DatabaseReference errorRef = FirebaseDatabase.getInstance().getReference("reports/error_reports");
+    public void sendReport(String imageURL) {
+        DatabaseReference errorRef = FirebaseDatabase.getInstance().getReference("reports/errorReports");
         HashMap<String, Object> pushData = new HashMap<>();
 
         if (imageURL != null) {
             pushData.put("imageUrl", imageURL);
         }
 
-        pushData.put("reportBy", FirebaseAuth.getInstance().getCurrentUser().getUid());
+        pushData.put("reportBy", Objects.requireNonNull(FirebaseAuth.getInstance().getCurrentUser()).getUid());
         pushData.put("issue", binding.edittext.getText().toString().trim());
-        pushData.put("timestamp", String.valueOf(System.currentTimeMillis()));
+        pushData.put("timestamp", System.currentTimeMillis());
 
-        errorRef.child(errorRef.push().getKey()).setValue(pushData).addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                PrepNestUtil.showLoadingDialog(ReportIssueActivity.this, false);
-                PrepNestUtil.showToast(ReportIssueActivity.this, "Sent successfully!");
-                binding.edittext.setText("");
-                binding.attachImageTitle.setText(R.string.attach_a_screenshot);
-                imageURI = null;
-            } else {
-                PrepNestUtil.showLoadingDialog(ReportIssueActivity.this, false);
-                PrepNestUtil.showToast(ReportIssueActivity.this, "An unknown error occurred: " + task.getException().toString());
-            }
-        });
+        errorRef
+                .child(Objects.requireNonNull(errorRef.push().getKey()))
+                .setValue(pushData)
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        PrepNestUtil.showLoadingDialog(ReportIssueActivity.this, false);
+                        PrepNestUtil.showToast(ReportIssueActivity.this, "Sent successfully!");
+                        binding.edittext.setText("");
+                        binding.attachImageTitle.setText(R.string.attach_a_screenshot);
+                        imageURI = null;
+                    } else {
+                        PrepNestUtil.showLoadingDialog(ReportIssueActivity.this, false);
+                        PrepNestUtil.showToast(ReportIssueActivity.this, "An unknown error occurred: " + Objects.requireNonNull(task.getException()));
+                    }
+                });
     }
 
     public String getFileNameFromURI(final Uri uri) {

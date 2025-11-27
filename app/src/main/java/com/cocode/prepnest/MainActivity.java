@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -15,6 +16,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -43,14 +45,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initialize(Bundle _savedInstanceState) {
-        appFirstVisitSp = getSharedPreferences("app first visit", Activity.MODE_PRIVATE);
+        appFirstVisitSp = getSharedPreferences("appFirstVisit", Activity.MODE_PRIVATE);
     }
 
     private void initializeLogic() {
+        initializeFirstVisit();
         createUI();
         networkMonitor = new NetworkMonitor(this);
         PrepNestUtil.changeNavBarColor(this, true);
-        getUserData();
+        loadApp();
     }
 
 
@@ -66,9 +69,8 @@ public class MainActivity extends AppCompatActivity {
         networkMonitor.unregister();
     }
 
-    private void getUserData() {
+    private void loadApp() {
         if (PrepNestUtil.isConnected(MainActivity.this)) {
-            initializeFirstVisit();
             if ((FirebaseAuth.getInstance().getCurrentUser() != null)) {
                 timer = new TimerTask() {
                     @Override
@@ -88,7 +90,8 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void run() {
                         runOnUiThread(() -> {
-                            if (appFirstVisit.get("onboarding").toString().equals("false")) {
+                            Log.d("VISIT", Objects.requireNonNull(appFirstVisit.get("onboarding")).toString());
+                            if (!Boolean.parseBoolean(Objects.requireNonNull(appFirstVisit.get("onboarding")).toString())) {
                                 toOnboarding.setClass(MainActivity.this, OnboardingActivity.class);
                                 startActivity(toOnboarding);
                             } else {
@@ -117,16 +120,16 @@ public class MainActivity extends AppCompatActivity {
 
 
     public void initializeFirstVisit() {
-        if (appFirstVisitSp.contains("features visit")) {
-            appFirstVisit = new Gson().fromJson(appFirstVisitSp.getString("features visit", ""), new TypeToken<HashMap<String, Object>>() {
+        if (appFirstVisitSp.contains("appFirstVisit")) {
+            appFirstVisit = new Gson().fromJson(appFirstVisitSp.getString("appFirstVisit", ""), new TypeToken<HashMap<String, Object>>() {
             }.getType());
         } else {
             appFirstVisit = new HashMap<>();
-            appFirstVisit.put("onboarding", "false");
-            appFirstVisit.put("provider overview", "false");
-            appFirstVisit.put("upload guidance", "false");
-            appFirstVisit.put("first resource view", "false");
-            appFirstVisitSp.edit().putString("features visit", new Gson().toJson(appFirstVisit)).apply();
+            appFirstVisit.put("onboarding", false);
+            appFirstVisit.put("providerOverview", false);
+            appFirstVisit.put("uploadGuidance", false);
+            appFirstVisit.put("firstResourceView", false);
+            appFirstVisitSp.edit().putString("appFirstVisit", new Gson().toJson(appFirstVisit)).apply();
         }
     }
 

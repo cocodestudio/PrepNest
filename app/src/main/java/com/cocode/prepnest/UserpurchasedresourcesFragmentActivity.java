@@ -33,6 +33,7 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.GenericTypeIndicator;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
@@ -45,6 +46,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -53,6 +55,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -61,15 +64,15 @@ import java.util.regex.Pattern;
 public class UserpurchasedresourcesFragmentActivity extends Fragment {
 
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
-    private final FirebaseDatabase firebase_database = FirebaseDatabase.getInstance();
-    private final DatabaseReference users = firebase_database.getReference("users");
-    private final DatabaseReference resources = firebase_database.getReference("resources");
+    private final FirebaseDatabase database = FirebaseDatabase.getInstance();
+    private final DatabaseReference users = database.getReference("users");
+    private final DatabaseReference resources = database.getReference("resources");
     private final ArrayList<HashMap<String, Object>> resourcesList = new ArrayList<>();
     private final Intent toImageView = new Intent();
     private final Intent toPDFView = new Intent();
     private UserpurchasedresourcesFragmentBinding binding;
     private resourcesAdapter listAdapter;
-    private String jsonCourseData = "";
+    private String jsonCourseData = null;
     private ProgressDialog progress_dialog;
     private ArrayList<String> resourceIDs = new ArrayList<>();
 
@@ -79,7 +82,7 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
             Matcher matcher = pattern.matcher(url);
             if (matcher.find()) {
                 String encodedPath = matcher.group(1);
-                return URLDecoder.decode(encodedPath, "UTF-8");
+                return URLDecoder.decode(encodedPath, StandardCharsets.UTF_8);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -92,7 +95,7 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
     public View onCreateView(@NonNull LayoutInflater _inflater, @Nullable ViewGroup _container, @Nullable Bundle _savedInstanceState) {
         binding = UserpurchasedresourcesFragmentBinding.inflate(_inflater, _container, false);
         initialize(_savedInstanceState, binding.getRoot());
-        FirebaseApp.initializeApp(getContext());
+        FirebaseApp.initializeApp(requireContext());
         initializeLogic();
         return binding.getRoot();
     }
@@ -120,7 +123,7 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
 
                 progress_dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
 
-                progress_dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                Objects.requireNonNull(progress_dialog.getWindow()).setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
 
             }
 
@@ -147,13 +150,17 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
 
     public void getPurchasedResourcesIDs() {
         binding.progressBarLayout.setVisibility(View.VISIBLE);
-        DatabaseReference dataRef = users.child(auth.getCurrentUser().getUid()).child("purchased resources");
+        assert auth.getCurrentUser() != null;
+        DatabaseReference dataRef = users.child(auth.getCurrentUser().getUid()).child("purchasedResources");
         dataRef.addListenerForSingleValueEvent(new ValueEventListener() {
+
+            final GenericTypeIndicator<ArrayList<String>> typeIndicator = new GenericTypeIndicator<>() {
+            };
+
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                if (dataSnapshot.exists() && (dataSnapshot.getValue() != null && !dataSnapshot.getValue(String.class).isEmpty())) {
-                    resourceIDs = new Gson().fromJson(dataSnapshot.getValue(String.class), new TypeToken<ArrayList<String>>() {
-                    }.getType());
+                if (dataSnapshot.exists() && (dataSnapshot.getValue() != null && !Objects.requireNonNull(dataSnapshot.getValue(typeIndicator)).isEmpty())) {
+                    resourceIDs = dataSnapshot.getValue(typeIndicator);
                 } else {
                     resourceIDs = new ArrayList<>();
                 }
@@ -161,7 +168,7 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
             }
 
             @Override
-            public void onCancelled(DatabaseError databaseError) {
+            public void onCancelled(@NonNull DatabaseError databaseError) {
                 PrepNestUtil.showToast(requireContext(), "An unknown error occurred : ".concat(databaseError.toString()));
                 binding.progressBarLayout.setVisibility(View.GONE);
                 binding.emptyStateContainer.setVisibility(View.VISIBLE);
@@ -195,87 +202,48 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
         AtomicInteger loadedCount = new AtomicInteger(0);
 
         for (String id : _childNodes) {
-
             final String finalId = id;
 
+            DatabaseReference resourceRef = resources.child(finalId);
 
-            DatabaseReference lookupRef = firebase_database
-                    .getReference("other")
-                    .child("resource_lookup")
-                    .child(finalId);
+            resourceRef.addListenerForSingleValueEvent(new ValueEventListener() {
 
-            lookupRef.addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
-                public void onDataChange(@NonNull DataSnapshot lookupSnap) {
+                public void onDataChange(@NonNull DataSnapshot resourceSnap) {
 
-                    if (!lookupSnap.exists()) {
-                        // Even if lookup missing, count as loaded to avoid UI freeze
-                        if (loadedCount.incrementAndGet() == _childNodes.size()) {
-                            showPurchasedResourcesUI();
+                    synchronized (resourcesList) {
+                        // Remove any existing entry of same ID
+                        resourcesList.removeIf(map -> finalId.equals(map.get("id")));
+
+                        if (resourceSnap.exists()) {
+                            Map<String, Object> item =
+                                    (Map<String, Object>) resourceSnap.getValue();
+
+                            if (item != null) {
+                                item.put("id", finalId);
+                                resourcesList.add(0, new HashMap<>(item));
+                            }
                         }
-                        return;
                     }
 
-                    String courseId = lookupSnap.child("course id").getValue(String.class);
-
-                    if (courseId == null || courseId.trim().isEmpty()) {
-
-                        if (loadedCount.incrementAndGet() == _childNodes.size()) {
-                            showPurchasedResourcesUI();
-                        }
-                        return;
+                    if (loadedCount.incrementAndGet() == _childNodes.size()) {
+                        showPurchasedResourcesUI();
                     }
-
-                    DatabaseReference resourceRef = resources.child(courseId).child(finalId);
-
-                    resourceRef.addListenerForSingleValueEvent(new ValueEventListener() {
-
-                        @Override
-                        public void onDataChange(@NonNull DataSnapshot resourceSnap) {
-
-                            synchronized (resourcesList) {
-                                // Remove any existing entry of same ID
-                                resourcesList.removeIf(map -> finalId.equals(map.get("id")));
-
-                                if (resourceSnap.exists()) {
-                                    Map<String, Object> item =
-                                            (Map<String, Object>) resourceSnap.getValue();
-
-                                    if (item != null) {
-                                        item.put("id", finalId);
-                                        resourcesList.add(0, new HashMap<>(item));
-                                    }
-                                }
-                            }
-
-                            if (loadedCount.incrementAndGet() == _childNodes.size()) {
-                                showPurchasedResourcesUI();
-                            }
-                        }
-
-                        @Override
-                        public void onCancelled(@NonNull DatabaseError error) {
-
-                            binding.progressBarLayout.setVisibility(View.GONE);
-                            binding.emptyStateContainer.setVisibility(View.VISIBLE);
-
-                            Toast.makeText(
-                                    requireActivity(),
-                                    "Failed loading resources: " + error.getMessage(),
-                                    Toast.LENGTH_SHORT
-                            ).show();
-
-                            // Still count load so UI doesn't freeze
-                            if (loadedCount.incrementAndGet() == _childNodes.size()) {
-                                showPurchasedResourcesUI();
-                            }
-                        }
-                    });
                 }
 
                 @Override
                 public void onCancelled(@NonNull DatabaseError error) {
-                    // Nothing to do but count load
+
+                    binding.progressBarLayout.setVisibility(View.GONE);
+                    binding.emptyStateContainer.setVisibility(View.VISIBLE);
+
+                    Toast.makeText(
+                            requireActivity(),
+                            "Failed loading resources: " + error.getMessage(),
+                            Toast.LENGTH_SHORT
+                    ).show();
+
+                    // Still count load so UI doesn't freeze
                     if (loadedCount.incrementAndGet() == _childNodes.size()) {
                         showPurchasedResourcesUI();
                     }
@@ -287,16 +255,16 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
 
     public void attachAdapterToRecyclerView() {
         binding.itemsList.setLayoutManager(new LinearLayoutManager(getContext()));
-        listAdapter = new resourcesAdapter(this::showResourceDetailsSheet, resourcesList);
+        listAdapter = new resourcesAdapter(this::showResourceOptionsSheet, resourcesList);
         binding.itemsList.setAdapter(listAdapter);
     }
 
     public void showResourceOptionsSheet(final HashMap<String, Object> _item) {
         com.google.android.material.bottomsheet.BottomSheetDialog resource_options;
         resource_options = new com.google.android.material.bottomsheet.BottomSheetDialog(requireActivity());
-        UserResourceOptionsSheetLayoutBinding sheetbinding = UserResourceOptionsSheetLayoutBinding.inflate(getActivity().getLayoutInflater());
+        UserResourceOptionsSheetLayoutBinding sheetBinding = UserResourceOptionsSheetLayoutBinding.inflate(Objects.requireNonNull(getActivity()).getLayoutInflater());
 
-        resource_options.setContentView(sheetbinding.getRoot());
+        resource_options.setContentView(sheetBinding.getRoot());
 
         resource_options.setOnShowListener(dialog -> {
             BottomSheetDialog d = (BottomSheetDialog) dialog;
@@ -309,19 +277,19 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor("#FFFFFF"));
         gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-        sheetbinding.container.setBackground(gd);
-        PrepNestUtil.roundViewWithRipple(sheetbinding.deleteOption, "#FFFFFF", 0, 0, "#000000", "#EEEEEE");
-        PrepNestUtil.roundViewWithRipple(sheetbinding.discontinueOption, "#FFFFFF", 0, 0, "#000000", "#EEEEEE");
-        PrepNestUtil.roundViewWithRipple(sheetbinding.showDetailsOption, "#FFFFFF", 0, 0, "#000000", "#EEEEEE");
-        sheetbinding.deleteOption.setVisibility(View.VISIBLE);
-        sheetbinding.discontinueOption.setVisibility(View.GONE);
-        sheetbinding.showDetailsOption.setVisibility(View.VISIBLE);
-        sheetbinding.deleteOption.setOnClickListener(_view -> {
+        sheetBinding.container.setBackground(gd);
+        PrepNestUtil.roundViewWithRipple(sheetBinding.deleteOption, "#FFFFFF", 0, 0, "#000000", "#EEEEEE");
+        PrepNestUtil.roundViewWithRipple(sheetBinding.discontinueOption, "#FFFFFF", 0, 0, "#000000", "#EEEEEE");
+        PrepNestUtil.roundViewWithRipple(sheetBinding.showDetailsOption, "#FFFFFF", 0, 0, "#000000", "#EEEEEE");
+        sheetBinding.deleteOption.setVisibility(View.VISIBLE);
+        sheetBinding.discontinueOption.setVisibility(View.GONE);
+        sheetBinding.showDetailsOption.setVisibility(View.VISIBLE);
+        sheetBinding.deleteOption.setOnClickListener(_view -> {
             showLoadingDialog(true);
             resource_options.dismiss();
             deleteItemFromFirebase(_item);
         });
-        sheetbinding.showDetailsOption.setOnClickListener(_view -> {
+        sheetBinding.showDetailsOption.setOnClickListener(_view -> {
             showResourceDetailsSheet(_item);
             resource_options.dismiss();
         });
@@ -365,21 +333,23 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
             showLoadingDialog(false);
             return;
         }
-        final String folderName = _item.get("id").toString();
+        final String folderName = Objects.requireNonNull(_item.get("id")).toString();
         for (int pos = 0; pos < resourceIDs.size(); pos++) {
-            if (resourceIDs.get(pos).equals(_item.get("id").toString())) {
+            if (resourceIDs.get(pos).equals(Objects.requireNonNull(_item.get("id")).toString())) {
                 resourceIDs.remove(pos);
                 break;
             }
         }
-        String newIDs = new Gson().toJson(resourceIDs);
-        users.child(auth.getCurrentUser().getUid()).child("purchased resources").setValue(newIDs).addOnCompleteListener(unused -> {
+//        String newIDs = new Gson().toJson(resourceIDs);
+        assert auth.getCurrentUser() != null;
+        users.child(auth.getCurrentUser().getUid()).child("purchasedResources").setValue(resourceIDs).addOnCompleteListener(unused -> {
             showLoadingDialog(false);
             resourcesList.remove(_item);
+            listAdapter.notifyItemRemoved(Integer.parseInt(Objects.requireNonNull(_item.get("position")).toString()));
             loadResourceItemsToList();
             toggleEmptyState();
             PrepNestUtil.showToast(requireActivity(), "Deleted successfully!");
-            FolderUtils.deleteFolder(getContext(), folderName);
+            FolderUtils.deleteFolder(Objects.requireNonNull(getContext()), folderName);
         }).addOnFailureListener(error -> {
             showLoadingDialog(false);
             PrepNestUtil.showToast(requireActivity(), "Failed to delete: " + error.getMessage());
@@ -387,8 +357,8 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
     }
 
     public void openResource(final HashMap<String, Object> _item) {
-        File internalDir = getContext().getFilesDir();
-        String folderName = _item.get("id").toString();
+        File internalDir = Objects.requireNonNull(getContext()).getFilesDir();
+        String folderName = Objects.requireNonNull(_item.get("id")).toString();
         File targetFolder = new File(internalDir, folderName);
         if (targetFolder.exists()) {
             navigateToResourceView(_item);
@@ -398,7 +368,7 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
 
             if (created) {
                 List<String> fileURLs;
-                fileURLs = new Gson().fromJson(_item.get("resource urls").toString(), new TypeToken<ArrayList<String>>() {
+                fileURLs = new Gson().fromJson(Objects.requireNonNull(_item.get("resourceUrls")).toString(), new TypeToken<ArrayList<String>>() {
                 }.getType());
                 FilesDownloader.downloadFiles(getContext(), fileURLs, folderName, new FilesDownloader.DownloadCallback() {
                     @Override
@@ -410,8 +380,8 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
                     @Override
                     public void onDownloadFailed(Exception e) {
                         showLoadingDialog(false);
-                        boolean success = FolderUtils.deleteFolder(getContext(), folderName);
-                        PrepNestUtil.showToast(getContext(), e.getCause().toString());
+                        boolean success = FolderUtils.deleteFolder(Objects.requireNonNull(getContext()), folderName);
+                        PrepNestUtil.showToast(getContext(), Objects.requireNonNull(e.getCause()).toString());
                     }
                 });
             } else {
@@ -424,9 +394,9 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
     public void showResourceDetailsSheet(final HashMap<String, Object> _item) {
         com.google.android.material.bottomsheet.BottomSheetDialog resource_details_sheet;
         resource_details_sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(requireActivity());
-        ResourceDetailsSheetLayoutBinding sheetbinding = ResourceDetailsSheetLayoutBinding.inflate(getActivity().getLayoutInflater());
+        ResourceDetailsSheetLayoutBinding sheetBinding = ResourceDetailsSheetLayoutBinding.inflate(Objects.requireNonNull(getActivity()).getLayoutInflater());
 
-        resource_details_sheet.setContentView(sheetbinding.getRoot());
+        resource_details_sheet.setContentView(sheetBinding.getRoot());
 
         resource_details_sheet.setOnShowListener(dialog -> {
             BottomSheetDialog d = (BottomSheetDialog) dialog;
@@ -439,85 +409,85 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor("#FFFFFF"));
         gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-        sheetbinding.container.setBackground(gd);
-        if (_item.containsKey("resource title")) {
-            sheetbinding.resourceTitle.setText(_item.get("resource title").toString());
+        sheetBinding.container.setBackground(gd);
+        if (_item.containsKey("resourceTitle")) {
+            sheetBinding.resourceTitle.setText(Objects.requireNonNull(_item.get("resourceTitle")).toString());
         } else {
-            sheetbinding.resourceTitle.setText("No title");
+            sheetBinding.resourceTitle.setText("No title");
         }
-        if (_item.containsKey("course id")) {
-            sheetbinding.resourceCourse.setText(getCourseName(_item.get("course id").toString()));
+        if (_item.containsKey("courseId")) {
+            sheetBinding.resourceCourse.setText(getCourseName(Objects.requireNonNull(_item.get("courseId")).toString()));
         } else {
-            sheetbinding.resourceCourse.setText("None");
+            sheetBinding.resourceCourse.setText("None");
         }
         if (_item.containsKey("session")) {
-            sheetbinding.sessionValueTxt.setBackground(new GradientDrawable() {
+            sheetBinding.sessionValueTxt.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            sheetbinding.sessionValueTxt.setText(_item.get("session").toString());
+            sheetBinding.sessionValueTxt.setText(Objects.requireNonNull(_item.get("session")).toString());
         } else {
-            sheetbinding.sessionContainer.setVisibility(View.GONE);
+            sheetBinding.sessionContainer.setVisibility(View.GONE);
         }
         if (_item.containsKey("semester")) {
-            sheetbinding.semesterValueTxt.setBackground(new GradientDrawable() {
+            sheetBinding.semesterValueTxt.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            sheetbinding.semesterValueTxt.setText(getFormattedNumber(((Number) _item.get("semester")).doubleValue()).concat(" semester"));
+            sheetBinding.semesterValueTxt.setText(getFormattedNumber(((Number) Objects.requireNonNull(_item.get("semester"))).doubleValue()).concat(" semester"));
         } else {
-            sheetbinding.semesterContainer.setVisibility(View.GONE);
+            sheetBinding.semesterContainer.setVisibility(View.GONE);
         }
         if (_item.containsKey("subject")) {
-            sheetbinding.subjectValue.setBackground(new GradientDrawable() {
+            sheetBinding.subjectValue.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            sheetbinding.subjectValue.setText(_item.get("subject").toString());
+            sheetBinding.subjectValue.setText(Objects.requireNonNull(_item.get("subject")).toString());
         } else {
-            sheetbinding.subjectContainer.setVisibility(View.GONE);
+            sheetBinding.subjectContainer.setVisibility(View.GONE);
         }
         if (_item.containsKey("subtype")) {
-            sheetbinding.subtypeValue.setBackground(new GradientDrawable() {
+            sheetBinding.subtypeValue.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            if (_item.get("subtype").toString().equals("midtem")) {
-                sheetbinding.subtypeValue.setText("Midterm");
+            if (Objects.requireNonNull(_item.get("subtype")).toString().equals("midterm")) {
+                sheetBinding.subtypeValue.setText("Midterm");
             } else {
-                if (_item.get("subtype").toString().equals("notes")) {
-                    sheetbinding.subtypeValue.setText("Semester");
+                if (Objects.requireNonNull(_item.get("subtype")).toString().equals("semester")) {
+                    sheetBinding.subtypeValue.setText("Semester");
                 } else {
-                    sheetbinding.subtypeContainer.setVisibility(View.GONE);
+                    sheetBinding.subtypeContainer.setVisibility(View.GONE);
                 }
             }
         } else {
-            sheetbinding.subtypeContainer.setVisibility(View.GONE);
+            sheetBinding.subtypeContainer.setVisibility(View.GONE);
         }
 		/*
 if (_item.containsKey("rating")) {
-sheetbinding.ratingContainer.setBackground(new GradientDrawable() { public GradientDrawable getIns(int a, int b) { this.setCornerRadius(a); this.setColor(b); return this; } }.getIns((int)360, 0xFFFFF3E0));
-sheetbinding.ratingTxt.setText(_item.get("rating").toString());
+sheetBinding.ratingContainer.setBackground(new GradientDrawable() { public GradientDrawable getIns(int a, int b) { this.setCornerRadius(a); this.setColor(b); return this; } }.getIns((int)360, 0xFFFFF3E0));
+sheetBinding.ratingTxt.setText(_item.get("rating").toString());
 } else {
-sheetbinding.ratingTitle.setVisibility(View.GONE);
-sheetbinding.ratingContainer.setVisibility(View.GONE);
+sheetBinding.ratingTitle.setVisibility(View.GONE);
+sheetBinding.ratingContainer.setVisibility(View.GONE);
 }
 */
-        if (_item.containsKey("date of upload")) {
-            sheetbinding.dateOfUploadValue.setText(formatTimeDifference(_item.get("date of upload").toString()));
-            sheetbinding.dateOfUploadValue.setBackground(new GradientDrawable() {
+        if (_item.containsKey("dateOfUpload")) {
+            sheetBinding.dateOfUploadValue.setText(formatTimeDifference(Objects.requireNonNull(_item.get("dateOfUpload")).toString()));
+            sheetBinding.dateOfUploadValue.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
@@ -525,76 +495,76 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
         } else {
-            sheetbinding.dateOfUploadTitle.setVisibility(View.GONE);
-            sheetbinding.dateOfUploadValue.setVisibility(View.GONE);
+            sheetBinding.dateOfUploadTitle.setVisibility(View.GONE);
+            sheetBinding.dateOfUploadValue.setVisibility(View.GONE);
         }
-        if (_item.containsKey("best choice")) {
-            if ((Boolean) _item.get("best choice")) {
-                sheetbinding.bestChoiceTag.setBackground(new GradientDrawable() {
+        if (_item.containsKey("isBestChoice")) {
+            if (Boolean.parseBoolean(Objects.requireNonNull(_item.get("isBestChoice")).toString())) {
+                sheetBinding.bestChoiceTag.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFF000000));
-                sheetbinding.bestChoiceTag.setVisibility(View.VISIBLE);
+                sheetBinding.bestChoiceTag.setVisibility(View.VISIBLE);
             } else {
-                sheetbinding.bestChoiceTag.setVisibility(View.GONE);
+                sheetBinding.bestChoiceTag.setVisibility(View.GONE);
             }
         } else {
-            sheetbinding.bestChoiceTag.setVisibility(View.GONE);
+            sheetBinding.bestChoiceTag.setVisibility(View.GONE);
         }
-        if (_item.containsKey("recommended")) {
-            if ((Boolean) _item.get("recommended")) {
-                sheetbinding.recommendedTag.setBackground(new GradientDrawable() {
+        if (_item.containsKey("isRecommended")) {
+            if (Boolean.parseBoolean(Objects.requireNonNull(_item.get("isRecommended")).toString())) {
+                sheetBinding.recommendedTag.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFF000000));
-                sheetbinding.recommendedTag.setVisibility(View.VISIBLE);
+                sheetBinding.recommendedTag.setVisibility(View.VISIBLE);
             } else {
-                sheetbinding.recommendedTag.setVisibility(View.GONE);
+                sheetBinding.recommendedTag.setVisibility(View.GONE);
             }
         } else {
-            sheetbinding.recommendedTag.setVisibility(View.GONE);
+            sheetBinding.recommendedTag.setVisibility(View.GONE);
         }
         if (_item.containsKey("price")) {
-            sheetbinding.cashValue.setBackground(new GradientDrawable() {
+            sheetBinding.cashValue.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            sheetbinding.coinsValue.setBackground(new GradientDrawable() {
+            sheetBinding.coinsValue.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            sheetbinding.cashValue.setText("₹".concat(String.valueOf(((Number) _item.get("price")).longValue())));
-            sheetbinding.coinsValue.setText(String.valueOf(((Number) _item.get("price")).longValue() * 5).concat(" coins"));
+            sheetBinding.cashValue.setText("₹".concat(String.valueOf(((Number) Objects.requireNonNull(_item.get("price"))).longValue())));
+            sheetBinding.coinsValue.setText(String.valueOf(((Number) Objects.requireNonNull(_item.get("price"))).longValue() * 5).concat(" coins"));
         } else {
-            sheetbinding.priceTitle.setVisibility(View.GONE);
-            sheetbinding.cashValue.setVisibility(View.GONE);
-            sheetbinding.coinsValue.setVisibility(View.GONE);
-            sheetbinding.slash.setVisibility(View.GONE);
+            sheetBinding.priceTitle.setVisibility(View.GONE);
+            sheetBinding.cashValue.setVisibility(View.GONE);
+            sheetBinding.coinsValue.setVisibility(View.GONE);
+            sheetBinding.slash.setVisibility(View.GONE);
         }
         resource_details_sheet.show();
     }
 
     public void loadCourses() {
-        if (jsonCourseData.isEmpty()) {
+        if (jsonCourseData == null || jsonCourseData.isEmpty()) {
             try {
-                InputStream is = getContext().getAssets().open("courses.json");
+                InputStream is = Objects.requireNonNull(getContext()).getAssets().open("courses.json");
                 int size = is.available();
                 byte[] buffer = new byte[size];
                 is.read(buffer);
                 is.close();
-                jsonCourseData = new String(buffer, "UTF-8");
+                jsonCourseData = new String(buffer, StandardCharsets.UTF_8);
             } catch (IOException ex) {
                 PrepNestUtil.showToast(requireContext(), ex.toString());
             }
@@ -614,12 +584,12 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
     public void navigateToResourceView(final HashMap<String, Object> _item) {
         if (_item.containsKey("type")) {
-            if (_item.get("type").toString().equals("paper")) {
+            if (Objects.requireNonNull(_item.get("type")).toString().equals("paper")) {
                 toImageView.setClass(requireContext(), ImageviewActivity.class);
-                toImageView.putExtra("id", _item.get("id").toString());
+                toImageView.putExtra("id", Objects.requireNonNull(_item.get("id")).toString());
                 startActivity(toImageView);
             } else {
-                toPDFView.putExtra("id", _item.get("id").toString());
+                toPDFView.putExtra("id", Objects.requireNonNull(_item.get("id")).toString());
                 startActivity(toPDFView);
             }
         }
@@ -656,6 +626,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
             for (String url : fileURLsList) {
                 String storagePath = extractStoragePathFromURL(url);
+                assert storagePath != null;
                 StorageReference fileRef = storage.getReference().child(storagePath);
 
                 staticLog.addLog("RESOURCE DOWNLOAD", "DOWNLOADING RESOURCE : ".concat(storagePath));
@@ -781,14 +752,14 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
             HashMap<String, Object> item = list.get(position);
 
-            if (item.containsKey("resource title")) {
-                holder.binding.title.setText(item.get("resource title").toString());
+            if (item.containsKey("resourceTitle")) {
+                holder.binding.title.setText(Objects.requireNonNull(item.get("resourceTitle")).toString());
             } else {
                 holder.binding.title.setText("No name");
             }
 
             if (item.containsKey("type")) {
-                if (item.get("type").toString().equals("paper")) {
+                if (Objects.requireNonNull(item.get("type")).toString().equals("paper")) {
                     holder.binding.image.setImageResource(R.drawable.previous_paper);
                 } else {
                     holder.binding.image.setImageResource(R.drawable.short_notes);
@@ -796,8 +767,8 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             } else {
                 holder.binding.image.setVisibility(View.INVISIBLE);
             }
-            if (item.containsKey("best choice")) {
-                if (item.get("best choice").toString().equals("true")) {
+            if (item.containsKey("isBestChoice")) {
+                if (Boolean.parseBoolean(Objects.requireNonNull(item.get("isBestChoice")).toString())) {
                     holder.binding.bestChoiceTag.setVisibility(View.VISIBLE);
                 } else {
                     holder.binding.bestChoiceTag.setVisibility(View.GONE);
@@ -805,8 +776,8 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             } else {
                 holder.binding.bestChoiceTag.setVisibility(View.GONE);
             }
-            if (item.containsKey("recommended")) {
-                if (item.get("recommended").toString().equals("true")) {
+            if (item.containsKey("isRecommended")) {
+                if (Boolean.parseBoolean(Objects.requireNonNull(item.get("isRecommended")).toString())) {
                     holder.binding.recommendedTag.setVisibility(View.VISIBLE);
                 } else {
                     holder.binding.recommendedTag.setVisibility(View.GONE);
@@ -816,13 +787,13 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             }
 
             if (item.containsKey("subject")) {
-                holder.binding.subjectNameTxt.setText(item.get("subject").toString());
+                holder.binding.subjectNameTxt.setText(Objects.requireNonNull(item.get("subject")).toString());
                 holder.binding.subjectNameTxt.setVisibility(View.VISIBLE);
 
                 ViewGroup.MarginLayoutParams sessionTxtParams =
                         (ViewGroup.MarginLayoutParams) holder.binding.sessionTxt.getLayoutParams();
 
-                if (item.get("subject").toString().length() >= 20) {
+                if (Objects.requireNonNull(item.get("subject")).toString().length() >= 20) {
                     holder.binding.subAndSessionContainer.setOrientation(LinearLayout.VERTICAL);
                     sessionTxtParams.setMargins(0, (int) convertToDp(8), 0, 0);
                 } else {
@@ -835,25 +806,25 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             }
 
             if (item.containsKey("session")) {
-                holder.binding.sessionTxt.setText(item.get("session").toString());
+                holder.binding.sessionTxt.setText(Objects.requireNonNull(item.get("session")).toString());
                 holder.binding.sessionTxt.setVisibility(View.VISIBLE);
             } else {
                 holder.binding.sessionTxt.setVisibility(View.GONE);
             }
 
 
-            ViewGroup.MarginLayoutParams paramscontainer =
+            ViewGroup.MarginLayoutParams paramsContainer =
                     (ViewGroup.MarginLayoutParams) holder.binding.container.getLayoutParams();
 
             if (position == (list.size() - 1)) {
-                paramscontainer.setMargins(
+                paramsContainer.setMargins(
                         (int) convertToDp(20),
                         (int) convertToDp(10),
                         (int) convertToDp(20),
                         (int) convertToDp(10)
                 );
             } else {
-                paramscontainer.setMargins(
+                paramsContainer.setMargins(
                         (int) convertToDp(20),
                         (int) convertToDp(10),
                         (int) convertToDp(20),
@@ -861,15 +832,17 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 );
             }
 
-            paramscontainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
-            paramscontainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            paramsContainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            paramsContainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
 
-            holder.binding.container.setLayoutParams(paramscontainer);
+            holder.binding.container.setLayoutParams(paramsContainer);
 
             holder.binding.iconMoreOptions.setOnClickListener(v -> {
                 int pos = holder.getAdapterPosition();
                 if (pos != RecyclerView.NO_POSITION && listener != null) {
-                    listener.showOptions(list.get(pos));
+                    HashMap<String, Object> itemTemp = list.get(pos);
+                    itemTemp.put("position", pos);
+                    listener.showOptions(itemTemp);
                 }
             });
 
@@ -895,6 +868,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
         public class ViewHolder extends RecyclerView.ViewHolder {
             ResourceItemCardFullBinding binding;
+
             public ViewHolder(ResourceItemCardFullBinding binding) {
                 super(binding.getRoot());
                 this.binding = binding;
@@ -933,6 +907,5 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
         public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
             return oldList.get(oldItemPosition).equals(newList.get(newItemPosition));
         }
-
     }
 }

@@ -179,6 +179,7 @@ public class InfoviewActivity extends AppCompatActivity {
 
         public class ViewHolder extends RecyclerView.ViewHolder {
             InformationViewLayoutBinding binding;
+
             public ViewHolder(InformationViewLayoutBinding binding) {
                 super(binding.getRoot());
                 this.binding = binding;

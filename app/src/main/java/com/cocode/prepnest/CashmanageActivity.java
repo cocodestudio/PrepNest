@@ -16,8 +16,6 @@ import com.cocode.prepnest.databinding.RequestPayoutBinding;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.LoadAdError;
 import com.google.android.gms.ads.MobileAds;
-import com.google.android.gms.ads.OnUserEarnedRewardListener;
-import com.google.android.gms.ads.rewarded.RewardItem;
 import com.google.android.gms.ads.rewarded.RewardedAd;
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -34,6 +32,7 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -48,8 +47,8 @@ public class CashmanageActivity extends AppCompatActivity {
 
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
     private final DatabaseReference users = FirebaseDatabase.getInstance().getReference("users");
-    private final DatabaseReference requests = FirebaseDatabase.getInstance().getReference("requests/payout_requests");
-    private final DatabaseReference transaction_history = FirebaseDatabase.getInstance().getReference("transactions_history");
+    private final DatabaseReference requests = FirebaseDatabase.getInstance().getReference("requests/payoutRequests");
+    private final DatabaseReference transactionHistory = FirebaseDatabase.getInstance().getReference("transactionsHistory");
     private final Intent toTransactionHistory = new Intent();
     private final Intent toAddCash = new Intent();
     private RewardedAd rewardedAd;
@@ -60,7 +59,22 @@ public class CashmanageActivity extends AppCompatActivity {
     private String keyRequest = "";
     private String keyHistory = "";
     private NetworkMonitor networkMonitor;
-    private com.google.android.material.bottomsheet.BottomSheetDialog request_payout_sheet;
+    private com.google.android.material.bottomsheet.BottomSheetDialog requestPayoutSheet;
+
+    private static long getMoney(Object value) {
+        long money;
+
+        if (value instanceof Long) {
+            money = (Long) value + 5;
+        } else if (value instanceof Double) {
+            money = ((Double) value).longValue() + 5;
+        } else if (value instanceof Integer) {
+            money = ((Integer) value).longValue() + 5;
+        } else {
+            money = 0L; // Or handle error
+        }
+        return money;
+    }
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -82,7 +96,7 @@ public class CashmanageActivity extends AppCompatActivity {
 
         binding.addCashOp.setOnClickListener(_view -> {
             toAddCash.setClass(CashmanageActivity.this, AddcashActivity.class);
-            toAddCash.putExtra("name", userData.get("name").toString());
+            toAddCash.putExtra("name", Objects.requireNonNull(userData.get("name")).toString());
             startActivity(toAddCash);
             overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
         });
@@ -101,9 +115,7 @@ public class CashmanageActivity extends AppCompatActivity {
             overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
         });
 
-        binding.earnCoinsOp.setOnClickListener(_view -> {
-            showRewardedAds();
-        });
+        binding.earnCoinsOp.setOnClickListener(_view -> showRewardedAds());
 
         binding.backIcon.setOnClickListener(_view -> {
             finish();
@@ -159,13 +171,10 @@ public class CashmanageActivity extends AppCompatActivity {
         if (rewardedAd != null) {
             rewardedAd.show(
                     this,
-                    new OnUserEarnedRewardListener() {
-                        @Override
-                        public void onUserEarnedReward(@NonNull RewardItem rewardItem) {
-                            PrepNestUtil.showLoadingDialog(CashmanageActivity.this, true);
-                            addRewardToUser();
-                            loadRewardedAd();
-                        }
+                    rewardItem -> {
+                        PrepNestUtil.showLoadingDialog(CashmanageActivity.this, true);
+                        addRewardToUser();
+                        loadRewardedAd();
                     }
             );
         } else {
@@ -185,7 +194,7 @@ public class CashmanageActivity extends AppCompatActivity {
                 // Prepare JSON payload
                 Map<String, Object> data = new HashMap<>();
                 data.put("userId", user.getUid());
-                data.put("timestamp", String.valueOf(System.currentTimeMillis()));
+                data.put("timestamp", System.currentTimeMillis());
 
                 // Convert to JSON string
                 JSONObject json = new JSONObject(data);
@@ -218,17 +227,7 @@ public class CashmanageActivity extends AppCompatActivity {
                                 PrepNestUtil.showToast(CashmanageActivity.this, "Reward added successfully");
                                 if (userData.containsKey("coins")) {
                                     Object value = userData.get("coins");
-                                    long money;
-
-                                    if (value instanceof Long) {
-                                        money = (Long) value + 5;
-                                    } else if (value instanceof Double) {
-                                        money = ((Double) value).longValue() + 5;
-                                    } else if (value instanceof Integer) {
-                                        money = ((Integer) value).longValue() + 5;
-                                    } else {
-                                        money = 0L; // Or handle error
-                                    }
+                                    long money = getMoney(value);
                                     userData.put("coins", money);
                                     binding.coinAmountTxt.setText(String.valueOf(money).concat(" coins"));
                                 } else {
@@ -281,6 +280,7 @@ public class CashmanageActivity extends AppCompatActivity {
             userData.clear();
             userData = new Gson().fromJson(getIntent().getStringExtra("user"), new TypeToken<HashMap<String, Object>>() {
             }.getType());
+            assert userData != null;
             if (userData.containsKey("coins")) {
                 Object value = userData.get("coins");
                 long money;
@@ -326,12 +326,12 @@ public class CashmanageActivity extends AppCompatActivity {
 
 
     public void showRequestPayoutSheet() {
-        request_payout_sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(CashmanageActivity.this);
-        RequestPayoutBinding sheetbinding = RequestPayoutBinding.inflate(getLayoutInflater());
+        requestPayoutSheet = new com.google.android.material.bottomsheet.BottomSheetDialog(CashmanageActivity.this);
+        RequestPayoutBinding sheetBinding = RequestPayoutBinding.inflate(getLayoutInflater());
 
-        request_payout_sheet.setContentView(sheetbinding.getRoot());
+        requestPayoutSheet.setContentView(sheetBinding.getRoot());
 
-        request_payout_sheet.setOnShowListener(dialog -> {
+        requestPayoutSheet.setOnShowListener(dialog -> {
             BottomSheetDialog d = (BottomSheetDialog) dialog;
             View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheet != null) {
@@ -343,53 +343,55 @@ public class CashmanageActivity extends AppCompatActivity {
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor("#FFFFFF"));
         gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-        sheetbinding.container.setBackground(gd);
-        PrepNestUtil.roundViewWithRipple(sheetbinding.amount1Container, "#FAFAFA", 15, 0, "#000000", "#E0E0E0");
-        PrepNestUtil.roundViewWithRipple(sheetbinding.amount2Container, "#FAFAFA", 15, 0, "#000000", "#E0E0E0");
-        PrepNestUtil.roundViewWithRipple(sheetbinding.amount3Container, "#FAFAFA", 15, 0, "#000000", "#E0E0E0");
-        sheetbinding.amountEdittext.setFocusableInTouchMode(true);
-        sheetbinding.amount1Container.setOnClickListener(_view -> {
-            sheetbinding.amountEdittext.setText(sheetbinding.amountTxt1.getText().toString());
-            sheetbinding.amountEdittext.setSelection(sheetbinding.amountEdittext.getText().toString().length());
+        sheetBinding.container.setBackground(gd);
+        PrepNestUtil.roundViewWithRipple(sheetBinding.amount1Container, "#FAFAFA", 15, 0, "#000000", "#E0E0E0");
+        PrepNestUtil.roundViewWithRipple(sheetBinding.amount2Container, "#FAFAFA", 15, 0, "#000000", "#E0E0E0");
+        PrepNestUtil.roundViewWithRipple(sheetBinding.amount3Container, "#FAFAFA", 15, 0, "#000000", "#E0E0E0");
+        sheetBinding.amountEdittext.setFocusableInTouchMode(true);
+        sheetBinding.amount1Container.setOnClickListener(_view -> {
+            sheetBinding.amountEdittext.setText(sheetBinding.amountTxt1.getText().toString());
+            sheetBinding.amountEdittext.setSelection(sheetBinding.amountEdittext.getText().toString().length());
         });
-        sheetbinding.amount2Container.setOnClickListener(_view -> {
-            sheetbinding.amountEdittext.setText(sheetbinding.amountTxt2.getText().toString());
-            sheetbinding.amountEdittext.setSelection(sheetbinding.amountEdittext.getText().toString().length());
+        sheetBinding.amount2Container.setOnClickListener(_view -> {
+            sheetBinding.amountEdittext.setText(sheetBinding.amountTxt2.getText().toString());
+            sheetBinding.amountEdittext.setSelection(sheetBinding.amountEdittext.getText().toString().length());
         });
-        sheetbinding.amount3Container.setOnClickListener(_view -> {
-            sheetbinding.amountEdittext.setText(sheetbinding.amountTxt3.getText().toString());
-            sheetbinding.amountEdittext.setSelection(sheetbinding.amountEdittext.getText().toString().length());
+        sheetBinding.amount3Container.setOnClickListener(_view -> {
+            sheetBinding.amountEdittext.setText(sheetBinding.amountTxt3.getText().toString());
+            sheetBinding.amountEdittext.setSelection(sheetBinding.amountEdittext.getText().toString().length());
         });
-        sheetbinding.sendReqBtn.setOnClickListener(_view -> {
-            PrepNestUtil.TransitionManager(sheetbinding.container, 150);
-            if (sheetbinding.amountEdittext.getText().toString().trim().isEmpty()) {
+        sheetBinding.sendReqBtn.setOnClickListener(_view -> {
+            PrepNestUtil.TransitionManager(sheetBinding.container, 150);
+            if (sheetBinding.amountEdittext.getText().toString().trim().isEmpty()) {
                 PrepNestUtil.showToast(CashmanageActivity.this, "Enter amount");
             } else {
-                if ((Double.parseDouble(sheetbinding.amountEdittext.getText().toString().trim()) > Double.parseDouble(userData.get("cash").toString())) || (Double.parseDouble(sheetbinding.amountEdittext.getText().toString().trim()) < 0)) {
+                if ((Double.parseDouble(sheetBinding.amountEdittext.getText().toString().trim()) > Double.parseDouble(Objects.requireNonNull(userData.get("cash")).toString())) || (Double.parseDouble(sheetBinding.amountEdittext.getText().toString().trim()) < 0)) {
                     PrepNestUtil.showToast(CashmanageActivity.this, "Insufficient balance");
                 } else {
-                    if (Double.parseDouble(sheetbinding.amountEdittext.getText().toString().trim()) < 10) {
-                        PrepNestUtil.showToast(CashmanageActivity.this, "Enter atleast ₹10");
+                    if (Double.parseDouble(sheetBinding.amountEdittext.getText().toString().trim()) < 10) {
+                        PrepNestUtil.showToast(CashmanageActivity.this, "Enter at least ₹10");
                     } else {
-                        if (userData.containsKey("phone number")) {
-                            sendPayoutRequest(Double.parseDouble(sheetbinding.amountEdittext.getText().toString().trim()));
+                        if (userData.containsKey("phoneNumber")) {
+                            sendPayoutRequest(Double.parseDouble(sheetBinding.amountEdittext.getText().toString().trim()));
                         } else {
                             PrepNestUtil.showToast(CashmanageActivity.this, "Link your phone number first!");
-                            request_payout_sheet.dismiss();
+                            requestPayoutSheet.dismiss();
                         }
                     }
                 }
             }
         });
-        request_payout_sheet.setCancelable(true);
-        request_payout_sheet.show();
+        requestPayoutSheet.setCancelable(true);
+        requestPayoutSheet.show();
     }
 
 
     public void sendPayoutRequest(final double _amount) {
         PrepNestUtil.showLoadingDialog(this, true);
         long currentTimeInMS = System.currentTimeMillis();
-        newAmount = (Double) userData.get("cash") - _amount;
+
+        newAmount = ((Number) Objects.requireNonNull(userData.get("cash"))).doubleValue() - _amount;
+        assert auth.getCurrentUser() != null;
         users.child(auth.getCurrentUser().getUid()).child("cash").setValue(newAmount).addOnCompleteListener(userUpdateTask -> {
             if (userUpdateTask.isSuccessful()) {
                 binding.cashAmountTxt.setText("₹ ".concat(String.valueOf((long) (newAmount))));
@@ -397,27 +399,27 @@ public class CashmanageActivity extends AppCompatActivity {
                 keyRequest = requestRef.push().getKey();
                 dataMap = new HashMap<>();
                 dataMap.put("amount", _amount);
-                dataMap.put("timestamp", String.valueOf(currentTimeInMS));
+                dataMap.put("timestamp", currentTimeInMS);
                 requestRef.child(keyRequest).setValue(dataMap).addOnCompleteListener(requestTask -> {
                     if (requestTask.isSuccessful()) {
-                        DatabaseReference historyRef = transaction_history.child(auth.getCurrentUser().getUid());
+                        DatabaseReference historyRef = transactionHistory.child(auth.getCurrentUser().getUid());
                         keyHistory = historyRef.push().getKey();
                         dataMap = new HashMap<>();
                         dataMap.put("type", "cash_deduct");
                         dataMap.put("amount", _amount);
-                        dataMap.put("timestamp", String.valueOf(currentTimeInMS));
+                        dataMap.put("timestamp", currentTimeInMS);
                         dataMap.put("status", "pending");
                         historyRef.child(keyHistory).setValue(dataMap).addOnCompleteListener(historyTask -> {
                             if (historyTask.isSuccessful()) {
-                                requestRef.child(keyRequest).child("history id").setValue(keyHistory);
+                                requestRef.child(keyRequest).child("historyId").setValue(keyHistory);
                                 PrepNestUtil.showToast(CashmanageActivity.this, "Request sent successfully.");
                                 PrepNestUtil.showLoadingDialog(CashmanageActivity.this, false);
-                                if (request_payout_sheet != null && request_payout_sheet.isShowing()) {
-                                    request_payout_sheet.dismiss();
+                                if (requestPayoutSheet != null && requestPayoutSheet.isShowing()) {
+                                    requestPayoutSheet.dismiss();
                                 }
                                 userData.put("cash", newAmount);
                             } else {
-                                PrepNestUtil.showToast(CashmanageActivity.this, "An unknown error occurred : ".concat(historyTask.getException().toString()));
+                                PrepNestUtil.showToast(CashmanageActivity.this, "An unknown error occurred : ".concat(Objects.requireNonNull(historyTask.getException()).toString()));
                                 PrepNestUtil.showLoadingDialog(CashmanageActivity.this, false);
                             }
                         });
@@ -427,7 +429,7 @@ public class CashmanageActivity extends AppCompatActivity {
                     }
                 });
             } else {
-                PrepNestUtil.showToast(CashmanageActivity.this, "An unknown error occurred : ".concat(userUpdateTask.getException().toString()));
+                PrepNestUtil.showToast(CashmanageActivity.this, "An unknown error occurred : ".concat(Objects.requireNonNull(userUpdateTask.getException()).toString()));
                 PrepNestUtil.showLoadingDialog(this, false);
             }
         });

@@ -2,9 +2,9 @@ package com.cocode.prepnest;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.ImageDecoder;
 import android.net.Uri;
 import android.os.Bundle;
-import android.provider.MediaStore;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
@@ -17,6 +17,7 @@ import com.isseiaoki.simplecropview.CropImageView;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Objects;
 
 
 public class ImagecropActivity extends AppCompatActivity {
@@ -43,7 +44,7 @@ public class ImagecropActivity extends AppCompatActivity {
         binding.cropBtn.setOnClickListener(_view -> {
             Uri savedUri = saveCroppedImage(binding.cropImageView.getCroppedBitmap());
             Intent resultIntent = new Intent();
-            resultIntent.putExtra("croppedImageUri", savedUri.toString());
+            resultIntent.putExtra("croppedImageUri", Objects.requireNonNull(savedUri).toString());
             setResult(RESULT_OK, resultIntent);
             overridePendingTransition(R.anim.slide_in_left_fade, R.anim.slide_out_right_fade);
             finish();
@@ -73,9 +74,12 @@ public class ImagecropActivity extends AppCompatActivity {
 
     public void initializeImageCropper() {
         Uri imageUri = Uri.parse(getIntent().getStringExtra("imageUri"));
+
         try {
-            Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
+            ImageDecoder.Source source = ImageDecoder.createSource(getContentResolver(), imageUri);
+            Bitmap bitmap = ImageDecoder.decodeBitmap(source);
             binding.cropImageView.setImageBitmap(bitmap);
+
         } catch (IOException e) {
             e.printStackTrace();
             PrepNestUtil.showToast(this, "Failed to load image");

@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -50,7 +51,7 @@ public class AddreferralActivity extends AppCompatActivity {
     private final Intent toHomePage = new Intent();
     private AddreferralBinding binding;
     private HashMap<String, Object> map = new HashMap<>();
-    private String tempid = "";
+    private String tempId = "";
     private HashMap<String, Object> otherUserData = new HashMap<>();
     private String currentUID = "";
     private NetworkMonitor networkMonitor;
@@ -83,7 +84,8 @@ public class AddreferralActivity extends AppCompatActivity {
                 if (validateReferralCode(binding.edittext.getText().toString().trim())) {
                     if (PrepNestUtil.isConnected(AddreferralActivity.this)) {
                         PrepNestUtil.showLoadingDialog(AddreferralActivity.this, true);
-                        addReferCF(auth.getCurrentUser().getUid(), tempid);
+                        assert auth.getCurrentUser() != null;
+                        addReferCF(auth.getCurrentUser().getUid(), tempId);
                     } else {
                         com.google.android.material.snackbar.Snackbar.make(binding.wrapperLayout, "No internet connection", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).setAction("", _view1 -> {
 
@@ -99,10 +101,7 @@ public class AddreferralActivity extends AppCompatActivity {
         binding.edittext.addTextChangedListener(new TextWatcher() {
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (binding.errorTxt.getVisibility() == View.VISIBLE) {
-                    PrepNestUtil.TransitionManager(binding.wrapperLayout, 150);
-                    binding.errorTxt.setVisibility(View.INVISIBLE);
-                }
+
             }
 
             @Override
@@ -113,6 +112,10 @@ public class AddreferralActivity extends AppCompatActivity {
             @Override
 
             public void afterTextChanged(Editable s) {
+                if (binding.errorTxt.getVisibility() == View.VISIBLE) {
+                    PrepNestUtil.TransitionManager(binding.wrapperLayout, 150);
+                    binding.errorTxt.setVisibility(View.INVISIBLE);
+                }
             }
         });
 
@@ -165,35 +168,36 @@ public class AddreferralActivity extends AppCompatActivity {
 
     public void getAllUserIDs() {
         PrepNestUtil.showLoadingDialog(this, true);
-        users.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+        users
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
 
-                for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
-                    String key = userSnapshot.getKey();
-                    userKeys.add(key);
-                }
-                PrepNestUtil.showLoadingDialog(AddreferralActivity.this, false);
+                        for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
+                            String key = userSnapshot.getKey();
+                            userKeys.add(key);
+                        }
+                        PrepNestUtil.showLoadingDialog(AddreferralActivity.this, false);
 
-            }
+                    }
 
-            @Override
-            public void onCancelled(@NonNull DatabaseError databaseError) {
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
 
-                PrepNestUtil.showLoadingDialog(AddreferralActivity.this, false);
-                PrepNestUtil.showToast(AddreferralActivity.this, "Database error: " + databaseError.getMessage());
+                        PrepNestUtil.showLoadingDialog(AddreferralActivity.this, false);
+                        PrepNestUtil.showToast(AddreferralActivity.this, "Database error: " + databaseError.getMessage());
 
-            }
-        });
+                    }
+                });
 
     }
 
 
     public boolean validateReferralCode(final String _code) {
-        if (!FirebaseAuth.getInstance().getCurrentUser().getUid().substring(0, 7).equals(_code)) {
+        if (!Objects.requireNonNull(FirebaseAuth.getInstance().getCurrentUser()).getUid().substring(0, 7).equals(_code)) {
             for (int i = 0; i < userKeys.size(); i++) {
                 if (userKeys.get(i).substring(0, 7).equals(_code)) {
-                    tempid = userKeys.get(i);
+                    tempId = userKeys.get(i);
                     return true;
                 }
             }
@@ -298,7 +302,7 @@ public class AddreferralActivity extends AppCompatActivity {
 
 
     public void addRefer() {
-        users.child(tempid).addListenerForSingleValueEvent(new ValueEventListener() {
+        users.child(tempId).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 otherUserData = dataSnapshot.getValue(new GenericTypeIndicator<>() {
@@ -314,10 +318,10 @@ public class AddreferralActivity extends AppCompatActivity {
                     otherUserRefers.add(currentUID);
                     map = new HashMap<>();
                     map.put("referred users", new Gson().toJson(otherUserRefers));
-                    users.child(tempid).updateChildren(map).addOnCompleteListener(otask -> {
+                    users.child(tempId).updateChildren(map).addOnCompleteListener(otask -> {
                         if (otask.isSuccessful()) {
                             map = new HashMap<>();
-                            map.put("referred by", tempid);
+                            map.put("referred by", tempId);
                             users.child(auth.getCurrentUser().getUid()).updateChildren(map);
                         } else {
                             PrepNestUtil.showToast(AddreferralActivity.this, "Error: try again");

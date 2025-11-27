@@ -1,6 +1,8 @@
 package com.cocode.prepnest;
 
+import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -39,11 +41,11 @@ import com.google.gson.reflect.TypeToken;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -62,6 +64,7 @@ public class ResourcesActivity extends AppCompatActivity {
     private final DatabaseReference users = firebase_database.getReference("users");
     private final ArrayList<HashMap<String, Object>> resourcesList = new ArrayList<>();
     private final Intent toManageResources = new Intent();
+    private final Gson gson = new Gson();
     private ResourcesBinding binding;
     private HashMap<String, Object> filterMap = new HashMap<>();
     private HashMap<String, Object> userData = new HashMap<>();
@@ -70,18 +73,25 @@ public class ResourcesActivity extends AppCompatActivity {
     private ArrayList<String> wishlistedResources = new ArrayList<>();
     private ArrayList<String> purchasedResources = new ArrayList<>();
     private ArrayList<String> uploadedResources = new ArrayList<>();
+    private SharedPreferences cachedData;
+
+    @SuppressWarnings("unchecked")
+    public static <T> T getValue(HashMap<String, Object> map, String key) {
+        return (T) map.get(key);
+    }
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
         super.onCreate(_savedInstanceState);
         binding = ResourcesBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        initialize(_savedInstanceState);
+        initialize();
         FirebaseApp.initializeApp(this);
         initializeLogic();
     }
 
-    private void initialize(Bundle _savedInstanceState) {
+    private void initialize() {
+        cachedData = getSharedPreferences("userCachedData", Activity.MODE_PRIVATE);
 
         binding.backIcon.setOnClickListener(_view -> {
             finish();
@@ -95,9 +105,9 @@ public class ResourcesActivity extends AppCompatActivity {
         networkMonitor = new NetworkMonitor(this);
         designUI();
         attachAdapterToRecyclerView();
-        getUserData();
+        loadUserDataFromSP();
         setDefaultFilters();
-        loadResources();
+        loadResourcesFromSP();
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
@@ -133,7 +143,6 @@ public class ResourcesActivity extends AppCompatActivity {
         PrepNestUtil.changeNavBarColor(this, true);
     }
 
-
     public double convertToDp(final double _pixels) {
         return TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_DIP,
@@ -141,15 +150,14 @@ public class ResourcesActivity extends AppCompatActivity {
                 getResources().getDisplayMetrics());
     }
 
-
     public void showFilterSheet() {
-        com.google.android.material.bottomsheet.BottomSheetDialog filter_sheet;
-        filter_sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(ResourcesActivity.this);
-        ResourcesFilterSheetBinding sheetbinding = ResourcesFilterSheetBinding.inflate(getLayoutInflater());
+        com.google.android.material.bottomsheet.BottomSheetDialog filterSheet;
+        filterSheet = new com.google.android.material.bottomsheet.BottomSheetDialog(ResourcesActivity.this);
+        ResourcesFilterSheetBinding sheetBinding = ResourcesFilterSheetBinding.inflate(getLayoutInflater());
 
-        filter_sheet.setContentView(sheetbinding.getRoot());
+        filterSheet.setContentView(sheetBinding.getRoot());
 
-        filter_sheet.setOnShowListener(dialog -> {
+        filterSheet.setOnShowListener(dialog -> {
             BottomSheetDialog d = (BottomSheetDialog) dialog;
             View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheet != null) {
@@ -161,115 +169,114 @@ public class ResourcesActivity extends AppCompatActivity {
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor("#FFFFFF"));
         gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-        sheetbinding.container.setBackground(gd);
+        sheetBinding.container.setBackground(gd);
         if (filterMap.containsKey("date")) {
             if (Objects.requireNonNull(filterMap.get("date")).toString().equals("recent")) {
-                setFilterOption(sheetbinding.dateSortRecentTxt, sheetbinding.dateSortOldTxt, null);
+                setFilterOption(sheetBinding.dateSortRecentTxt, sheetBinding.dateSortOldTxt, null);
             } else {
                 if (Objects.requireNonNull(filterMap.get("date")).toString().equals("old")) {
-                    setFilterOption(sheetbinding.dateSortOldTxt, sheetbinding.dateSortRecentTxt, null);
+                    setFilterOption(sheetBinding.dateSortOldTxt, sheetBinding.dateSortRecentTxt, null);
                 } else {
                     filterMap.put("date", "recent");
-                    setFilterOption(sheetbinding.dateSortRecentTxt, sheetbinding.dateSortOldTxt, null);
+                    setFilterOption(sheetBinding.dateSortRecentTxt, sheetBinding.dateSortOldTxt, null);
                 }
             }
         } else {
             filterMap.put("date", "recent");
-            setFilterOption(sheetbinding.dateSortRecentTxt, sheetbinding.dateSortOldTxt, null);
+            setFilterOption(sheetBinding.dateSortRecentTxt, sheetBinding.dateSortOldTxt, null);
         }
         if (filterMap.containsKey("type")) {
             if (Objects.requireNonNull(filterMap.get("type")).toString().equals("both")) {
-                setFilterOption(sheetbinding.typeSortBothTxt, sheetbinding.typeSortMidTxt, sheetbinding.typeSortSemTxt);
+                setFilterOption(sheetBinding.typeSortBothTxt, sheetBinding.typeSortMidTxt, sheetBinding.typeSortSemTxt);
             } else {
                 if (Objects.requireNonNull(filterMap.get("type")).toString().equals("sem")) {
-                    setFilterOption(sheetbinding.typeSortSemTxt, sheetbinding.typeSortMidTxt, sheetbinding.typeSortBothTxt);
+                    setFilterOption(sheetBinding.typeSortSemTxt, sheetBinding.typeSortMidTxt, sheetBinding.typeSortBothTxt);
                 } else {
                     if (Objects.requireNonNull(filterMap.get("type")).toString().equals("mid")) {
-                        setFilterOption(sheetbinding.typeSortMidTxt, sheetbinding.typeSortSemTxt, sheetbinding.typeSortBothTxt);
+                        setFilterOption(sheetBinding.typeSortMidTxt, sheetBinding.typeSortSemTxt, sheetBinding.typeSortBothTxt);
                     } else {
                         filterMap.put("type", "both");
-                        setFilterOption(sheetbinding.typeSortBothTxt, sheetbinding.typeSortMidTxt, sheetbinding.typeSortSemTxt);
+                        setFilterOption(sheetBinding.typeSortBothTxt, sheetBinding.typeSortMidTxt, sheetBinding.typeSortSemTxt);
                     }
                 }
             }
         } else {
             filterMap.put("type", "both");
-            setFilterOption(sheetbinding.typeSortBothTxt, sheetbinding.typeSortMidTxt, sheetbinding.typeSortSemTxt);
+            setFilterOption(sheetBinding.typeSortBothTxt, sheetBinding.typeSortMidTxt, sheetBinding.typeSortSemTxt);
         }
 		/*
 if (filterMap.containsKey("rating")) {
 if (filterMap.get("rating").toString().equals("high")) {
-setFilterOption(sheetbinding.ratingSortHighTxt, sheetbinding.ratingSortLowTxt, null);
+setFilterOption(sheetBinding.ratingSortHighTxt, sheetBinding.ratingSortLowTxt, null);
 } else {
 if (filterMap.get("rating").toString().equals("low")) {
-setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, null);
+setFilterOption(sheetBinding.ratingSortLowTxt, sheetBinding.ratingSortHighTxt, null);
 } else {
 filterMap.put("rating", "null");
-setFilterOption(sheetbinding.ratingSortHighTxt, sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt);
+setFilterOption(sheetBinding.ratingSortHighTxt, sheetBinding.ratingSortLowTxt, sheetBinding.ratingSortHighTxt);
 }
 }
 } else {
 filterMap.put("rating", "null");
-setFilterOption(sheetbinding.ratingSortHighTxt, sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt);
+setFilterOption(sheetBinding.ratingSortHighTxt, sheetBinding.ratingSortLowTxt, sheetBinding.ratingSortHighTxt);
 }
 */
-        PrepNestUtil.roundViewWithRipple(sheetbinding.btnApply, "#000000", 15, 0, "#000000", "#212121");
-        PrepNestUtil.roundViewWithRipple(sheetbinding.btnReset, "#F5F5F5", 15, 0, "#000000", "#E0E0E0");
-        sheetbinding.dateSortRecentTxt.setOnClickListener(_view -> {
+        PrepNestUtil.roundViewWithRipple(sheetBinding.btnApply, "#000000", 15, 0, "#000000", "#212121");
+        PrepNestUtil.roundViewWithRipple(sheetBinding.btnReset, "#F5F5F5", 15, 0, "#000000", "#E0E0E0");
+        sheetBinding.dateSortRecentTxt.setOnClickListener(_view -> {
             filterMap.put("date", "recent");
-            setFilterOption(sheetbinding.dateSortRecentTxt, sheetbinding.dateSortOldTxt, null);
+            setFilterOption(sheetBinding.dateSortRecentTxt, sheetBinding.dateSortOldTxt, null);
         });
-        sheetbinding.dateSortOldTxt.setOnClickListener(_view -> {
+        sheetBinding.dateSortOldTxt.setOnClickListener(_view -> {
             filterMap.put("date", "old");
-            setFilterOption(sheetbinding.dateSortOldTxt, sheetbinding.dateSortRecentTxt, null);
+            setFilterOption(sheetBinding.dateSortOldTxt, sheetBinding.dateSortRecentTxt, null);
         });
-        sheetbinding.typeSortSemTxt.setOnClickListener(_view -> {
+        sheetBinding.typeSortSemTxt.setOnClickListener(_view -> {
             filterMap.put("type", "sem");
-            setFilterOption(sheetbinding.typeSortSemTxt, sheetbinding.typeSortMidTxt, sheetbinding.typeSortBothTxt);
+            setFilterOption(sheetBinding.typeSortSemTxt, sheetBinding.typeSortMidTxt, sheetBinding.typeSortBothTxt);
         });
-        sheetbinding.typeSortMidTxt.setOnClickListener(_view -> {
+        sheetBinding.typeSortMidTxt.setOnClickListener(_view -> {
             filterMap.put("type", "mid");
-            setFilterOption(sheetbinding.typeSortMidTxt, sheetbinding.typeSortSemTxt, sheetbinding.typeSortBothTxt);
+            setFilterOption(sheetBinding.typeSortMidTxt, sheetBinding.typeSortSemTxt, sheetBinding.typeSortBothTxt);
         });
-        sheetbinding.typeSortBothTxt.setOnClickListener(_view -> {
-            setFilterOption(sheetbinding.typeSortBothTxt, sheetbinding.typeSortSemTxt, sheetbinding.typeSortMidTxt);
+        sheetBinding.typeSortBothTxt.setOnClickListener(_view -> {
+            setFilterOption(sheetBinding.typeSortBothTxt, sheetBinding.typeSortSemTxt, sheetBinding.typeSortMidTxt);
             filterMap.put("type", "both");
         });
 		/*
-sheetbinding.ratingSortHighTxt.setOnClickListener(new View.OnClickListener() {
+sheetBinding.ratingSortHighTxt.setOnClickListener(new View.OnClickListener() {
 @Override
 public void onClick(View _view) {
 filterMap.put("rating", "high");
-setFilterOption(sheetbinding.ratingSortHighTxt, sheetbinding.ratingSortLowTxt, null);
+setFilterOption(sheetBinding.ratingSortHighTxt, sheetBinding.ratingSortLowTxt, null);
 }
 });
-sheetbinding.ratingSortLowTxt.setOnClickListener(new View.OnClickListener() {
+sheetBinding.ratingSortLowTxt.setOnClickListener(new View.OnClickListener() {
 @Override
 public void onClick(View _view) {
 filterMap.put("rating", "low");
-setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, null);
+setFilterOption(sheetBinding.ratingSortLowTxt, sheetBinding.ratingSortHighTxt, null);
 }
 });
 */
-        sheetbinding.btnApply.setOnClickListener(_view -> {
+        sheetBinding.btnApply.setOnClickListener(_view -> {
             binding.progressLinear.setVisibility(View.VISIBLE);
             binding.emptyStateLinear.setVisibility(View.GONE);
             binding.itemsList.setVisibility(View.GONE);
-            loadResources();
-            filter_sheet.dismiss();
+            loadResourcesFromSP();
+            filterSheet.dismiss();
         });
-        sheetbinding.btnReset.setOnClickListener(_view -> {
+        sheetBinding.btnReset.setOnClickListener(_view -> {
             setDefaultFilters();
             binding.progressLinear.setVisibility(View.VISIBLE);
             binding.emptyStateLinear.setVisibility(View.GONE);
             binding.itemsList.setVisibility(View.GONE);
-            loadResources();
-            filter_sheet.dismiss();
+            loadResourcesFromSP();
+            filterSheet.dismiss();
         });
-        filter_sheet.setCancelable(true);
-        filter_sheet.show();
+        filterSheet.setCancelable(true);
+        filterSheet.show();
     }
-
 
     public void setFilterOption(final TextView op1, final TextView op2, final TextView op3) {
         PrepNestUtil.roundViewWithRipple(op1, "#000000", 360, 0, "#000000", "#212121");
@@ -282,7 +289,6 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
         }
     }
 
-
     public void setDefaultFilters() {
         filterMap = new HashMap<>();
         filterMap.put("date", "recent");
@@ -290,7 +296,7 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
         filterMap.put("rating", "null");
     }
 
-
+    @SuppressWarnings("unchecked")
     public void loadResources() {
         ValueEventListener listener = new ValueEventListener() {
             @Override
@@ -325,40 +331,55 @@ setFilterOption(sheetbinding.ratingSortLowTxt, sheetbinding.ratingSortHighTxt, n
             }
         };
 
-        resources.child(Objects.requireNonNull(userData.get("course id")).toString()).addListenerForSingleValueEvent(listener);
+        resources
+                .child(Objects.requireNonNull(userData.get("courseId")).toString())
+                .addListenerForSingleValueEvent(listener);
     }
 
-
-    public void getUserData() {
-        if (getIntent().hasExtra("user")) {
-            userData = new Gson().fromJson(getIntent().getStringExtra("user"), new TypeToken<HashMap<String, Object>>() {
-            }.getType());
-            assert userData != null;
-            if (userData.containsKey("wishlist")) {
-                wishlistedResources = new Gson().fromJson(Objects.requireNonNull(userData.get("wishlist")).toString(), new TypeToken<ArrayList<String>>() {
-                }.getType());
-            } else {
-                wishlistedResources = new ArrayList<>();
-            }
-            if (userData.containsKey("purchased resources")) {
-                purchasedResources = new Gson().fromJson(Objects.requireNonNull(userData.get("purchased resources")).toString(), new TypeToken<ArrayList<String>>() {
-                }.getType());
-            } else {
-                purchasedResources = new ArrayList<>();
-            }
-            if (userData.containsKey("uploaded resources")) {
-                uploadedResources = new Gson().fromJson(Objects.requireNonNull(userData.get("uploaded resources")).toString(), new TypeToken<ArrayList<String>>() {
-                }.getType());
-            } else {
-                uploadedResources = new ArrayList<>();
-            }
+    public void loadUserDataFromSP() {
+        if (cachedData.contains("userData")) {
+            Type type = new TypeToken<HashMap<String, Object>>() {
+            }.getType();
+            userData = gson.fromJson(cachedData.getString("userData", "{}"), type);
+            loadUserDataToUI();
         } else {
-            auth.signOut();
-            PrepNestUtil.showToast(this, "An unknown error occurred, please login again");
+            PrepNestUtil.showToast(this, "An unknown error occurred, restart the app");
             finishAffinity();
         }
     }
 
+    public void loadUserDataToUI() {
+        if (userData.containsKey("wishlist")) {
+            wishlistedResources = getValue(userData, "wishlist");
+        } else {
+            wishlistedResources = new ArrayList<>();
+        }
+        if (userData.containsKey("purchasedResources")) {
+            purchasedResources = getValue(userData, "purchasedResources");
+        } else {
+            purchasedResources = new ArrayList<>();
+        }
+        if (userData.containsKey("uploadedResources")) {
+            uploadedResources = getValue(userData, "uploadedResources");
+        } else {
+            uploadedResources = new ArrayList<>();
+        }
+    }
+
+    public void loadResourcesFromSP() {
+        if (cachedData.contains("resources")) {
+            resourcesList.clear();
+
+            Type type = new TypeToken<ArrayList<HashMap<String, Object>>>() {
+            }.getType();
+            ArrayList<HashMap<String, Object>> tempList = gson.fromJson(cachedData.getString("resources", "[]"), type);
+
+            tempList.removeIf(item -> !getTaggedResource(item));
+            filterResources(tempList);
+        } else {
+            loadResources();
+        }
+    }
 
     public void filterResources(final ArrayList<HashMap<String, Object>> list) {
         if (list.isEmpty()) {
@@ -413,20 +434,25 @@ ListMapUtils.sortListByKey(resourcesList, "rating", true, ListMapUtils.SortType.
     }
 
 
-    public boolean getRequiredResources(final HashMap<String, Object> _item) {
-        boolean matchesSemester = ((Number) (Objects.requireNonNull(_item.get("semester")))).intValue() <= (((Number) (Objects.requireNonNull(userData.get("semester")))).intValue() + 2);
-        boolean isActive = !_item.containsKey("discontinue") || Boolean.FALSE.equals(_item.get("discontinue"));
-        boolean tagMatches = true;
-        if (getIntent().hasExtra("tag type")) {
-            if (Objects.equals(getIntent().getStringExtra("tag type"), "recommended")) {
-                tagMatches = _item.containsKey("recommended") && Boolean.parseBoolean(Objects.requireNonNull(_item.get("recommended")).toString());
-            } else if (Objects.equals(getIntent().getStringExtra("tag type"), "best")) {
-                tagMatches = _item.containsKey("best choice") && Boolean.parseBoolean(Objects.requireNonNull(_item.get("best choice")).toString());
-            }
-        }
-        return matchesSemester && isActive && tagMatches;
+    public boolean getRequiredResources(final HashMap<String, Object> item) {
+        boolean matchesSemester = ((Number) (Objects.requireNonNull(item.get("semester")))).intValue() <= (((Number) (Objects.requireNonNull(userData.get("semester")))).intValue() + 2);
+        boolean isActive = !item.containsKey("isDiscontinue") || Boolean.FALSE.equals(item.get("isDiscontinue"));
+
+        return matchesSemester && isActive && getTaggedResource(item);
     }
 
+    public boolean getTaggedResource(final HashMap<String, Object> item) {
+        boolean tagMatches = true;
+        if (getIntent().hasExtra("tagType")) {
+            if (Objects.equals(getIntent().getStringExtra("tagType"), "isRecommended")) {
+                tagMatches = item.containsKey("isRecommended") && Boolean.parseBoolean(Objects.requireNonNull(item.get("isRecommended")).toString());
+            } else if (Objects.equals(getIntent().getStringExtra("tagType"), "isBestChoice")) {
+                tagMatches = item.containsKey("isBestChoice") && Boolean.parseBoolean(Objects.requireNonNull(item.get("isBestChoice")).toString());
+            }
+        }
+
+        return tagMatches;
+    }
 
     public void toggleEmptyState(final boolean _state) {
         binding.progressLinear.setVisibility(View.GONE);
@@ -448,13 +474,13 @@ ListMapUtils.sortListByKey(resourcesList, "rating", true, ListMapUtils.SortType.
 
 
     public void showPurchaseSheet(final HashMap<String, Object> resourceItem) {
-        com.google.android.material.bottomsheet.BottomSheetDialog resource_purchase_sheet;
-        resource_purchase_sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(ResourcesActivity.this);
-        ResourcePurchaseSheetLayoutBinding sheetbinding = ResourcePurchaseSheetLayoutBinding.inflate(getLayoutInflater());
+        com.google.android.material.bottomsheet.BottomSheetDialog resourcePurchaseSheet;
+        resourcePurchaseSheet = new com.google.android.material.bottomsheet.BottomSheetDialog(ResourcesActivity.this);
+        ResourcePurchaseSheetLayoutBinding sheetBinding = ResourcePurchaseSheetLayoutBinding.inflate(getLayoutInflater());
 
-        resource_purchase_sheet.setContentView(sheetbinding.getRoot());
+        resourcePurchaseSheet.setContentView(sheetBinding.getRoot());
 
-        resource_purchase_sheet.setOnShowListener(dialog -> {
+        resourcePurchaseSheet.setOnShowListener(dialog -> {
             BottomSheetDialog d = (BottomSheetDialog) dialog;
             View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheet != null) {
@@ -462,163 +488,168 @@ ListMapUtils.sortListByKey(resourcesList, "rating", true, ListMapUtils.SortType.
             }
         });
 
-        sheetbinding.radiogroup.setOnCheckedChangeListener((group, checkedId) -> {
-            PrepNestUtil.TransitionManager(sheetbinding.container, 150);
+        sheetBinding.radiogroup.setOnCheckedChangeListener((group, checkedId) -> {
+            PrepNestUtil.TransitionManager(sheetBinding.container, 150);
 
-            if (checkedId == sheetbinding.cashRadiobutton.getId()) {
+            if (checkedId == sheetBinding.cashRadiobutton.getId()) {
                 if (userData.containsKey("cash")) {
-                    sheetbinding.cashRadiobutton.setText("Cash (₹".concat(String.valueOf(((Number) Objects.requireNonNull(userData.get("cash"))).longValue()).concat(")")));
+                    sheetBinding.cashRadiobutton.setText("Cash (₹".concat(String.valueOf(((Number) Objects.requireNonNull(userData.get("cash"))).longValue()).concat(")")));
                     if (resourceItem.containsKey("price")) {
-                        sheetbinding.btnBuy.setText("Buy for ₹".concat(String.valueOf(((Number) Objects.requireNonNull(resourceItem.get("price"))).longValue())));
-                        sheetbinding.btnBuy.setEnabled(true);
-                        sheetbinding.btnBuy.setAlpha(1f);
+                        sheetBinding.btnBuy.setText("Buy for ₹".concat(String.valueOf(((Number) Objects.requireNonNull(resourceItem.get("price"))).longValue())));
+                        sheetBinding.btnBuy.setEnabled(true);
+                        sheetBinding.btnBuy.setAlpha(1f);
                     } else {
-                        resource_purchase_sheet.dismiss();
+                        resourcePurchaseSheet.dismiss();
                         PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred, please login again!");
                         auth.signOut();
                         finishAffinity();
                     }
                 } else {
-                    sheetbinding.cashRadiobutton.setText("Cash (₹0)");
-                    sheetbinding.btnBuy.setText("Buy");
-                    sheetbinding.btnBuy.setEnabled(false);
-                    sheetbinding.btnBuy.setAlpha(0.7f);
+                    sheetBinding.cashRadiobutton.setText("Cash (₹0)");
+                    sheetBinding.btnBuy.setText("Buy");
+                    sheetBinding.btnBuy.setEnabled(false);
+                    sheetBinding.btnBuy.setAlpha(0.7f);
                 }
-            } else if (checkedId == sheetbinding.coinsRadiobutton.getId()) {
+            } else if (checkedId == sheetBinding.coinsRadiobutton.getId()) {
                 if (userData.containsKey("coins")) {
-                    sheetbinding.coinsRadiobutton.setText("Coins (".concat(String.valueOf(((Number) Objects.requireNonNull(userData.get("coins"))).longValue()).concat(")")));
+                    sheetBinding.coinsRadiobutton.setText("Coins (".concat(String.valueOf(((Number) Objects.requireNonNull(userData.get("coins"))).longValue()).concat(")")));
                     if (resourceItem.containsKey("price")) {
-                        sheetbinding.btnBuy.setText("Buy for ".concat(String.valueOf(((Number) Objects.requireNonNull(resourceItem.get("price"))).longValue() * 5)).concat(" coins"));
-                        sheetbinding.btnBuy.setEnabled(true);
-                        sheetbinding.btnBuy.setAlpha(1f);
+                        sheetBinding.btnBuy.setText("Buy for ".concat(String.valueOf(((Number) Objects.requireNonNull(resourceItem.get("price"))).longValue() * 5)).concat(" coins"));
+                        sheetBinding.btnBuy.setEnabled(true);
+                        sheetBinding.btnBuy.setAlpha(1f);
                     } else {
-                        resource_purchase_sheet.dismiss();
+                        resourcePurchaseSheet.dismiss();
                         PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred, please login again!");
                         auth.signOut();
                         finishAffinity();
                     }
                 } else {
-                    sheetbinding.coinsRadiobutton.setText("Coins (0)");
-                    sheetbinding.btnBuy.setText("Buy");
-                    sheetbinding.btnBuy.setEnabled(false);
-                    sheetbinding.btnBuy.setAlpha(0.7f);
+                    sheetBinding.coinsRadiobutton.setText("Coins (0)");
+                    sheetBinding.btnBuy.setText("Buy");
+                    sheetBinding.btnBuy.setEnabled(false);
+                    sheetBinding.btnBuy.setAlpha(0.7f);
                 }
             }
         });
+
+        final String resourcePathId = Objects
+                .requireNonNull(resourceItem.get("courseId")).toString()
+                .concat("/")
+                .concat(Objects.requireNonNull(resourceItem.get("id")).toString());
 
         final boolean[] wishlisted = {true};
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor("#FFFFFF"));
         gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-        sheetbinding.container.setBackground(gd);
-        PrepNestUtil.roundViewWithRipple(sheetbinding.btnWishlist, "#F5F5F5", 15, 0, "#000000", "#E0E0E0");
-        PrepNestUtil.roundViewWithRipple(sheetbinding.btnBuy, "#000000", 15, 0, "#000000", "#212121");
-        if (resourceItem.containsKey("resource title")) {
-            sheetbinding.resourceTitle.setText(Objects.requireNonNull(resourceItem.get("resource title")).toString());
+        sheetBinding.container.setBackground(gd);
+        PrepNestUtil.roundViewWithRipple(sheetBinding.btnWishlist, "#F5F5F5", 15, 0, "#000000", "#E0E0E0");
+        PrepNestUtil.roundViewWithRipple(sheetBinding.btnBuy, "#000000", 15, 0, "#000000", "#212121");
+        if (resourceItem.containsKey("resourceTitle")) {
+            sheetBinding.resourceTitle.setText(Objects.requireNonNull(resourceItem.get("resourceTitle")).toString());
         } else {
-            sheetbinding.resourceTitle.setText("No title");
+            sheetBinding.resourceTitle.setText("No title");
         }
 		/*
 if (_item.containsKey("rating")) {
-sheetbinding.ratingTxt.setText(_item.get("rating").toString());
-sheetbinding.ratingContainer.setBackground(new GradientDrawable() { public GradientDrawable getIns(int a, int b) { this.setCornerRadius(a); this.setColor(b); return this; } }.getIns((int)360, 0xFFFFF3E0));
-sheetbinding.ratingContainer.setVisibility(View.VISIBLE);
+sheetBinding.ratingTxt.setText(_item.get("rating").toString());
+sheetBinding.ratingContainer.setBackground(new GradientDrawable() { public GradientDrawable getIns(int a, int b) { this.setCornerRadius(a); this.setColor(b); return this; } }.getIns((int)360, 0xFFFFF3E0));
+sheetBinding.ratingContainer.setVisibility(View.VISIBLE);
 } else {
-sheetbinding.ratingContainer.setVisibility(View.GONE);
+sheetBinding.ratingContainer.setVisibility(View.GONE);
 }
 */
         if (resourceItem.containsKey("subject")) {
-            sheetbinding.subjectNameTxt.setText(Objects.requireNonNull(resourceItem.get("subject")).toString());
-            sheetbinding.subjectNameTxt.setBackground(new GradientDrawable() {
+            sheetBinding.subjectNameTxt.setText(Objects.requireNonNull(resourceItem.get("subject")).toString());
+            sheetBinding.subjectNameTxt.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            sheetbinding.subjectNameTxt.setVisibility(View.VISIBLE);
+            sheetBinding.subjectNameTxt.setVisibility(View.VISIBLE);
         } else {
-            sheetbinding.subjectNameTxt.setVisibility(View.GONE);
+            sheetBinding.subjectNameTxt.setVisibility(View.GONE);
         }
         if (resourceItem.containsKey("session")) {
-            sheetbinding.sessionTxt.setText(Objects.requireNonNull(resourceItem.get("session")).toString());
-            sheetbinding.sessionTxt.setBackground(new GradientDrawable() {
+            sheetBinding.sessionTxt.setText(Objects.requireNonNull(resourceItem.get("session")).toString());
+            sheetBinding.sessionTxt.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            sheetbinding.sessionTxt.setVisibility(View.VISIBLE);
+            sheetBinding.sessionTxt.setVisibility(View.VISIBLE);
         } else {
-            sheetbinding.sessionTxt.setVisibility(View.GONE);
+            sheetBinding.sessionTxt.setVisibility(View.GONE);
         }
         if (resourceItem.containsKey("price")) {
-            sheetbinding.btnBuy.setText("Buy for ₹".concat(resourceItem.get("price").toString()));
+            sheetBinding.btnBuy.setText("Buy for ₹".concat(String.valueOf(((Number) Objects.requireNonNull(resourceItem.get("price"))).longValue())));
         } else {
-            resource_purchase_sheet.dismiss();
+            resourcePurchaseSheet.dismiss();
             PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred, please login again!");
             auth.signOut();
             finishAffinity();
         }
         if (userData.containsKey("cash")) {
-            sheetbinding.cashRadiobutton.setText("Cash (₹".concat(String.valueOf(((Number) userData.get("cash")).longValue()).concat(")")));
+            sheetBinding.cashRadiobutton.setText("Cash (₹".concat(String.valueOf(((Number) Objects.requireNonNull(userData.get("cash"))).longValue()).concat(")")));
         } else {
             userData.put("cash", 0);
-            sheetbinding.cashRadiobutton.setText("Cash (₹0)");
+            sheetBinding.cashRadiobutton.setText("Cash (₹0)");
         }
         if (userData.containsKey("coins")) {
-            sheetbinding.coinsRadiobutton.setText("Coins (".concat(String.valueOf(((Number) userData.get("coins")).longValue()).concat(")")));
+            sheetBinding.coinsRadiobutton.setText("Coins (".concat(String.valueOf(((Number) Objects.requireNonNull(userData.get("coins"))).longValue()).concat(")")));
         } else {
             userData.put("coins", 0);
-            sheetbinding.coinsRadiobutton.setText("Coins (0)");
+            sheetBinding.coinsRadiobutton.setText("Coins (0)");
         }
         if (resourceItem.containsKey("id")) {
-            if (wishlistedResources.contains(resourceItem.get("id").toString())) {
-                sheetbinding.btnWishlistTxt.setText("Remove from wishlist");
-                sheetbinding.iconWishlist.setImageResource(R.drawable.icon_heart_filled);
+            if (wishlistedResources.contains(resourcePathId)) {
+                sheetBinding.btnWishlistTxt.setText("Remove from wishlist");
+                sheetBinding.iconWishlist.setImageResource(R.drawable.icon_heart_filled);
             } else {
-                sheetbinding.btnWishlistTxt.setText("Add to wishlist");
-                sheetbinding.iconWishlist.setImageResource(R.drawable.icon_heart_hollow);
+                sheetBinding.btnWishlistTxt.setText("Add to wishlist");
+                sheetBinding.iconWishlist.setImageResource(R.drawable.icon_heart_hollow);
                 wishlisted[0] = false;
             }
         }
-        sheetbinding.btnWishlist.setOnClickListener(_view -> {
+        sheetBinding.btnWishlist.setOnClickListener(_view -> {
             if (wishlisted[0]) {
-                updateUserWishlist(resourceItem.get("id").toString(), true);
-                sheetbinding.iconWishlist.setImageResource(R.drawable.icon_heart_hollow);
-                sheetbinding.btnWishlistTxt.setText("Add to wishlist");
+                updateUserWishlist(resourcePathId, true);
+                sheetBinding.iconWishlist.setImageResource(R.drawable.icon_heart_hollow);
+                sheetBinding.btnWishlistTxt.setText("Add to wishlist");
             } else {
-                updateUserWishlist(resourceItem.get("id").toString(), false);
-                sheetbinding.iconWishlist.setImageResource(R.drawable.icon_heart_filled);
-                sheetbinding.btnWishlistTxt.setText("Remove from wishlist");
+                updateUserWishlist(resourcePathId, false);
+                sheetBinding.iconWishlist.setImageResource(R.drawable.icon_heart_filled);
+                sheetBinding.btnWishlistTxt.setText("Remove from wishlist");
             }
             wishlisted[0] = !wishlisted[0];
         });
-        sheetbinding.btnBuy.setOnClickListener(_view -> {
+        sheetBinding.btnBuy.setOnClickListener(_view -> {
             PrepNestUtil.showLoadingDialog(ResourcesActivity.this, true);
-            purchaseResourceCF(resourceItem, sheetbinding.cashRadiobutton.isChecked());
-            resource_purchase_sheet.dismiss();
+            purchaseResourceCF(resourceItem, sheetBinding.cashRadiobutton.isChecked());
+            resourcePurchaseSheet.dismiss();
         });
-        resource_purchase_sheet.show();
+        resourcePurchaseSheet.show();
     }
 
 
     public void checkResource(final HashMap<String, Object> _item) {
         boolean canPurchase = true;
         if (_item.containsKey("id")) {
-            if (uploadedResources.contains(_item.get("id").toString())) {
+            if (uploadedResources.contains(Objects.requireNonNull(_item.get("id")).toString())) {
                 canPurchase = false;
                 toManageResources.setClass(ResourcesActivity.this, ManageresourcesActivity.class);
-                toManageResources.putExtra("navigation type", "owner");
+                toManageResources.putExtra("navigationType", "owner");
                 startActivity(toManageResources);
                 overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
                 finish();
             }
-            if (purchasedResources.contains(_item.get("id").toString())) {
+            if (purchasedResources.contains(Objects.requireNonNull(_item.get("id")).toString())) {
                 canPurchase = false;
                 toManageResources.setClass(ResourcesActivity.this, ManageresourcesActivity.class);
-                toManageResources.putExtra("navigation type", "purchased");
+                toManageResources.putExtra("navigationType", "purchased");
                 startActivity(toManageResources);
                 overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
                 finish();
@@ -644,25 +675,31 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             wishlistedResources.add(_ID);
             message = "Added to wishlist";
         }
-        String newList = new Gson().toJson(wishlistedResources);
-        users.child(auth.getCurrentUser().getUid()).child("wishlist").setValue(newList).addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                PrepNestUtil.showToast(ResourcesActivity.this, message);
-            } else {
-                PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred: " + task.getException().toString());
-            }
-        });
+//        String newList = new Gson().toJson(wishlistedResources);
+        assert auth.getCurrentUser() != null;
+        users
+                .child(auth.getCurrentUser().getUid())
+                .child("wishlist")
+                .setValue(wishlistedResources).addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        PrepNestUtil.showToast(ResourcesActivity.this, message);
+                        userData.put("wishlist", wishlistedResources);
+                        cachedData.edit().putString("userData", gson.toJson(userData)).apply();
+                    } else {
+                        PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred: " + Objects.requireNonNull(task.getException()));
+                    }
+                });
     }
 
     public void purchaseResourceCF(final HashMap<String, Object> resourceItem, final boolean isCash) {
         if (isCash) {
-            if ((((Number) userData.get("cash")).longValue()) < (((Number) resourceItem.get("price")).longValue())) {
+            if ((((Number) Objects.requireNonNull(userData.get("cash"))).longValue()) < (((Number) Objects.requireNonNull(resourceItem.get("price"))).longValue())) {
                 PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
                 PrepNestUtil.showToast(ResourcesActivity.this, "Insufficient balance!");
                 return;
             }
         } else {
-            if ((((Number) userData.get("coins")).longValue()) >= (((Number) resourceItem.get("price")).longValue() * 5)) {
+            if ((((Number) Objects.requireNonNull(userData.get("coins"))).longValue()) >= (((Number) Objects.requireNonNull(resourceItem.get("price"))).longValue() * 5)) {
                 PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
                 PrepNestUtil.showToast(ResourcesActivity.this, "Insufficient balance!");
                 return;
@@ -678,10 +715,11 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 // Prepare JSON payload
                 Map<String, Object> data = new HashMap<>();
                 data.put("buyerId", user.getUid());
-                data.put("ownerId", resourceItem.get("uploader uid").toString());
+                data.put("ownerId", Objects.requireNonNull(resourceItem.get("uploaderId")).toString());
                 data.put("modeOfPayment", isCash ? "cash" : "coins");
-                data.put("resourceId", resourceItem.get("id").toString());
-                data.put("timestamp", String.valueOf(System.currentTimeMillis()));
+                data.put("resourceId", Objects.requireNonNull(resourceItem.get("id")).toString());
+                data.put("courseId", Objects.requireNonNull(resourceItem.get("courseId")).toString());
+                data.put("timestamp", System.currentTimeMillis());
 
                 // Convert to JSON string
                 JSONObject json = new JSONObject(data);
@@ -697,6 +735,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                         runOnUiThread(() -> {
                             PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
                             PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred");
+                            Log.d("ERROR", e.toString());
                         });
                     }
 
@@ -704,18 +743,23 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                     public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
                         final String resp = response.body() != null ? response.body().string() : "No response";
                         if (response.isSuccessful()) {
+                            final String resourcePathId = Objects
+                                    .requireNonNull(resourceItem.get("courseId")).toString()
+                                    .concat("/")
+                                    .concat(Objects.requireNonNull(resourceItem.get("id")).toString());
                             runOnUiThread(() -> {
                                 PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
                                 PrepNestUtil.showToast(ResourcesActivity.this, "Purchased successfully");
-                                purchasedResources.add(resourceItem.get("id").toString());
-                                if (wishlistedResources.contains(resourceItem.get("id").toString())) {
-                                    updateUserWishlist(resourceItem.get("id").toString(), true);
+                                purchasedResources.add(Objects.requireNonNull(resourceItem.get("id")).toString());
+                                if (wishlistedResources.contains(resourcePathId)) {
+                                    updateUserWishlist(resourcePathId, true);
                                 }
                             });
                         } else {
                             runOnUiThread(() -> {
                                 PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
                                 PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred");
+                                Log.d("ERROR IN SUCCESS", resp);
                             });
                         }
                     }
@@ -725,315 +769,6 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
         } else {
             Log.e("FCM_CLIENT", "User not signed in");
         }
-    }
-
-    public void purchaseResource(final HashMap<String, Object> _item, final boolean _isCash) {
-        // add to history after successful add
-        DatabaseReference currentUser = users.child(auth.getCurrentUser().getUid());
-        DatabaseReference history_db = firebase_database.getReference("transactions_history");
-        purchasedResources.add(_item.get("id").toString());
-        String newList = new Gson().toJson(purchasedResources);
-        if (_isCash) {
-            if ((((Number) userData.get("cash")).longValue()) >= (((Number) _item.get("price")).longValue())) {
-                double newAmount = (((Number) userData.get("cash")).longValue()) - (((Number) _item.get("price")).longValue());
-                currentUser.child("cash").setValue(newAmount).addOnCompleteListener(deductCash -> {
-                    if (deductCash.isSuccessful()) {
-                        userData.put("cash", newAmount);
-                        // add id to purchased resources
-                        currentUser.child("purchased resources").setValue(newList).addOnCompleteListener(addItem -> {
-                            if (addItem.isSuccessful()) {
-                                HashMap<String, Object> history = new HashMap<>();
-                                String key = history_db.child(auth.getCurrentUser().getUid()).push().getKey();
-                                history.put("type", "purchase");
-                                history.put("amount", ((Number) _item.get("price")).longValue());
-                                history.put("amount type", "cash");
-                                history.put("timestamp", String.valueOf(System.currentTimeMillis()));
-                                history_db.child(auth.getCurrentUser().getUid()).child(key).setValue(history).addOnCompleteListener(addHistory -> {
-                                    if (addHistory.isSuccessful()) {
-                                        PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
-                                        PrepNestUtil.showToast(ResourcesActivity.this, "Successfully purchased!");
-                                    } else {
-                                        PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
-                                        PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred!");
-                                    }
-                                });
-                                addReferralReward(_item.get("uploader uid").toString(), currentUser, history_db);
-                                addPurchaseReward(_item, currentUser, history_db);
-                                addResourceSoldData(_item, users, history_db, true);
-                                if (wishlistedResources.contains(_item.get("id").toString())) {
-                                    updateUserWishlist(_item.get("id").toString(), true);
-                                }
-                            } else {
-                                PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
-                                PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred!");
-                                double previousAmount = (((Number) userData.get("cash")).longValue()) + (((Number) _item.get("price")).longValue());
-                                userData.put("cash", previousAmount);
-                                currentUser.child("cash").setValue(previousAmount);
-                            }
-                        });
-                    } else {
-                        PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
-                        PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred!");
-                        double previousAmount = (((Number) userData.get("cash")).longValue()) + (((Number) _item.get("price")).longValue());
-                        userData.put("cash", previousAmount);
-                        currentUser.child("cash").setValue(previousAmount);
-                    }
-                });
-
-            } else {
-                purchasedResources.remove(purchasedResources.size() - 1);
-                PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
-                PrepNestUtil.showToast(ResourcesActivity.this, "Insufficient balance!");
-            }
-        } else {
-            if ((((Number) userData.get("coins")).longValue()) >= (((Number) _item.get("price")).longValue() * 5)) {
-                double newAmount = (((Number) userData.get("coins")).longValue()) - (((Number) _item.get("price")).longValue() * 5);
-                currentUser.child("coins").setValue(newAmount).addOnCompleteListener(deductCash -> {
-                    if (deductCash.isSuccessful()) {
-                        userData.put("coins", newAmount);
-                        // add id to purchased resources
-                        currentUser.child("purchased resources").setValue(newList).addOnCompleteListener(addItem -> {
-                            if (addItem.isSuccessful()) {
-                                HashMap<String, Object> history = new HashMap<>();
-                                String key = history_db.child(auth.getCurrentUser().getUid()).push().getKey();
-                                history.put("type", "purchase");
-                                history.put("amount", ((Number) _item.get("price")).longValue() * 5);
-                                history.put("amount type", "coins");
-                                history.put("timestamp", String.valueOf(System.currentTimeMillis()));
-                                history_db.child(auth.getCurrentUser().getUid()).child(key).setValue(history).addOnCompleteListener(addHistory -> {
-                                    if (addHistory.isSuccessful()) {
-                                        PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
-                                        PrepNestUtil.showToast(ResourcesActivity.this, "Successfully purchased!");
-                                    } else {
-                                        PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
-                                        PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred!");
-                                    }
-                                });
-
-                                addReferralReward(_item.get("uploader uid").toString(), currentUser, history_db);
-                                addPurchaseReward(_item, currentUser, history_db);
-                                addResourceSoldData(_item, users, history_db, false);
-                                if (wishlistedResources.contains(_item.get("id").toString())) {
-                                    updateUserWishlist(_item.get("id").toString(), true);
-                                }
-                            } else {
-                                PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
-                                PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred!");
-                                double previousAmount = (((Number) userData.get("coins")).longValue()) + (((Number) _item.get("price")).longValue() * 5);
-                                userData.put("coins", previousAmount);
-                                currentUser.child("coins").setValue(previousAmount);
-                            }
-                        });
-                    } else {
-                        PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
-                        PrepNestUtil.showToast(ResourcesActivity.this, "An unknown error occurred!");
-                        double previousAmount = (((Number) userData.get("coins")).longValue()) + (((Number) _item.get("price")).longValue() * 5);
-                        userData.put("coins", previousAmount);
-                        currentUser.child("coins").setValue(previousAmount);
-                    }
-                });
-
-            } else {
-                purchasedResources.remove(purchasedResources.size() - 1);
-                PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
-                PrepNestUtil.showToast(ResourcesActivity.this, "Insufficient balance!");
-            }
-        }
-    }
-
-
-    public void addReferralReward(final String _otherUserID, final DatabaseReference _currentUser, final DatabaseReference _history_db) {
-        checkFirstItem(_currentUser, result -> {
-            if (result) {
-                final long[] totalAmount = {((Number) userData.get("coins")).longValue() + 10};
-                _currentUser.child("coins").setValue(totalAmount[0]).addOnCompleteListener(updatedAmount -> {
-                    if (updatedAmount.isSuccessful()) {
-                        userData.put("coins", totalAmount[0]);
-                        _currentUser.child("first purchase").setValue(true).addOnCompleteListener(purchase -> {
-                            if (purchase.isSuccessful()) {
-                                AtomicReference<HashMap<String, Object>> historyRef = new AtomicReference<>(new HashMap<>());
-                                AtomicReference<String> keyRef = new AtomicReference<>(_history_db.child(auth.getCurrentUser().getUid()).push().getKey());
-                                historyRef.get().put("type", "refer_reward");
-                                historyRef.get().put("amount", 10);
-                                historyRef.get().put("timestamp", String.valueOf(System.currentTimeMillis()));
-                                _history_db.child(auth.getCurrentUser().getUid()).child(keyRef.get()).setValue(historyRef.get());
-                                users.child(_otherUserID).child("coins").addListenerForSingleValueEvent(new ValueEventListener() {
-                                    @Override
-                                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                                        if (dataSnapshot.exists()) {
-                                            Long coinsAmount = dataSnapshot.getValue(Long.class);
-
-                                            users.child(_otherUserID).child("coins").setValue(coinsAmount + 50).addOnCompleteListener(otherUser -> {
-                                                if (otherUser.isSuccessful()) {
-                                                    sendNotifications(_otherUserID, "Referral reward 💰", "50 coins has been successfully credited to your account for a successful refer 💰.");
-                                                    historyRef.set(new HashMap<>());
-                                                    keyRef.set(_history_db.child(_otherUserID).push().getKey());
-
-                                                    historyRef.get().put("type", "refer_success");
-                                                    historyRef.get().put("amount", 50);
-                                                    historyRef.get().put("timestamp", String.valueOf(System.currentTimeMillis()));
-
-                                                    _history_db.child(_otherUserID).child(keyRef.get()).setValue(historyRef.get());
-                                                }
-                                            });
-                                        }
-                                    }
-
-                                    @Override
-                                    public void onCancelled(@NonNull DatabaseError error) {
-
-                                    }
-                                });
-                            } else {
-                                totalAmount[0] -= 10;
-                                userData.put("coins", totalAmount[0]);
-                                _currentUser.child("coins").setValue(totalAmount[0]);
-                            }
-                        });
-                    } else {
-                        totalAmount[0] -= 10;
-                        userData.put("coins", totalAmount[0]);
-                        _currentUser.child("coins").setValue(totalAmount[0]);
-                    }
-                });
-
-            }
-        });
-
-    }
-
-
-    public void checkFirstItem(final DatabaseReference _currentUser, final BooleanCallback _callback) {
-        _currentUser.child("first purchase").addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                if (dataSnapshot.exists()) {
-                    boolean value = Boolean.TRUE.equals(dataSnapshot.getValue(Boolean.class));
-                    _callback.onResult(!value);
-                } else {
-                    _callback.onResult(true);
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError databaseError) {
-                _callback.onResult(false);
-            }
-        });
-
-    }
-
-    public void addPurchaseReward(final HashMap<String, Object> _item, final DatabaseReference _currentUser, final DatabaseReference _history_db) {
-        double resourcePrice = ((Number) _item.get("price")).doubleValue();
-        long userCoinsAmount = ((Number) userData.get("coins")).longValue();
-        final long[] rewardedAmount = {(long) (resourcePrice * 0.7)};
-        _currentUser.child("coins").setValue(userCoinsAmount + rewardedAmount[0]).addOnSuccessListener(unused -> {
-            HashMap<String, Object> history = new HashMap<>();
-            String key = _history_db.child(auth.getCurrentUser().getUid()).push().getKey();
-            history.put("amount", rewardedAmount[0]);
-            history.put("type", "purchase_reward");
-            history.put("timestamp", String.valueOf(System.currentTimeMillis()));
-            _history_db.child(auth.getCurrentUser().getUid()).child(key).setValue(history);
-        });
-    }
-
-    public void addResourceSoldData(final HashMap<String, Object> _item, final DatabaseReference _users, final DatabaseReference _history_db, final boolean _isCash) {
-        final long[] amount = {((Number) _item.get("price")).longValue()};
-        if (_isCash) amount[0] *= 0.3;
-        else amount[0] *= 1.5;
-        DatabaseReference otherUser = _users.child(_item.get("uploader uid").toString()).child(_isCash ? "cash" : "coins");
-
-        otherUser.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                Long userAmount = dataSnapshot.getValue(Long.class);
-                otherUser.setValue(userAmount + amount[0]).addOnSuccessListener(unused -> {
-                    if (_isCash) {
-                        sendNotifications(_item.get("uploader uid").toString(), "New Purchase 💰", "₹".concat(String.valueOf(amount[0]).concat(" has been credited to your account 💰.")));
-                    } else {
-                        sendNotifications(_item.get("uploader uid").toString(), "New Purchase 💰", String.valueOf(amount[0]).concat(" coins has been successfully credited to your account 💰."));
-                    }
-                    HashMap<String, Object> history = new HashMap<>();
-                    String key = _history_db.child(auth.getCurrentUser().getUid()).push().getKey();
-
-                    history.put("type", "resource_sold");
-                    history.put("amount type", _isCash ? "cash" : "coins");
-                    history.put("amount", amount[0]);
-                    history.put("timestamp", String.valueOf(System.currentTimeMillis()));
-                    _history_db.child(_item.get("uploader uid").toString()).child(key).setValue(history);
-                });
-            }
-
-            @Override
-            public void onCancelled(DatabaseError error) {
-            }
-        });
-
-    }
-
-    public void sendNotifications(final String topic, final String title, final String message) {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-
-        if (user != null) {
-            // Force refresh token to make sure it's valid
-            user.getIdToken(true).addOnSuccessListener(result -> {
-                String idToken = result.getToken();
-
-                // Prepare JSON payload
-                Map<String, Object> data = new HashMap<>();
-                data.put("topic", topic);
-                data.put("title", title);
-                data.put("body", message);
-
-                // Convert to JSON string
-                JSONObject json = new JSONObject(data);
-
-                // Send HTTP POST request using OkHttp
-                OkHttpClient client = new OkHttpClient();
-
-                RequestBody requestBody = RequestBody.create(json.toString(), MediaType.parse("application/json; charset=utf-8"));
-
-                Request request = new Request.Builder().url("https://us-central1-prepnest-65133.cloudfunctions.net/sendNotification").post(requestBody).addHeader("Authorization", "Bearer " + idToken) // <-- add token
-                        .build();
-
-                client.newCall(request).enqueue(new Callback() {
-                    @Override
-                    public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                        Log.e("FCM_CLIENT", "Failed to send notification: " + e.getMessage());
-                        runOnUiThread(() -> {
-                            PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
-                            PrepNestUtil.showToast(ResourcesActivity.this, "Failed to send notification");
-                        });
-                    }
-
-                    @Override
-                    public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
-                        final String resp = response.body() != null ? response.body().string() : "No response";
-                        Log.d("FCM_CLIENT", "Response: " + resp);
-
-                        if (response.isSuccessful()) {
-                            runOnUiThread(() -> {
-                                PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
-                                PrepNestUtil.showToast(ResourcesActivity.this, "Sent successfully");
-                            });
-                        } else {
-                            runOnUiThread(() -> {
-                                PrepNestUtil.showLoadingDialog(ResourcesActivity.this, false);
-                                PrepNestUtil.showToast(ResourcesActivity.this, "Failed to send notification");
-                            });
-                        }
-                    }
-                });
-
-            }).addOnFailureListener(e -> Log.e("FCM_CLIENT", "Failed to get token: " + e.getMessage()));
-        } else {
-            Log.e("FCM_CLIENT", "User not signed in");
-        }
-    }
-
-
-    public interface BooleanCallback {
-        void onResult(boolean result);
     }
 
     public class ItemsListAdapter extends RecyclerView.Adapter<ItemsListAdapter.ViewHolder> {
@@ -1059,8 +794,8 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, final int position) {
             PrepNestUtil.roundViewWithRipple(holder.binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            if (list.get(position).containsKey("resource title")) {
-                holder.binding.title.setText(list.get(position).get("resource title").toString());
+            if (list.get(position).containsKey("resourceTitle")) {
+                holder.binding.title.setText(Objects.requireNonNull(list.get(position).get("resourceTitle")).toString());
             } else {
                 holder.binding.title.setText("No title");
             }
@@ -1073,13 +808,13 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                holder.binding.subjectNameTxt.setText(list.get(position).get("subject").toString());
+                holder.binding.subjectNameTxt.setText(Objects.requireNonNull(list.get(position).get("subject")).toString());
                 holder.binding.subjectNameTxt.setVisibility(View.VISIBLE);
 
                 ViewGroup.MarginLayoutParams sessionTxtParams =
                         (ViewGroup.MarginLayoutParams) holder.binding.sessionTxt.getLayoutParams();
 
-                if (list.get(position).get("subject").toString().length() >= 20) {
+                if (Objects.requireNonNull(list.get(position).get("subject")).toString().length() >= 20) {
                     holder.binding.subAndSessionContainer.setOrientation(LinearLayout.VERTICAL);
                     sessionTxtParams.setMargins(0, (int) convertToDp(8), 0, 0);
                 } else {
@@ -1098,13 +833,13 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                holder.binding.sessionTxt.setText(list.get(position).get("session").toString());
+                holder.binding.sessionTxt.setText(Objects.requireNonNull(list.get(position).get("session")).toString());
                 holder.binding.sessionTxt.setVisibility(View.VISIBLE);
             } else {
                 holder.binding.sessionTxt.setVisibility(View.GONE);
             }
-            if (list.get(position).containsKey("best choice")) {
-                if (list.get(position).get("best choice").toString().equals("true")) {
+            if (list.get(position).containsKey("isBestChoice")) {
+                if (Boolean.parseBoolean(Objects.requireNonNull(list.get(position).get("isBestChoice")).toString())) {
                     holder.binding.bestChoiceTag.setBackground(new GradientDrawable() {
                         public GradientDrawable getIns(int a, int b) {
                             this.setCornerRadius(a);
@@ -1119,8 +854,8 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             } else {
                 holder.binding.bestChoiceTag.setVisibility(View.GONE);
             }
-            if (list.get(position).containsKey("recommended")) {
-                if (list.get(position).get("recommended").toString().equals("true")) {
+            if (list.get(position).containsKey("isRecommended")) {
+                if (Boolean.parseBoolean(Objects.requireNonNull(list.get(position).get("isRecommended")).toString())) {
                     holder.binding.recommendedTag.setBackground(new GradientDrawable() {
                         public GradientDrawable getIns(int a, int b) {
                             this.setCornerRadius(a);
@@ -1136,10 +871,10 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 holder.binding.recommendedTag.setVisibility(View.GONE);
             }
             if (list.get(position).containsKey("type")) {
-                if (list.get(position).get("type").toString().equals("paper")) {
+                if (Objects.requireNonNull(list.get(position).get("type")).toString().equals("paper")) {
                     holder.binding.image.setImageResource(R.drawable.previous_paper);
                 } else {
-                    if (list.get(position).get("type").toString().equals("notes")) {
+                    if (Objects.requireNonNull(list.get(position).get("type")).toString().equals("notes")) {
                         holder.binding.image.setImageResource(R.drawable.short_notes);
                     } else {
                         holder.binding.image.setVisibility(View.INVISIBLE);
@@ -1148,28 +883,17 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             } else {
                 holder.binding.image.setVisibility(View.INVISIBLE);
             }
-            ViewGroup.LayoutParams rawParams = holder.binding.container.getLayoutParams();
-            ViewGroup.MarginLayoutParams paramscontainer;
-
-            if (rawParams instanceof ViewGroup.MarginLayoutParams) {
-                paramscontainer = (ViewGroup.MarginLayoutParams) rawParams;
-            } else {
-                // Fallback if getLayoutParams() is null or not a MarginLayoutParams
-                paramscontainer = new ViewGroup.MarginLayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                );
-            }
+            ViewGroup.MarginLayoutParams paramsContainer = getLayoutParams(holder);
 
             if (position == (list.size() - 1)) {
-                paramscontainer.setMargins(
+                paramsContainer.setMargins(
                         (int) convertToDp(20),
                         (int) convertToDp(10),
                         (int) convertToDp(20),
                         (int) convertToDp(10)
                 );
             } else {
-                paramscontainer.setMargins(
+                paramsContainer.setMargins(
                         (int) convertToDp(20),
                         (int) convertToDp(10),
                         (int) convertToDp(20),
@@ -1177,10 +901,10 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 );
             }
 
-            paramscontainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
-            paramscontainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            paramsContainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            paramsContainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
 
-            holder.binding.container.setLayoutParams(paramscontainer);
+            holder.binding.container.setLayoutParams(paramsContainer);
 
 
             holder.binding.container.setOnClickListener(_view1 -> {
@@ -1191,6 +915,22 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             });
         }
 
+        private ViewGroup.MarginLayoutParams getLayoutParams(@NonNull ViewHolder holder) {
+            ViewGroup.LayoutParams rawParams = holder.binding.container.getLayoutParams();
+            ViewGroup.MarginLayoutParams paramsContainer;
+
+            if (rawParams instanceof ViewGroup.MarginLayoutParams) {
+                paramsContainer = (ViewGroup.MarginLayoutParams) rawParams;
+            } else {
+                // Fallback if getLayoutParams() is null or not a MarginLayoutParams
+                paramsContainer = new ViewGroup.MarginLayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+            }
+            return paramsContainer;
+        }
+
         @Override
         public int getItemCount() {
             return list.size();
@@ -1198,6 +938,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
         public class ViewHolder extends RecyclerView.ViewHolder {
             ResourceItemCardFullBinding binding;
+
             public ViewHolder(ResourceItemCardFullBinding binding) {
                 super(binding.getRoot());
                 this.binding = binding;

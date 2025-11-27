@@ -26,6 +26,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.gson.Gson;
 
 import java.util.HashMap;
+import java.util.Objects;
 
 
 public class LoginActivity extends AppCompatActivity {
@@ -35,9 +36,9 @@ public class LoginActivity extends AppCompatActivity {
     private boolean isPasswordShow = false;
     private LoginBinding binding;
     private FirebaseAuth auth;
-    private OnCompleteListener<AuthResult> _auth_sign_in_listener;
-    private OnCompleteListener<Void> _auth_reset_password_listener;
-    private SharedPreferences user_credentials;
+    private OnCompleteListener<AuthResult> authSignInListener;
+    private OnCompleteListener<Void> authResetPasswordListener;
+    private SharedPreferences userCredentialsSP;
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -51,7 +52,7 @@ public class LoginActivity extends AppCompatActivity {
 
     private void initialize(Bundle _savedInstanceState) {
         auth = FirebaseAuth.getInstance();
-        user_credentials = getSharedPreferences("credentials", Activity.MODE_PRIVATE);
+        userCredentialsSP = getSharedPreferences("credentials", Activity.MODE_PRIVATE);
 
         binding.loginBtn.setOnClickListener(_view -> {
             PrepNestUtil.hideKeyboard(LoginActivity.this);
@@ -68,7 +69,7 @@ public class LoginActivity extends AppCompatActivity {
                         if (binding.passwordEdittext.getText().toString().trim().length() > 7) {
                             if (PrepNestUtil.isConnected(LoginActivity.this)) {
                                 PrepNestUtil.showLoadingDialog(LoginActivity.this, true);
-                                auth.signInWithEmailAndPassword(binding.emailEdittext.getText().toString().trim(), binding.passwordEdittext.getText().toString().trim()).addOnCompleteListener(LoginActivity.this, _auth_sign_in_listener);
+                                auth.signInWithEmailAndPassword(binding.emailEdittext.getText().toString().trim(), binding.passwordEdittext.getText().toString().trim()).addOnCompleteListener(LoginActivity.this, authSignInListener);
                             } else {
                                 com.google.android.material.snackbar.Snackbar.make(binding.wrapperLayout, "No internet connection", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).setAction("", _view1 -> {
 
@@ -89,10 +90,7 @@ public class LoginActivity extends AppCompatActivity {
         binding.emailEdittext.addTextChangedListener(new TextWatcher() {
             @Override
             public void onTextChanged(CharSequence _param1, int _param2, int _param3, int _param4) {
-                if (binding.emailErrorTxt.getVisibility() == View.VISIBLE) {
-                    PrepNestUtil.TransitionManager(binding.edittextsContainer, 150);
-                    binding.emailErrorTxt.setVisibility(View.GONE);
-                }
+
             }
 
             @Override
@@ -102,17 +100,17 @@ public class LoginActivity extends AppCompatActivity {
 
             @Override
             public void afterTextChanged(Editable _param1) {
-
+                if (binding.emailErrorTxt.getVisibility() == View.VISIBLE) {
+                    PrepNestUtil.TransitionManager(binding.edittextsContainer, 150);
+                    binding.emailErrorTxt.setVisibility(View.GONE);
+                }
             }
         });
 
         binding.passwordEdittext.addTextChangedListener(new TextWatcher() {
             @Override
             public void onTextChanged(CharSequence _param1, int _param2, int _param3, int _param4) {
-                if (binding.passwordErrorTxt.getVisibility() == View.VISIBLE) {
-                    PrepNestUtil.TransitionManager(binding.edittextsContainer, 150);
-                    binding.passwordErrorTxt.setVisibility(View.INVISIBLE);
-                }
+
             }
 
             @Override
@@ -122,7 +120,10 @@ public class LoginActivity extends AppCompatActivity {
 
             @Override
             public void afterTextChanged(Editable _param1) {
-
+                if (binding.passwordErrorTxt.getVisibility() == View.VISIBLE) {
+                    PrepNestUtil.TransitionManager(binding.edittextsContainer, 150);
+                    binding.passwordErrorTxt.setVisibility(View.INVISIBLE);
+                }
             }
         });
 
@@ -135,7 +136,7 @@ public class LoginActivity extends AppCompatActivity {
             } else {
                 if (validateEmail(binding.emailEdittext.getText().toString().trim())) {
                     PrepNestUtil.showLoadingDialog(LoginActivity.this, true);
-                    auth.sendPasswordResetEmail(binding.emailEdittext.getText().toString().trim()).addOnCompleteListener(_auth_reset_password_listener);
+                    auth.sendPasswordResetEmail(binding.emailEdittext.getText().toString().trim()).addOnCompleteListener(authResetPasswordListener);
                 } else {
                     binding.emailErrorTxt.setText("Enter a valid email address");
                     binding.emailErrorTxt.setVisibility(View.VISIBLE);
@@ -163,16 +164,15 @@ public class LoginActivity extends AppCompatActivity {
 
         });
 
-        _auth_sign_in_listener = task -> {
+        authSignInListener = task -> {
 //                final boolean _success = _param1.isSuccessful();
 //                final String _errorMessage = _param1.getException() != null ? _param1.getException().getMessage() : "";
             PrepNestUtil.showLoadingDialog(LoginActivity.this, false);
             if (task.isSuccessful()) {
-                HashMap<String, Object> userCredentials;
-                userCredentials = new HashMap<>();
-                userCredentials.put("email", FirebaseAuth.getInstance().getCurrentUser().getEmail());
+                HashMap<String, Object> userCredentials = new HashMap<>();
+                userCredentials.put("email", Objects.requireNonNull(FirebaseAuth.getInstance().getCurrentUser()).getEmail());
                 userCredentials.put("password", binding.passwordEdittext.getText().toString().trim());
-                user_credentials.edit().putString("credentials", new Gson().toJson(userCredentials)).apply();
+                userCredentialsSP.edit().putString("credentials", new Gson().toJson(userCredentials)).apply();
                 toHomePage.setClass(LoginActivity.this, HomepageActivity.class);
                 startActivity(toHomePage);
                 overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
@@ -183,10 +183,9 @@ public class LoginActivity extends AppCompatActivity {
             }
         };
 
-        _auth_reset_password_listener = _param1 -> {
-            final boolean _success = _param1.isSuccessful();
+        authResetPasswordListener = task -> {
             PrepNestUtil.showLoadingDialog(LoginActivity.this, false);
-            if (_success) {
+            if (task.isSuccessful()) {
                 showPasswordResetDialog();
             } else {
                 PrepNestUtil.showToast(LoginActivity.this, "Error in sending email, try again later");
@@ -230,84 +229,84 @@ public class LoginActivity extends AppCompatActivity {
 
 
     public void showPasswordResetDialog() {
-        AlertDialog pwd_reset_dialog = new AlertDialog.Builder(LoginActivity.this).create();
+        AlertDialog pwdResetDialog = new AlertDialog.Builder(LoginActivity.this).create();
 
 
-        StatusViewBinding dialogbinding = StatusViewBinding.inflate(getLayoutInflater());
+        StatusViewBinding dialogBinding = StatusViewBinding.inflate(getLayoutInflater());
 
-        pwd_reset_dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        Objects.requireNonNull(pwdResetDialog.getWindow()).setBackgroundDrawableResource(android.R.color.transparent);
 
-        pwd_reset_dialog.setView(dialogbinding.getRoot());
+        pwdResetDialog.setView(dialogBinding.getRoot());
 
 
-        dialogbinding.btnOk.setVisibility(View.GONE);
-        dialogbinding.btnCancel.setVisibility(View.GONE);
-        dialogbinding.image.setImageResource(R.drawable.icon_email);
-        dialogbinding.bg.setBackground(new GradientDrawable() {
+        dialogBinding.btnOk.setVisibility(View.GONE);
+        dialogBinding.btnCancel.setVisibility(View.GONE);
+        dialogBinding.image.setImageResource(R.drawable.icon_email);
+        dialogBinding.bg.setBackground(new GradientDrawable() {
             public GradientDrawable getIns(int a, int b) {
                 this.setCornerRadius(a);
                 this.setColor(b);
                 return this;
             }
         }.getIns((int) 30, 0xFFFFFFFF));
-//        dialogbinding.imageContainer.setBackground(new GradientDrawable() {
+//        dialogBinding.imageContainer.setBackground(new GradientDrawable() {
 //            public GradientDrawable getIns(int a, int b) {
 //                this.setCornerRadius(a);
 //                this.setColor(b);
 //                return this;
 //            }
 //        }.getIns((int) 360, 0xFFFAFAFA));
-        dialogbinding.title.setText("Password Reset Link");
-        dialogbinding.subtext.setText("We have sent you a mail on ".concat(binding.emailEdittext.getText().toString().concat(" with a password reset link, click on the link to reset your password.")));
-        pwd_reset_dialog.setCancelable(true);
-        pwd_reset_dialog.show();
+        dialogBinding.title.setText("Password Reset Link");
+        dialogBinding.subtext.setText("We have sent you a mail on ".concat(binding.emailEdittext.getText().toString().concat(" with a password reset link, click on the link to reset your password.")));
+        pwdResetDialog.setCancelable(true);
+        pwdResetDialog.show();
 
-        ViewGroup.MarginLayoutParams paramsbg =
-                (ViewGroup.MarginLayoutParams) dialogbinding.bg.getLayoutParams();
+        ViewGroup.MarginLayoutParams paramsBg =
+                (ViewGroup.MarginLayoutParams) dialogBinding.bg.getLayoutParams();
 
-        paramsbg.setMargins((int) convertToDp(20), (int) convertToDp(20), (int) convertToDp(20), (int) convertToDp(20));
-        dialogbinding.bg.setLayoutParams(paramsbg);
+        paramsBg.setMargins((int) convertToDp(20), (int) convertToDp(20), (int) convertToDp(20), (int) convertToDp(20));
+        dialogBinding.bg.setLayoutParams(paramsBg);
 
     }
 
 
     public void showLoginErrorDialog() {
-        AlertDialog login_error_dialog = new AlertDialog.Builder(LoginActivity.this).create();
+        AlertDialog loginErrorDialog = new AlertDialog.Builder(LoginActivity.this).create();
 
 
-        StatusViewBinding dialogbinding = StatusViewBinding.inflate(getLayoutInflater());
+        StatusViewBinding dialogBinding = StatusViewBinding.inflate(getLayoutInflater());
 
-        login_error_dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        Objects.requireNonNull(loginErrorDialog.getWindow()).setBackgroundDrawableResource(android.R.color.transparent);
 
-        login_error_dialog.setView(dialogbinding.getRoot());
+        loginErrorDialog.setView(dialogBinding.getRoot());
 
-        dialogbinding.image.setImageResource(R.drawable.icon_failed_error);
-        dialogbinding.btnOk.setVisibility(View.GONE);
-        dialogbinding.btnCancel.setVisibility(View.GONE);
-        dialogbinding.bg.setBackground(new GradientDrawable() {
+        dialogBinding.image.setImageResource(R.drawable.icon_failed_error);
+        dialogBinding.btnOk.setVisibility(View.GONE);
+        dialogBinding.btnCancel.setVisibility(View.GONE);
+        dialogBinding.bg.setBackground(new GradientDrawable() {
             public GradientDrawable getIns(int a, int b) {
                 this.setCornerRadius(a);
                 this.setColor(b);
                 return this;
             }
         }.getIns((int) 30, 0xFFFFFFFF));
-//        dialogbinding.imageContainer.setBackground(new GradientDrawable() {
+//        dialogBinding.imageContainer.setBackground(new GradientDrawable() {
 //            public GradientDrawable getIns(int a, int b) {
 //                this.setCornerRadius(a);
 //                this.setColor(b);
 //                return this;
 //            }
 //        }.getIns((int) 360, 0xFFFAFAFA));
-        dialogbinding.title.setText("Incorrect details");
-        dialogbinding.subtext.setText("The account with email : ".concat(binding.emailEdittext.getText().toString().concat(" doesn't exists or the password is wrong.")));
-        login_error_dialog.setCancelable(true);
-        login_error_dialog.show();
+        dialogBinding.title.setText("Incorrect details");
+        dialogBinding.subtext.setText("The account with email : ".concat(binding.emailEdittext.getText().toString().concat(" doesn't exists or the password is wrong.")));
+        loginErrorDialog.setCancelable(true);
+        loginErrorDialog.show();
 
-        ViewGroup.MarginLayoutParams paramsbg =
-                (ViewGroup.MarginLayoutParams) dialogbinding.bg.getLayoutParams();
+        ViewGroup.MarginLayoutParams paramsBg =
+                (ViewGroup.MarginLayoutParams) dialogBinding.bg.getLayoutParams();
 
-        paramsbg.setMargins((int) convertToDp(20), (int) convertToDp(20), (int) convertToDp(20), (int) convertToDp(20));
-        dialogbinding.bg.setLayoutParams(paramsbg);
+        paramsBg.setMargins((int) convertToDp(20), (int) convertToDp(20), (int) convertToDp(20), (int) convertToDp(20));
+        dialogBinding.bg.setLayoutParams(paramsBg);
     }
 
 

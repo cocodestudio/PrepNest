@@ -1,31 +1,24 @@
 package com.cocode.prepnest;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.graphics.Rect;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.util.Patterns;
-import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.BaseAdapter;
 import android.widget.EditText;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.cocode.prepnest.databinding.DetailsSelectSheetBinding;
-import com.cocode.prepnest.databinding.SheetSingleItemSelectBinding;
 import com.cocode.prepnest.databinding.SignupBinding;
 import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
@@ -34,15 +27,19 @@ import com.google.firebase.auth.GetTokenResult;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -53,28 +50,25 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 
-public class SignupActivity extends AppCompatActivity {
+public class SignupActivity extends AppCompatActivity implements ItemListSheetFragment.BottomSheetListener {
 
     private final DatabaseReference users = FirebaseDatabase.getInstance().getReference("users");
     private final DatabaseReference transaction_history = FirebaseDatabase.getInstance().getReference("transactions_history");
-    private final ArrayList<String> keysList = new ArrayList<>();
-    private final ArrayList<HashMap<String, Object>> totalSemestersList = new ArrayList<>();
     private final Intent toLogin = new Intent();
     private final Intent toAddRefer = new Intent();
     private final Intent toInformation = new Intent();
+    private ArrayList<HashMap<String, Object>> itemsList = new ArrayList<>();
+    private HashMap<String, Object> dataPayload = new HashMap<>();
     private SignupBinding binding;
     private boolean isPasswordShow = false;
-    private String coursesJson = "";
-    private String selectedCourseID = "";
-    private double selectedSemester = 0;
-    private ArrayList<HashMap<String, Object>> allCoursesList = new ArrayList<>();
+    private int selectedSemester = 0;
     private FirebaseAuth auth;
     private OnCompleteListener<AuthResult> _auth_create_user_listener;
     private SharedPreferences userCredentials;
     private SharedPreferences cachedData;
-    private int selectedPosition = -1;
-    private int selectedCoursePosition = -1;
-    private int selectedSemesterPosition = -1;
+    private String selectedCourseId = "-1";
+    private String selectedSemesterId = "-1";
+    private String jsonCourseData = null;
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -94,9 +88,9 @@ public class SignupActivity extends AppCompatActivity {
         binding.signupBtn.setOnClickListener(_view -> {
             Rect r = new Rect();
             binding.wrapperLayout.getWindowVisibleDisplayFrame(r);
-            int screenheight = binding.wrapperLayout.getRootView().getHeight();
-            int keypadheight = screenheight - r.bottom;
-            if (keypadheight > (screenheight * 0.15d)) {
+            int screenHeight = binding.wrapperLayout.getRootView().getHeight();
+            int keypadHeight = screenHeight - r.bottom;
+            if (keypadHeight > (screenHeight * 0.15d)) {
                 PrepNestUtil.hideKeyboard(SignupActivity.this);
             }
             PrepNestUtil.TransitionManager(binding.edittextsContainer, 150);
@@ -104,11 +98,11 @@ public class SignupActivity extends AppCompatActivity {
                 binding.nameErrorTxt.setText("Enter your name");
                 binding.nameErrorTxt.setVisibility(View.VISIBLE);
             } else {
-                if (selectedCourseID.isEmpty()) {
+                if (selectedCourseId.equals("-1")) {
                     binding.otherDetailsErrorTxt.setText("Select your course");
                     binding.otherDetailsErrorTxt.setVisibility(View.VISIBLE);
                 } else {
-                    if (selectedSemester == 0) {
+                    if (selectedSemesterId.equals("-1")) {
                         binding.otherDetailsErrorTxt.setText("Select your semester");
                         binding.otherDetailsErrorTxt.setVisibility(View.VISIBLE);
                     } else {
@@ -142,12 +136,12 @@ public class SignupActivity extends AppCompatActivity {
                                                     binding.confirmPwdErrorTxt.setVisibility(View.VISIBLE);
                                                 }
                                             } else {
-                                                binding.confirmPwdErrorTxt.setText("Password must be atleast 8 characters long");
+                                                binding.confirmPwdErrorTxt.setText("Password must be at least 8 characters long");
                                                 binding.confirmPwdErrorTxt.setVisibility(View.VISIBLE);
                                             }
                                         }
                                     } else {
-                                        binding.passwordErrorTxt.setText("Password must be atleast 8 characters long");
+                                        binding.passwordErrorTxt.setText("Password must be at least 8 characters long");
                                         binding.passwordErrorTxt.setVisibility(View.VISIBLE);
                                     }
                                 }
@@ -184,152 +178,47 @@ public class SignupActivity extends AppCompatActivity {
         binding.courseSelectContainer.setOnClickListener(_view -> {
             Rect r = new Rect();
             binding.wrapperLayout.getWindowVisibleDisplayFrame(r);
-            int screenheight = binding.wrapperLayout.getRootView().getHeight();
-            int keypadheight = screenheight - r.bottom;
-            if (keypadheight > (screenheight * 0.15d)) {
+            int screenHeight = binding.wrapperLayout.getRootView().getHeight();
+            int keypadHeight = screenHeight - r.bottom;
+            if (keypadHeight > (screenHeight * 0.15d)) {
                 PrepNestUtil.hideKeyboard(SignupActivity.this);
             }
-            final BottomSheetDialog coursesSheet = new BottomSheetDialog(SignupActivity.this);
 
-            DetailsSelectSheetBinding sheetbinding = DetailsSelectSheetBinding.inflate(getLayoutInflater());
+            List<String> courseIds = getCourseIds();
+            createCoursesList(courseIds);
 
-            coursesSheet.setContentView(sheetbinding.getRoot());
+            dataPayload = new HashMap<>();
+            dataPayload.put("type", ItemListSheetFragment.SheetType.COURSE.toString());
+            dataPayload.put("list", new ArrayList<>(itemsList));
+            dataPayload.put("selectedItemId", selectedCourseId);
 
-            coursesSheet.setOnShowListener(dialog -> {
-                BottomSheetDialog d = (BottomSheetDialog) dialog;
-                View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
-                if (bottomSheet != null) {
-                    bottomSheet.setBackgroundResource(android.R.color.transparent);
-                }
-            });
-
-            ViewGroup.LayoutParams paramscontainer = sheetbinding.container.getLayoutParams();
-            paramscontainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
-            paramscontainer.height = (int) convertToDp(500);
-            sheetbinding.container.setLayoutParams(paramscontainer);
-
-            GradientDrawable gd = new GradientDrawable();
-            gd.setColor(Color.parseColor("#FFFFFF"));
-            gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-            sheetbinding.container.setBackground(gd);
-            sheetbinding.searchContainer.setVisibility(View.VISIBLE);
-            sheetbinding.itemsList.setHorizontalScrollBarEnabled(false);
-            sheetbinding.itemsList.setVerticalScrollBarEnabled(false);
-            sheetbinding.searchEdittext.setFocusableInTouchMode(true);
-            sheetbinding.searchEdittext.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void onTextChanged(CharSequence _param1, int _param2, int _param3, int _param4) {
-                    final String _charSeq = _param1.toString();
-                    allCoursesList = new Gson().fromJson(coursesJson, new TypeToken<ArrayList<HashMap<String, Object>>>() {
-                    }.getType());
-                    for (int index = allCoursesList.size() - 1; index >= 0; index--) {
-                        if (!(_charSeq.length() > allCoursesList.get(index).get("name").toString().length()) && allCoursesList.get(index).get("name").toString().toLowerCase().contains(_charSeq.toLowerCase())) {
-
-                        } else {
-                            allCoursesList.remove(index);
-                        }
-                    }
-                    sheetbinding.itemsList.setAdapter(new ItemsAdapter(allCoursesList));
-
-                    ((BaseAdapter) sheetbinding.itemsList.getAdapter()).notifyDataSetChanged();
-                }
-
-                @Override
-                public void beforeTextChanged(CharSequence _param1, int _param2, int _param3, int _param4) {
-
-                }
-
-                @Override
-                public void afterTextChanged(Editable _param1) {
-
-                }
-            });
-            allCoursesList = new Gson().fromJson(coursesJson, new TypeToken<ArrayList<HashMap<String, Object>>>() {
-            }.getType());
-            sheetbinding.itemsList.setAdapter(new ItemsAdapter(allCoursesList));
-
-            selectedPosition = selectedCoursePosition;
-
-            ((BaseAdapter) sheetbinding.itemsList.getAdapter()).notifyDataSetChanged();
-            sheetbinding.itemsList.setOnItemClickListener((_param1, _param2, _param3, _param4) -> {
-                selectedCoursePosition = _param3;
-                selectedCourseID = keysList.get(_param3);
-                int spaceIndex = allCoursesList.get(_param3).get("name").toString().indexOf(" ");
-                if (spaceIndex != -1) {
-                    binding.courseTxt.setText(allCoursesList.get(_param3).get("name").toString().substring(0, spaceIndex));
-                } else {
-                    binding.courseTxt.setText(allCoursesList.get(_param3).get("name").toString());
-                }
-                if (binding.otherDetailsErrorTxt.getVisibility() == View.VISIBLE) {
-                    PrepNestUtil.TransitionManager(binding.edittextsContainer, 150);
-                    binding.otherDetailsErrorTxt.setVisibility(View.GONE);
-                }
-                addTotalSemesters(Double.parseDouble(allCoursesList.get(_param3).get("duration").toString()));
-                selectedSemester = 0;
-                selectedSemesterPosition = -1;
-                binding.semesterTxt.setText("Semester");
-                coursesSheet.dismiss();
-            });
-            coursesSheet.setCancelable(true);
-            coursesSheet.show();
+            final ItemListSheetFragment courseSheet = ItemListSheetFragment.newInstance(dataPayload);
+            courseSheet.show(getSupportFragmentManager(), "courseSheet");
         });
 
         binding.semesterSelectContainer.setOnClickListener(_view -> {
-            if (selectedCourseID.isEmpty()) {
+            if (selectedCourseId.equals("-1")) {
                 PrepNestUtil.TransitionManager(binding.wrapperLayout, 150);
                 binding.otherDetailsErrorTxt.setText("Select your course first");
                 binding.otherDetailsErrorTxt.setVisibility(View.VISIBLE);
             } else {
                 Rect r = new Rect();
                 binding.wrapperLayout.getWindowVisibleDisplayFrame(r);
-                int screenheight = binding.wrapperLayout.getRootView().getHeight();
-                int keypadheight = screenheight - r.bottom;
-                if (keypadheight > (screenheight * 0.15d)) {
+                int screenHeight = binding.wrapperLayout.getRootView().getHeight();
+                int keypadHeight = screenHeight - r.bottom;
+                if (keypadHeight > (screenHeight * 0.15d)) {
                     PrepNestUtil.hideKeyboard(SignupActivity.this);
                 }
-                final BottomSheetDialog semesterSheet = new BottomSheetDialog(SignupActivity.this);
 
-                DetailsSelectSheetBinding sheetbinding = DetailsSelectSheetBinding.inflate(getLayoutInflater());
+                createSemestersList(selectedCourseId);
 
-                semesterSheet.setContentView(sheetbinding.getRoot());
+                dataPayload = new HashMap<>();
+                dataPayload.put("type", ItemListSheetFragment.SheetType.SEMESTER.toString());
+                dataPayload.put("list", new ArrayList<>(itemsList));
+                dataPayload.put("selectedItemId", selectedSemesterId);
 
-                semesterSheet.setOnShowListener(dialog -> {
-                    BottomSheetDialog d = (BottomSheetDialog) dialog;
-                    View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
-                    if (bottomSheet != null) {
-                        bottomSheet.setBackgroundResource(android.R.color.transparent);
-                    }
-                });
-
-                ViewGroup.LayoutParams paramscontainer = sheetbinding.container.getLayoutParams();
-                paramscontainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
-                paramscontainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-                sheetbinding.container.setLayoutParams(paramscontainer);
-
-                GradientDrawable gd = new GradientDrawable();
-                gd.setColor(Color.parseColor("#FFFFFF"));
-                gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-                sheetbinding.container.setBackground(gd);
-                sheetbinding.searchContainer.setVisibility(View.GONE);
-                sheetbinding.itemsList.setVerticalScrollBarEnabled(false);
-                sheetbinding.itemsList.setVerticalScrollBarEnabled(false);
-                sheetbinding.itemsList.setAdapter(new ItemsAdapter(totalSemestersList));
-
-                selectedPosition = selectedSemesterPosition;
-
-                ((BaseAdapter) sheetbinding.itemsList.getAdapter()).notifyDataSetChanged();
-                sheetbinding.itemsList.setOnItemClickListener((_param1, _param2, position, _param4) -> {
-                    selectedSemesterPosition = position;
-                    selectedSemester = Double.parseDouble(totalSemestersList.get(position).get("semester").toString());
-                    binding.semesterTxt.setText(getFormattedNumber(selectedSemester).concat(" semester"));
-                    if (binding.otherDetailsErrorTxt.getVisibility() == View.VISIBLE) {
-                        PrepNestUtil.TransitionManager(binding.edittextsContainer, 150);
-                        binding.otherDetailsErrorTxt.setVisibility(View.GONE);
-                    }
-                    semesterSheet.dismiss();
-                });
-                semesterSheet.setCancelable(true);
-                semesterSheet.show();
+                final ItemListSheetFragment semSheet = ItemListSheetFragment.newInstance(dataPayload);
+                semSheet.show(getSupportFragmentManager(), "semSheet");
             }
         });
 
@@ -439,12 +328,12 @@ public class SignupActivity extends AppCompatActivity {
                 HashMap<String, Object> addUser;
                 addUser = new HashMap<>();
                 addUser.put("name", binding.nameEdittext.getText().toString().trim());
-                addUser.put("email", FirebaseAuth.getInstance().getCurrentUser().getEmail());
+                addUser.put("email", Objects.requireNonNull(FirebaseAuth.getInstance().getCurrentUser()).getEmail());
                 addUser.put("uid", FirebaseAuth.getInstance().getCurrentUser().getUid());
                 addUser.put("profile", null);
-                addUser.put("course id", selectedCourseID);
+                addUser.put("courseId", selectedCourseId);
                 addUser.put("semester", selectedSemester);
-                addUser.put("current year", (int) ((selectedSemester + 1) / 2));
+                addUser.put("currentYear", (selectedSemester + 1) / 2);
                 addUser.put("provider", false);
 //                addUser.put("referred by", "");
 //                addWelcomeBonusToUser(addUser);
@@ -468,6 +357,8 @@ public class SignupActivity extends AppCompatActivity {
                     } else {
                         PrepNestUtil.showToast(SignupActivity.this, task.getException() != null ? task.getException().getMessage() : "");
                     }
+                } else {
+                    PrepNestUtil.showToast(SignupActivity.this, task.getException() != null ? task.getException().getMessage() : "");
                 }
             }
         };
@@ -475,7 +366,8 @@ public class SignupActivity extends AppCompatActivity {
 
     private void initializeLogic() {
         designUI();
-        getCourses();
+//        getCourses();
+        loadAllCoursesFromJson(this);
     }
 
     @Override
@@ -505,10 +397,11 @@ public class SignupActivity extends AppCompatActivity {
     }
 
     public void createNewUser(final HashMap<String, Object> userData) {
+        assert auth.getCurrentUser() != null;
         auth.getCurrentUser().getIdToken(true)
                 .addOnSuccessListener((GetTokenResult result) -> {
                     String idToken = result.getToken();
-                    userData.put("timestamp", String.valueOf(System.currentTimeMillis()));
+                    userData.put("timestamp", System.currentTimeMillis());
 
                     Gson gson = new Gson();
                     String jsonData = gson.toJson(userData);
@@ -532,11 +425,11 @@ public class SignupActivity extends AppCompatActivity {
                         public void onFailure(@NonNull Call call, @NonNull IOException e) {
                             PrepNestUtil.showLoadingDialog(SignupActivity.this, false);
                             PrepNestUtil.showToast(SignupActivity.this, "An unknown error occurred");
-                            Log.e("createNewUser", e.getMessage());
+                            Log.e("createNewUser", Objects.requireNonNull(e.getMessage()));
                         }
 
                         @Override
-                        public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                        public void onResponse(@NonNull Call call, @NonNull Response response) {
                             if (response.isSuccessful()) {
                                 PrepNestUtil.showLoadingDialog(SignupActivity.this, false);
                                 toAddRefer.setClass(SignupActivity.this, AddreferralActivity.class);
@@ -546,7 +439,8 @@ public class SignupActivity extends AppCompatActivity {
                             } else {
                                 PrepNestUtil.showLoadingDialog(SignupActivity.this, false);
                                 PrepNestUtil.showToast(SignupActivity.this, "An unknown error occurred");
-                                Log.d("createNewUser", "Response: " + response.body().toString());
+                                assert response.body() != null;
+                                Log.d("createNewUser", "Response: " + response.body());
                             }
                         }
                     });
@@ -559,53 +453,94 @@ public class SignupActivity extends AppCompatActivity {
     }
 
 
-    public String loadCoursesFromJsonFile() {
-        String result;
+    public void loadAllCoursesFromJson(Context context) {
+        try (InputStream is = context.getAssets().open("courses.json");
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[1024];
+            int length;
 
-        try {
+            while ((length = is.read(buffer)) != -1) {
+                bos.write(buffer, 0, length);
+            }
 
-            InputStream is = getAssets().open("courses.json");
-
-            int size = is.available();
-
-            byte[] buffer = new byte[size];
-
-            is.read(buffer);
-
-            is.close();
-
-            result = new String(buffer, "UTF-8");
-
-        } catch (IOException ex) {
-
-            ex.printStackTrace();
-            return null;
-
+            jsonCourseData = bos.toString(StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-
-        return result;
-
     }
 
-
-    public void getCourses() {
+    public List<String> getCourseIds() {
+        List<String> idsList = new ArrayList<>();
+        JSONObject jsonObject = null;
         try {
-            JSONObject allCourses = new JSONObject(loadCoursesFromJsonFile());
-            Iterator<String> keys = allCourses.keys();
-            while (keys.hasNext()) {
-                keysList.add(keys.next());
-            }
-            for (int pos = 0; pos < keysList.size(); pos++) {
-                JSONObject course = allCourses.getJSONObject(keysList.get(pos));
-                HashMap<String, Object> addCourse;
-                addCourse = new HashMap<>();
-                addCourse.put("name", course.getString("name"));
-                addCourse.put("duration", String.format("%.1f", course.getDouble("duration")));
-                allCoursesList.add(addCourse);
-            }
-            coursesJson = new Gson().toJson(allCoursesList);
-        } catch (Exception ignored) {
+            jsonObject = new JSONObject(jsonCourseData);
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
+        Iterator<String> ids = jsonObject.keys();
 
+        while (ids.hasNext()) {
+            idsList.add(ids.next());
+        }
+
+        return idsList;
+    }
+
+    public String getCourseName(String courseId) {
+        JSONObject jsonObject = null;
+        try {
+            jsonObject = new JSONObject(jsonCourseData);
+            return jsonObject.getJSONObject(courseId).getString("name");
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public double getCourseDuration(String courseId) {
+        JSONObject jsonObject = null;
+        try {
+            jsonObject = new JSONObject(jsonCourseData);
+            return jsonObject.getJSONObject(courseId).getDouble("duration");
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public String setCourseName(String courseId) {
+        final String courseName = getCourseName(courseId);
+        int spaceIndex = courseName.indexOf(" ");
+
+        if (spaceIndex == -1) {
+            return courseName;
+        }
+
+        return courseName.substring(0, spaceIndex);
+    }
+
+    public void createCoursesList(List<String> courseIds) {
+        itemsList = new ArrayList<>();
+
+        for (int index = 0; index < courseIds.size(); index++) {
+            HashMap<String, Object> courseMap = new HashMap<>();
+            courseMap.put("id", courseIds.get(index));
+            courseMap.put("text", getCourseName(courseIds.get(index)));
+
+            itemsList.add(courseMap);
+        }
+    }
+
+    public void createSemestersList(String courseId) {
+        final double courseMaxDuration = getCourseDuration(courseId);
+        final int courseMaxSemesters = (int) (courseMaxDuration * 2);
+        itemsList = new ArrayList<>();
+
+
+        for (int sem = 1; sem <= courseMaxSemesters; sem++) {
+            HashMap<String, Object> semesterMap = new HashMap<>();
+            semesterMap.put("id", String.valueOf(sem));
+            semesterMap.put("text", PrepNestUtil.getFormattedNumber(sem).concat(" semester"));
+
+            itemsList.add(semesterMap);
         }
     }
 
@@ -613,46 +548,15 @@ public class SignupActivity extends AppCompatActivity {
         return Patterns.EMAIL_ADDRESS.matcher(_email).matches();
     }
 
-    public double convertToDp(final double _pixels) {
-        return TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP,
-                (float) _pixels,
-                getResources().getDisplayMetrics());
-    }
-
-    public void addTotalSemesters(final double _duration) {
-        totalSemestersList.clear();
-        int maxSemesters = (int) (_duration * 2);
-        for (int sem = 1; sem <= maxSemesters; sem++) {
-            {
-                HashMap<String, Object> _item = new HashMap<>();
-                _item.put("semester", String.valueOf((long) (sem)));
-                totalSemestersList.add(_item);
-            }
-        }
-    }
-
-    public String getFormattedNumber(final double _value) {
-        if (_value == 1) {
-            return "1st";
-        }
-        if (_value == 2) {
-            return "2nd";
-        }
-        if (_value == 3) {
-            return "3rd";
-        }
-        return String.valueOf((long) _value).concat("th");
-    }
-
     public void addWelcomeBonusToUser(final HashMap<String, Object> _user) {
         final String temp = "10";
+        assert auth.getCurrentUser() != null;
         DatabaseReference userRef = users.child(auth.getCurrentUser().getUid());
         userRef.updateChildren(_user).addOnCompleteListener(addUser -> {
             if (addUser.isSuccessful()) {
                 HashMap<String, Object> userCredentials;
                 userCredentials = new HashMap<>();
-                userCredentials.put("email", FirebaseAuth.getInstance().getCurrentUser().getEmail());
+                userCredentials.put("email", Objects.requireNonNull(FirebaseAuth.getInstance().getCurrentUser()).getEmail());
                 userCredentials.put("password", binding.confirmPwdEdittext.getText().toString().trim());
 //                userCredentials.edit().putString("credentials", new Gson().toJson(userCredentials)).apply();
                 userRef.child("coins").setValue(Long.parseLong(temp)).addOnCompleteListener(addBonus -> {
@@ -691,46 +595,25 @@ public class SignupActivity extends AppCompatActivity {
         });
     }
 
-    public class ItemsAdapter extends BaseAdapter {
-
-        ArrayList<HashMap<String, Object>> _data;
-
-        public ItemsAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _data = _arr;
-        }
-
-        @Override
-        public int getCount() {
-            return _data.size();
-        }
-
-        @Override
-        public HashMap<String, Object> getItem(int _index) {
-            return _data.get(_index);
-        }
-
-        @Override
-        public long getItemId(int _index) {
-            return _index;
-        }
-
-        @Override
-        public View getView(final int _position, View _v, ViewGroup _container) {
-            SheetSingleItemSelectBinding binding = SheetSingleItemSelectBinding.inflate(getLayoutInflater());
-            View _view = binding.getRoot();
-            if (_data.get(_position).containsKey("name")) {
-                binding.text.setText(_data.get(_position).get("name").toString());
-            }
-            if (_data.get(_position).containsKey("semester")) {
-                binding.text.setText(getFormattedNumber(Double.parseDouble(_data.get(_position).get("semester").toString())).concat(" semester"));
+    @Override
+    public void onDataReturned(HashMap<String, Object> updatedMap) {
+        if (updatedMap.containsKey("type") && updatedMap.containsKey("id")) {
+            final String type = Objects.requireNonNull(updatedMap.get("type")).toString();
+            if (type.equals(ItemListSheetFragment.SheetType.COURSE.toString())) {
+                selectedCourseId = Objects.requireNonNull(updatedMap.get("id")).toString();
+                binding.courseTxt.setText(setCourseName(selectedCourseId));
+                selectedSemesterId = "-1";
+                binding.semesterTxt.setText("Semester");
+            } else if (type.equals(ItemListSheetFragment.SheetType.SEMESTER.toString())) {
+                selectedSemesterId = Objects.requireNonNull(updatedMap.get("id")).toString();
+                selectedSemester = Integer.parseInt(selectedSemesterId);
+                binding.semesterTxt.setText(PrepNestUtil.getFormattedNumber(selectedSemester).concat(" semester"));
             }
 
-            if (selectedPosition == _position) {
-                binding.selectedCircle.setVisibility(View.VISIBLE);
-            } else {
-                binding.selectedCircle.setVisibility(View.GONE);
+            if (binding.otherDetailsErrorTxt.getVisibility() == View.VISIBLE) {
+                PrepNestUtil.TransitionManager(binding.wrapperLayout, 150);
+                binding.otherDetailsErrorTxt.setVisibility(View.GONE);
             }
-            return _view;
         }
     }
 }

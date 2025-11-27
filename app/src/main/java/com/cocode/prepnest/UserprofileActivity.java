@@ -6,6 +6,7 @@ import android.app.AlertDialog;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.ContentResolver;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -22,7 +23,6 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.MimeTypeMap;
-import android.widget.BaseAdapter;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.TextView;
@@ -37,9 +37,7 @@ import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 
 import com.bumptech.glide.Glide;
-import com.cocode.prepnest.databinding.DetailsSelectSheetBinding;
 import com.cocode.prepnest.databinding.ProfileViewBinding;
-import com.cocode.prepnest.databinding.SheetSingleItemSelectBinding;
 import com.cocode.prepnest.databinding.StatusViewBinding;
 import com.cocode.prepnest.databinding.UserprofileBinding;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -57,17 +55,20 @@ import com.google.firebase.storage.UploadTask;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.IOException;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 
 
-public class UserprofileActivity extends AppCompatActivity {
+public class UserprofileActivity extends AppCompatActivity implements ItemListSheetFragment.BottomSheetListener {
 
     private static final int REQUEST_PICK_IMAGE = 100;
     private static final int REQUEST_CROP_IMAGE = 200;
@@ -77,38 +78,42 @@ public class UserprofileActivity extends AppCompatActivity {
     private final String verificationID = "";
     private final String tempUID = "";
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
-    private final ArrayList<HashMap<String, Object>> totalSemestersList = new ArrayList<>();
     private final Timer _timer = new Timer();
     Uri imageUri;
     Uri resultUri;
+    private ArrayList<HashMap<String, Object>> itemsList = new ArrayList<>();
     private UserprofileBinding binding;
     private HashMap<String, Object> userData = new HashMap<>();
     private boolean editMode = false;
     private boolean removeProfileFromStorage = false;
-    private String jsonCourseData = "";
+    private String jsonCourseData = null;
+    private String selectedSemesterId = "-1";
     private DatabaseReference users;
     private StorageReference profile_pictures;
     private NetworkMonitor networkMonitor;
-    private double selectedSemester = 0;
+    private int selectedSemester = 0;
     private boolean semesterChanged = false;
-    private com.google.android.material.bottomsheet.BottomSheetDialog email_verification_sheet;
+    private com.google.android.material.bottomsheet.BottomSheetDialog emailVerificationSheet;
     private com.google.android.material.bottomsheet.BottomSheetDialog phn_verification_sheet;
     private int minutes = 0;
     private int seconds = 0;
     private TimerTask timer;
+    private SharedPreferences cachedData;
+    private SharedPreferences userCredentials;
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
         super.onCreate(_savedInstanceState);
         binding = UserprofileBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        initialize(_savedInstanceState);
+        initialize();
         FirebaseApp.initializeApp(this);
         initializeLogic();
     }
 
-    private void initialize(Bundle _savedInstanceState) {
-        SharedPreferences user_credentials = getSharedPreferences("credentials", Activity.MODE_PRIVATE);
+    private void initialize() {
+        userCredentials = getSharedPreferences("credentials", Activity.MODE_PRIVATE);
+        cachedData = getSharedPreferences("userCachedData", Activity.MODE_PRIVATE);
 
         binding.backIcon.setOnClickListener(_view -> {
             if (editMode) {
@@ -134,9 +139,9 @@ public class UserprofileActivity extends AppCompatActivity {
         binding.editIcon.setOnClickListener(_view -> {
             Rect r = new Rect();
             binding.background.getWindowVisibleDisplayFrame(r);
-            int screenheight = binding.background.getRootView().getHeight();
-            int keypadheight = screenheight - r.bottom;
-            if (keypadheight > (screenheight * 0.15d)) {
+            int screenHeight = binding.background.getRootView().getHeight();
+            int keypadHeight = screenHeight - r.bottom;
+            if (keypadHeight > (screenHeight * 0.15d)) {
                 PrepNestUtil.hideKeyboard(UserprofileActivity.this);
             }
             PrepNestUtil.TransitionManager(binding.container, 150);
@@ -146,8 +151,8 @@ public class UserprofileActivity extends AppCompatActivity {
                     binding.nameErrorTxt.setVisibility(View.VISIBLE);
                 } else {
                     if (binding.phnNumberEdittext.getText().toString().trim().isEmpty()) {
-                        if (userData.containsKey("phone number")) {
-                            binding.phnNmberErrorTxt.setText("Enter your phone number");
+                        if (userData.containsKey("phoneNumber")) {
+                            binding.phnNmberErrorTxt.setText("Enter your phoneNumber");
                             binding.phnNmberErrorTxt.setVisibility(View.VISIBLE);
                         } else {
                             binding.editIcon.setImageResource(R.drawable.icon_edit);
@@ -160,7 +165,7 @@ public class UserprofileActivity extends AppCompatActivity {
                             if (PrepNestUtil.isConnected(UserprofileActivity.this)) {
                                 editMode = !editMode;
                                 if (removeProfileFromStorage) {
-                                    deleteProfileFromStorage(userData.get("profile").toString());
+                                    deleteProfileFromStorage(Objects.requireNonNull(userData.get("profile")).toString());
                                 } else {
                                     if (resultUri != null) {
                                         uploadProfileToFirebase(resultUri);
@@ -176,7 +181,7 @@ public class UserprofileActivity extends AppCompatActivity {
                         }
                     } else {
                         if (!(binding.phnNumberEdittext.getText().toString().trim().length() == 10)) {
-                            binding.phnNmberErrorTxt.setText("Enter a valid phone number");
+                            binding.phnNmberErrorTxt.setText("Enter a valid phoneNumber");
                             binding.phnNmberErrorTxt.setVisibility(View.VISIBLE);
                         } else {
                             binding.editIcon.setImageResource(R.drawable.icon_edit);
@@ -189,7 +194,7 @@ public class UserprofileActivity extends AppCompatActivity {
                             if (PrepNestUtil.isConnected(UserprofileActivity.this)) {
                                 editMode = !editMode;
                                 if (removeProfileFromStorage) {
-                                    deleteProfileFromStorage(userData.get("profile").toString());
+                                    deleteProfileFromStorage(Objects.requireNonNull(userData.get("profile")).toString());
                                 } else {
                                     if (resultUri != null) {
                                         uploadProfileToFirebase(resultUri);
@@ -206,13 +211,13 @@ public class UserprofileActivity extends AppCompatActivity {
                     }
                 }
             } else {
-                editMode = !editMode;
+                editMode = true;
                 binding.editIcon.setImageResource(R.drawable.icon_done);
                 binding.nameEdittext.setEnabled(true);
                 binding.phnNumberEdittext.setEnabled(true);
                 binding.semesterSelectContainer.setEnabled(true);
                 if (userData.containsKey("profile")) {
-                    if (userData.get("profile").toString().equals("null")) {
+                    if (Objects.requireNonNull(userData.get("profile")).toString().equals("null")) {
                         binding.removeProfileTxt.setVisibility(View.GONE);
                     } else {
                         binding.removeProfileTxt.setVisibility(View.VISIBLE);
@@ -235,7 +240,7 @@ public class UserprofileActivity extends AppCompatActivity {
             PrepNestUtil.TransitionManager(binding.background, 150);
             binding.removeProfileTxt.setVisibility(View.GONE);
             if (userData.containsKey("profile")) {
-                if (userData.get("profile").toString().equals("null")) {
+                if (Objects.requireNonNull(userData.get("profile")).toString().equals("null")) {
                     if (resultUri != null) {
                         resultUri = null;
                         binding.defaultProfileContainer.setVisibility(View.VISIBLE);
@@ -248,7 +253,9 @@ public class UserprofileActivity extends AppCompatActivity {
                         binding.userProfileContainer.setVisibility(View.GONE);
                     } else {
                         resultUri = null;
-                        Glide.with(getApplicationContext()).load(Uri.parse(userData.get("profile").toString())).into(binding.userProfilePicture);
+                        Glide.with(getApplicationContext())
+                                .load(Uri.parse(Objects.requireNonNull(userData.get("profile")).toString()))
+                                .into(binding.userProfilePicture);
                         binding.removeProfileTxt.setVisibility(View.VISIBLE);
                     }
                 }
@@ -264,10 +271,7 @@ public class UserprofileActivity extends AppCompatActivity {
         binding.nameEdittext.addTextChangedListener(new TextWatcher() {
             @Override
             public void onTextChanged(CharSequence _param1, int _param2, int _param3, int _param4) {
-                if (binding.nameErrorTxt.getVisibility() == View.VISIBLE) {
-                    PrepNestUtil.TransitionManager(binding.edittextsContainer, 150);
-                    binding.nameErrorTxt.setVisibility(View.GONE);
-                }
+
             }
 
             @Override
@@ -277,55 +281,30 @@ public class UserprofileActivity extends AppCompatActivity {
 
             @Override
             public void afterTextChanged(Editable _param1) {
-
+                if (binding.nameErrorTxt.getVisibility() == View.VISIBLE) {
+                    PrepNestUtil.TransitionManager(binding.edittextsContainer, 150);
+                    binding.nameErrorTxt.setVisibility(View.GONE);
+                }
             }
         });
 
         binding.semesterSelectContainer.setOnClickListener(_view -> {
             Rect r = new Rect();
             binding.background.getWindowVisibleDisplayFrame(r);
-            int screenheight = binding.background.getRootView().getHeight();
-            int keypadheight = screenheight - r.bottom;
-            if (keypadheight > (screenheight * 0.15d)) {
+            int screenHeight = binding.background.getRootView().getHeight();
+            int keypadHeight = screenHeight - r.bottom;
+            if (keypadHeight > (screenHeight * 0.15d)) {
                 PrepNestUtil.hideKeyboard(UserprofileActivity.this);
             }
-            final BottomSheetDialog semesterSheet = new BottomSheetDialog(UserprofileActivity.this);
+            createSemestersList(Objects.requireNonNull(userData.get("courseId")).toString());
 
-            DetailsSelectSheetBinding sheetbinding = DetailsSelectSheetBinding.inflate(getLayoutInflater());
+            HashMap<String, Object> dataPayload = new HashMap<>();
+            dataPayload.put("type", ItemListSheetFragment.SheetType.SEMESTER.toString());
+            dataPayload.put("list", new ArrayList<>(itemsList));
+            dataPayload.put("selectedItemId", selectedSemesterId);
 
-            semesterSheet.setContentView(sheetbinding.getRoot());
-
-            semesterSheet.setOnShowListener(dialog -> {
-                BottomSheetDialog d = (BottomSheetDialog) dialog;
-                View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
-                if (bottomSheet != null) {
-                    bottomSheet.setBackgroundResource(android.R.color.transparent);
-                }
-            });
-
-            ViewGroup.LayoutParams paramscontainer = sheetbinding.container.getLayoutParams();
-            paramscontainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
-            paramscontainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-            sheetbinding.container.setLayoutParams(paramscontainer);
-
-            GradientDrawable gd = new GradientDrawable();
-            gd.setColor(Color.parseColor("#FFFFFF"));
-            gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-            sheetbinding.container.setBackground(gd);
-            sheetbinding.searchContainer.setVisibility(View.GONE);
-            sheetbinding.itemsList.setVerticalScrollBarEnabled(false);
-            sheetbinding.itemsList.setVerticalScrollBarEnabled(false);
-            sheetbinding.itemsList.setAdapter(new ItemsAdapter(totalSemestersList));
-
-            ((BaseAdapter) sheetbinding.itemsList.getAdapter()).notifyDataSetChanged();
-            sheetbinding.itemsList.setOnItemClickListener((_param1, _param2, _param3, _param4) -> {
-                selectedSemester = Double.parseDouble(totalSemestersList.get(_param3).get("semester").toString());
-                binding.semesterTxt.setText(getFormattedNumber(selectedSemester).concat(" semester"));
-                semesterChanged = true;
-                semesterSheet.dismiss();
-            });
-            semesterSheet.setCancelable(true);
-            semesterSheet.show();
+            final ItemListSheetFragment semSheet = ItemListSheetFragment.newInstance(dataPayload);
+            semSheet.show(getSupportFragmentManager(), "semSheet");
         });
 
         binding.btnEmailVerification.setOnClickListener(_view -> {
@@ -353,10 +332,7 @@ public class UserprofileActivity extends AppCompatActivity {
         binding.phnNumberEdittext.addTextChangedListener(new TextWatcher() {
             @Override
             public void onTextChanged(CharSequence _param1, int _param2, int _param3, int _param4) {
-                if (binding.phnNmberErrorTxt.getVisibility() == View.VISIBLE) {
-                    PrepNestUtil.TransitionManager(binding.edittextsContainer, 150);
-                    binding.phnNmberErrorTxt.setVisibility(View.GONE);
-                }
+
             }
 
             @Override
@@ -366,14 +342,17 @@ public class UserprofileActivity extends AppCompatActivity {
 
             @Override
             public void afterTextChanged(Editable _param1) {
-
+                if (binding.phnNmberErrorTxt.getVisibility() == View.VISIBLE) {
+                    PrepNestUtil.TransitionManager(binding.edittextsContainer, 150);
+                    binding.phnNmberErrorTxt.setVisibility(View.GONE);
+                }
             }
         });
 
         binding.btnPhoneVerification.setOnClickListener(_view -> {
             /*
 _loadingDialog(true);
-if (userData.containsKey("phone number")) {
+if (userData.containsKey("phoneNumber")) {
 if (userData.containsKey("phone verified")) {
 if (userData.get("phone verified").toString().equals("true")) {
 btn_phone_verification.setVisibility(View.GONE);
@@ -398,7 +377,6 @@ btn_phone_verification.setText("VERIFY");
         users = FirebaseDatabase.getInstance().getReference("users");
         profile_pictures = FirebaseStorage.getInstance().getReference("profile_pictures");
         networkMonitor = new NetworkMonitor(this);
-        String reference = "users/".concat(FirebaseAuth.getInstance().getCurrentUser().getUid());
         semesterChanged = false;
         designUI();
 
@@ -460,7 +438,8 @@ btn_phone_verification.setText("VERIFY");
     @Override
     protected void onPostCreate(Bundle _savedInstanceState) {
         super.onPostCreate(_savedInstanceState);
-        getUserData();
+        loadAllCoursesFromJson(this);
+        loadUserDataFromSP();
     }
 
     @Override
@@ -488,9 +467,20 @@ btn_phone_verification.setText("VERIFY");
         PrepNestUtil.changeNavBarColor(this, true);
     }
 
+    public void loadUserDataFromSP() {
+        if (cachedData.contains("userData")) {
+            userData = new Gson().fromJson(cachedData.getString("userData", ""), new TypeToken<HashMap<String, Object>>() {
+            }.getType());
+            loadUserDataToUI();
+        } else {
+            getUserData();
+        }
+    }
+
     public void getUserData() {
         PrepNestUtil.showLoadingDialog(UserprofileActivity.this, true);
         PrepNestUtil.TransitionManager(binding.background, 150);
+        assert auth.getCurrentUser() != null;
         users.child(auth.getCurrentUser().getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
@@ -499,78 +489,7 @@ btn_phone_verification.setText("VERIFY");
                 });
 
                 if (userData != null) {
-                    if (userData.containsKey("course id")) {
-                        userData.put("course duration", Double.parseDouble(fetchCourseData(userData.get("course id").toString()).get("duration").toString()));
-                        int spaceIndex = fetchCourseData(userData.get("course id").toString()).get("name").toString().indexOf(" ");
-                        if (spaceIndex != -1) {
-                            binding.courseTxt.setText(fetchCourseData(userData.get("course id").toString()).get("name").toString().substring(0, spaceIndex));
-                        } else {
-                            binding.courseTxt.setText(fetchCourseData(userData.get("course id").toString()).get("name").toString());
-                        }
-                    } else {
-                        userData.put("course duration", null);
-                        binding.courseTxt.setText("Course");
-                    }
-                    binding.profileContainer.setVisibility(View.VISIBLE);
-                    if (userData.containsKey("profile")) {
-                        if (userData.get("profile").toString().equals("null")) {
-                            binding.userProfileContainer.setVisibility(View.GONE);
-                            binding.defaultProfileContainer.setVisibility(View.VISIBLE);
-                        } else {
-                            binding.userProfileContainer.setVisibility(View.VISIBLE);
-                            binding.defaultProfileContainer.setVisibility(View.GONE);
-                            Glide.with(getApplicationContext()).load(Uri.parse(userData.get("profile").toString())).into(binding.userProfilePicture);
-                        }
-                    } else {
-                        binding.userProfileContainer.setVisibility(View.GONE);
-                        binding.defaultProfileContainer.setVisibility(View.VISIBLE);
-                    }
-                    binding.nameEtContainer.setVisibility(View.VISIBLE);
-                    if (userData.containsKey("name")) {
-                        binding.defaultProfileTitle.setText(generateDefaultName(userData.get("name").toString()).toUpperCase());
-                        binding.nameEdittext.setText(userData.get("name").toString());
-                    } else {
-                        binding.defaultProfileTitle.setText("PU");
-                        binding.nameEdittext.setText("PrepNest User");
-                    }
-                    binding.emailEtContainer.setVisibility(View.VISIBLE);
-                    if (userData.containsKey("email")) {
-                        binding.emailText.setText(userData.get("email").toString());
-                    } else {
-                        binding.emailText.setText("");
-                    }
-                    binding.phnNumberContainer.setVisibility(View.VISIBLE);
-                    if (userData.containsKey("phone number")) {
-                        binding.phnNumberEdittext.setText(decrypt(userData.get("phone number").toString(), FirebaseAuth.getInstance().getCurrentUser().getUid()));
-						/*
-if (userData.containsKey("phone verified")) {
-if (userData.get("phone verified").toString().equals("true")) {
-btn_phone_verification.setVisibility(View.GONE);
-} else {
-btn_phone_verification.setVisibility(View.VISIBLE);
-btn_phone_verification.setText("VERIFY");
-}
-} else {
-btn_phone_verification.setVisibility(View.VISIBLE);
-btn_phone_verification.setText("VERIFY");
-}
-*/
-                    } else {
-                        binding.phnNumberEdittext.setText("");
-                        binding.btnPhoneVerification.setVisibility(View.GONE);
-                    }
-                    binding.otherDetailsContainer.setVisibility(View.VISIBLE);
-                    if (userData.containsKey("semester")) {
-                        selectedSemester = ((Number) userData.get("semester")).doubleValue();
-                        binding.semesterTxt.setText(getFormattedNumber(selectedSemester).concat(" semester"));
-                    } else {
-                        binding.semesterTxt.setText("Semester");
-                    }
-                    if ((userData.get("course duration") == null)) {
-                        addTotalSemesters(5.5d);
-                    } else {
-                        addTotalSemesters(((Number) userData.get("course duration")).doubleValue());
-                    }
+                    loadUserDataToUI();
                 } else {
                     PrepNestUtil.showToast(UserprofileActivity.this, "Failed to load data, login again!");
                     FirebaseAuth.getInstance().signOut();
@@ -593,6 +512,85 @@ btn_phone_verification.setText("VERIFY");
 
     }
 
+    public void loadUserDataToUI() {
+        if (userData.containsKey("courseId")) {
+            userData.put("courseDuration", getCourseDuration(Objects.requireNonNull(userData.get("courseId")).toString()));
+            final String courseName = getCourseName(Objects.requireNonNull(userData.get("courseId")).toString());
+            int spaceIndex = courseName.indexOf(" ");
+            if (spaceIndex != -1) {
+                binding.courseTxt.setText(courseName.substring(0, spaceIndex));
+            } else {
+                binding.courseTxt.setText(courseName);
+            }
+        } else {
+            userData.put("courseDuration", null);
+            binding.courseTxt.setText("Course");
+        }
+        binding.profileContainer.setVisibility(View.VISIBLE);
+        if (userData.containsKey("profile")) {
+            if (Objects.requireNonNull(userData.get("profile")).toString().equals("null")) {
+                binding.userProfileContainer.setVisibility(View.GONE);
+                binding.defaultProfileContainer.setVisibility(View.VISIBLE);
+            } else {
+                binding.userProfileContainer.setVisibility(View.VISIBLE);
+                binding.defaultProfileContainer.setVisibility(View.GONE);
+                Glide.with(getApplicationContext())
+                        .load(Uri.parse(Objects.requireNonNull(userData.get("profile")).toString()))
+                        .into(binding.userProfilePicture);
+            }
+        } else {
+            binding.userProfileContainer.setVisibility(View.GONE);
+            binding.defaultProfileContainer.setVisibility(View.VISIBLE);
+        }
+        binding.nameEtContainer.setVisibility(View.VISIBLE);
+        if (userData.containsKey("name")) {
+            binding.defaultProfileTitle.setText(generateDefaultName(Objects.requireNonNull(userData.get("name")).toString()).toUpperCase());
+            binding.nameEdittext.setText(Objects.requireNonNull(userData.get("name")).toString());
+        } else {
+            binding.defaultProfileTitle.setText("PU");
+            binding.nameEdittext.setText("PrepNest User");
+        }
+        binding.emailEtContainer.setVisibility(View.VISIBLE);
+        if (userData.containsKey("email")) {
+            binding.emailText.setText(Objects.requireNonNull(userData.get("email")).toString());
+        } else {
+            binding.emailText.setText("");
+        }
+        binding.phnNumberContainer.setVisibility(View.VISIBLE);
+        if (userData.containsKey("phoneNumber")) {
+            binding.phnNumberEdittext.setText(decrypt(Objects.requireNonNull(userData.get("phoneNumber")).toString(), Objects.requireNonNull(FirebaseAuth.getInstance().getCurrentUser()).getUid()));
+						/*
+if (userData.containsKey("phone verified")) {
+if (userData.get("phone verified").toString().equals("true")) {
+btn_phone_verification.setVisibility(View.GONE);
+} else {
+btn_phone_verification.setVisibility(View.VISIBLE);
+btn_phone_verification.setText("VERIFY");
+}
+} else {
+btn_phone_verification.setVisibility(View.VISIBLE);
+btn_phone_verification.setText("VERIFY");
+}
+*/
+        } else {
+            binding.phnNumberEdittext.setText("");
+            binding.btnPhoneVerification.setVisibility(View.GONE);
+        }
+        binding.otherDetailsContainer.setVisibility(View.VISIBLE);
+        if (userData.containsKey("semester")) {
+            selectedSemester = ((Number) Objects.requireNonNull(userData.get("semester"))).intValue();
+            selectedSemesterId = String.valueOf(selectedSemester);
+            binding.semesterTxt.setText(PrepNestUtil.getFormattedNumber(selectedSemester).concat(" semester"));
+        } else {
+            binding.semesterTxt.setText("Semester");
+        }
+        if ((userData.get("courseDuration") == null)) {
+            createSemestersList("BON6SOM");
+        } else {
+            createSemestersList(Objects.requireNonNull(userData.get("courseId")).toString());
+        }
+    }
+
     public String generateDefaultName(final String _name) {
         if (_name.contains(" ")) {
             int lastIndex = _name.lastIndexOf(" ");
@@ -602,40 +600,65 @@ btn_phone_verification.setText("VERIFY");
         }
     }
 
-    public HashMap<String, Object> fetchCourseData(final String _id) {
-        HashMap<String, Object> courseData = new HashMap<>();
-        if (jsonCourseData.isEmpty()) {
-            try {
-                InputStream is = getAssets().open("courses.json");
-                int size = is.available();
-                byte[] buffer = new byte[size];
-                is.read(buffer);
-                is.close();
-                jsonCourseData = new String(buffer, "UTF-8");
-            } catch (IOException ex) {
-                PrepNestUtil.showToast(UserprofileActivity.this, ex.toString());
-                return courseData;
+    public void loadAllCoursesFromJson(Context context) {
+        try (InputStream is = context.getAssets().open("courses.json");
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[1024];
+            int length;
+
+            while ((length = is.read(buffer)) != -1) {
+                bos.write(buffer, 0, length);
             }
-        }
-        try {
-            JSONObject allCourses = new JSONObject(jsonCourseData);
-            JSONObject course = allCourses.getJSONObject(_id);
-            courseData = new Gson().fromJson(course.toString(), new TypeToken<HashMap<String, Object>>() {
-            }.getType());
-            return courseData;
+
+            jsonCourseData = bos.toString(StandardCharsets.UTF_8);
         } catch (Exception e) {
-            PrepNestUtil.showToast(UserprofileActivity.this, e.toString());
-            return courseData;
+            e.printStackTrace();
         }
     }
 
+
+    public String getCourseName(String courseId) {
+        JSONObject jsonObject = null;
+        try {
+            jsonObject = new JSONObject(jsonCourseData);
+            return jsonObject.getJSONObject(courseId).getString("name");
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public double getCourseDuration(String courseId) {
+        JSONObject jsonObject = null;
+        try {
+            jsonObject = new JSONObject(jsonCourseData);
+            return jsonObject.getJSONObject(courseId).getDouble("duration");
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void createSemestersList(String courseId) {
+        final double courseMaxDuration = getCourseDuration(courseId);
+        final int courseMaxSemesters = (int) (courseMaxDuration * 2);
+        itemsList = new ArrayList<>();
+
+        for (int sem = 1; sem <= courseMaxSemesters; sem++) {
+            HashMap<String, Object> semesterMap = new HashMap<>();
+            semesterMap.put("id", String.valueOf(sem));
+            semesterMap.put("text", PrepNestUtil.getFormattedNumber(sem).concat(" semester"));
+
+            itemsList.add(semesterMap);
+        }
+    }
+
+
     public void showEmailVerificationSheet() {
-        email_verification_sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(UserprofileActivity.this);
-        StatusViewBinding sheetbinding = StatusViewBinding.inflate(getLayoutInflater());
+        emailVerificationSheet = new com.google.android.material.bottomsheet.BottomSheetDialog(UserprofileActivity.this);
+        StatusViewBinding sheetBinding = StatusViewBinding.inflate(getLayoutInflater());
 
-        email_verification_sheet.setContentView(sheetbinding.getRoot());
+        emailVerificationSheet.setContentView(sheetBinding.getRoot());
 
-        email_verification_sheet.setOnShowListener(dialog -> {
+        emailVerificationSheet.setOnShowListener(dialog -> {
             BottomSheetDialog d = (BottomSheetDialog) dialog;
             View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheet != null) {
@@ -647,25 +670,25 @@ btn_phone_verification.setText("VERIFY");
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor("#FFFFFF"));
         gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-        sheetbinding.bg.setBackground(gd);
-        sheetbinding.subtext.setTextSize(11);
-        sheetbinding.title.setVisibility(View.GONE);
-        sheetbinding.btnOk.setVisibility(View.GONE);
-//        sheetbinding.imageContainer.setBackground(new GradientDrawable() {
+        sheetBinding.bg.setBackground(gd);
+        sheetBinding.subtext.setTextSize(11);
+        sheetBinding.title.setVisibility(View.GONE);
+        sheetBinding.btnOk.setVisibility(View.GONE);
+//        sheetBinding.imageContainer.setBackground(new GradientDrawable() {
 //            public GradientDrawable getIns(int a, int b) {
 //                this.setCornerRadius(a);
 //                this.setColor(b);
 //                return this;
 //            }
 //        }.getIns((int) 360, 0xFFFAFAFA));
-        PrepNestUtil.roundViewWithRipple(sheetbinding.btnCancel, "#000000", 15, 0, "#000000", "#212121");
-        sheetbinding.btnCancelTxt.setTextColor(0xFFFFFFFF);
-        sheetbinding.image.setImageResource(R.drawable.icon_email);
-        sheetbinding.subtext.setText("We have sent you a mail on ".concat(FirebaseAuth.getInstance().getCurrentUser().getEmail().concat(" with a account verification link, click on the link to verify your email. If you didn't find the email, check spam folder.")));
-        sheetbinding.btnCancelTxt.setText("Dismiss");
-        sheetbinding.btnCancel.setOnClickListener(_view -> email_verification_sheet.dismiss());
-        email_verification_sheet.setCancelable(true);
-        email_verification_sheet.show();
+        PrepNestUtil.roundViewWithRipple(sheetBinding.btnCancel, "#000000", 15, 0, "#000000", "#212121");
+        sheetBinding.btnCancelTxt.setTextColor(0xFFFFFFFF);
+        sheetBinding.image.setImageResource(R.drawable.icon_email);
+        sheetBinding.subtext.setText("We have sent you a mail on ".concat(Objects.requireNonNull(Objects.requireNonNull(FirebaseAuth.getInstance().getCurrentUser()).getEmail()).concat(" with a account verification link, click on the link to verify your email. If you didn't find the email, check spam folder.")));
+        sheetBinding.btnCancelTxt.setText("Dismiss");
+        sheetBinding.btnCancel.setOnClickListener(_view -> emailVerificationSheet.dismiss());
+        emailVerificationSheet.setCancelable(true);
+        emailVerificationSheet.show();
     }
 
     public void checkEmailVerificationStatus() {
@@ -729,7 +752,7 @@ not_get_code_txt.setTypeface(Typeface.createFromAsset(getAssets(),"fonts/default
 resend_code_txt.setTypeface(Typeface.createFromAsset(getAssets(),"fonts/default_font.ttf"), 0);
 otp_edittext.setFocusableInTouchMode(true);
 _showTimerCountdown(otpResendTime, minutes_txt, seconds_txt, resend_code_txt);
-subtext.setText("We have sent you an OTP on +91 ".concat(phn_number_edittext.getText().toString().trim().concat(" number to verify your phone number")));
+subtext.setText("We have sent you an OTP on +91 ".concat(phn_number_edittext.getText().toString().trim().concat(" number to verify your phoneNumber")));
 btn_verify.setOnClickListener(new View.OnClickListener() {
 @Override
 public void onClick(View _view) {
@@ -800,7 +823,7 @@ phn_verification_sheet.show();
 
         final java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
 
-        byte[] b = pwd.getBytes("UTF-8");
+        byte[] b = pwd.getBytes(StandardCharsets.UTF_8);
 
         digest.update(b, 0, b.length);
 
@@ -832,8 +855,8 @@ phn_verification_sheet.show();
             javax.crypto.Cipher c = javax.crypto.Cipher.getInstance("AES");
             c.init(javax.crypto.Cipher.DECRYPT_MODE, key);
             byte[] decode = android.util.Base64.decode(_msg, android.util.Base64.DEFAULT);
-            byte[] decval = c.doFinal(decode);
-            return new String(decval);
+            byte[] decal = c.doFinal(decode);
+            return new String(decal);
 
         } catch (Exception ex) {
             return "Error: Invalid key";
@@ -854,15 +877,12 @@ phn_verification_sheet.show();
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(
-                        this,
-                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                        100
-                );
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 100);
             }
         }
 
         notificationManager.notify(NOTIFICATION_ID, builder.build());
+        assert auth.getCurrentUser() != null;
         StorageReference ref = profile_pictures.child(auth.getCurrentUser().getUid() + "." + getFileExtension(_imageUri));
         UploadTask profileUpload = ref.putFile(_imageUri);
         profileUpload.addOnProgressListener(taskSnapshot -> {
@@ -873,13 +893,11 @@ phn_verification_sheet.show();
             builder.setProgress(100, progress, false);
             notificationManager.notify(NOTIFICATION_ID, builder.build());
         });
-        profileUpload.addOnSuccessListener(taskSnapshot -> {
-            ref.getDownloadUrl().addOnSuccessListener(uri -> {
-                updateUserData(true, uri.toString());
-                builder.setContentText("Upload complete").setProgress(0, 0, false);
-                notificationManager.notify(NOTIFICATION_ID, builder.build());
-            });
-        });
+        profileUpload.addOnSuccessListener(taskSnapshot -> ref.getDownloadUrl().addOnSuccessListener(uri -> {
+            updateUserData(true, uri.toString());
+            builder.setContentText("Upload complete").setProgress(0, 0, false);
+            notificationManager.notify(NOTIFICATION_ID, builder.build());
+        }));
         profileUpload.addOnFailureListener(e -> {
             builder.setContentText("Upload failed!").setProgress(0, 0, false);
             notificationManager.notify(NOTIFICATION_ID, builder.build());
@@ -904,25 +922,25 @@ phn_verification_sheet.show();
 
     public void updateUserData(final boolean _hasProfile, final String _url) {
         HashMap<String, Object> newUserData = new HashMap<>();
-        if (!binding.nameEdittext.getText().toString().trim().equals(userData.get("name").toString())) {
+        if (!binding.nameEdittext.getText().toString().trim().equals(Objects.requireNonNull(userData.get("name")).toString())) {
             newUserData.put("name", binding.nameEdittext.getText().toString().trim());
         }
         String encryptedPhn;
-        if (userData.containsKey("phone number")) {
-            String decryptedPhn = decrypt(userData.get("phone number").toString(), FirebaseAuth.getInstance().getCurrentUser().getUid());
+        if (userData.containsKey("phoneNumber")) {
+            String decryptedPhn = decrypt(Objects.requireNonNull(userData.get("phoneNumber")).toString(), Objects.requireNonNull(FirebaseAuth.getInstance().getCurrentUser()).getUid());
             if (!binding.phnNumberEdittext.getText().toString().trim().equals(decryptedPhn)) {
                 encryptedPhn = encrypt(binding.phnNumberEdittext.getText().toString().trim(), FirebaseAuth.getInstance().getCurrentUser().getUid());
-                newUserData.put("phone number", encryptedPhn);
+                newUserData.put("phoneNumber", encryptedPhn);
             }
         } else {
             if (!binding.phnNumberEdittext.getText().toString().trim().isEmpty()) {
-                encryptedPhn = encrypt(binding.phnNumberEdittext.getText().toString().trim(), FirebaseAuth.getInstance().getCurrentUser().getUid());
-                newUserData.put("phone number", encryptedPhn);
+                encryptedPhn = encrypt(binding.phnNumberEdittext.getText().toString().trim(), Objects.requireNonNull(FirebaseAuth.getInstance().getCurrentUser()).getUid());
+                newUserData.put("phoneNumber", encryptedPhn);
             }
         }
         if (semesterChanged) {
             newUserData.put("semester", selectedSemester);
-            newUserData.put("current year", (int) ((selectedSemester + 1) / 2));
+            newUserData.put("currentYear", (selectedSemester + 1) / 2);
         }
         if (_hasProfile) {
             newUserData.put("profile", _url);
@@ -934,6 +952,7 @@ phn_verification_sheet.show();
             if (!_hasProfile) {
                 PrepNestUtil.showLoadingDialog(this, true);
             }
+            assert auth.getCurrentUser() != null;
             users.child(auth.getCurrentUser().getUid()).updateChildren(newUserData).addOnCompleteListener(task -> {
                 PrepNestUtil.showLoadingDialog(UserprofileActivity.this, false);
                 if (task.isSuccessful()) {
@@ -960,27 +979,25 @@ phn_verification_sheet.show();
         }
         String decodedPath = Uri.decode(encodedPath);
         StorageReference ref = FirebaseStorage.getInstance().getReference().child(decodedPath);
-        ref.delete().addOnSuccessListener(aVoid -> {
-            updateUserData(true, "delete");
-        }).addOnFailureListener(exception -> {
+        ref.delete().addOnSuccessListener(aVoid -> updateUserData(true, "delete")).addOnFailureListener(exception -> {
             PrepNestUtil.showLoadingDialog(UserprofileActivity.this, false);
             PrepNestUtil.showToast(UserprofileActivity.this, "Failed to remove profile picture, try again later.");
         });
     }
 
     public void showUserProfileViewDialog() {
-        AlertDialog profile_view_dialog = new AlertDialog.Builder(UserprofileActivity.this).create();
-        ProfileViewBinding dialogbinding = ProfileViewBinding.inflate(getLayoutInflater());
+        AlertDialog profileViewDialog = new AlertDialog.Builder(UserprofileActivity.this).create();
+        ProfileViewBinding dialogBinding = ProfileViewBinding.inflate(getLayoutInflater());
 
-        profile_view_dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
-        profile_view_dialog.setView(dialogbinding.getRoot());
+        Objects.requireNonNull(profileViewDialog.getWindow()).setBackgroundDrawableResource(android.R.color.transparent);
+        profileViewDialog.setView(dialogBinding.getRoot());
 
-        profile_view_dialog.setCancelable(true);
-        profile_view_dialog.show();
+        profileViewDialog.setCancelable(true);
+        profileViewDialog.show();
 
-        ViewGroup.LayoutParams paramsimageLayout = dialogbinding.imageLayout.getLayoutParams();
-        if (paramsimageLayout == null) {
-            paramsimageLayout = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        ViewGroup.LayoutParams paramsImageLayout = dialogBinding.imageLayout.getLayoutParams();
+        if (paramsImageLayout == null) {
+            paramsImageLayout = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
         }
 
         int screenWidthPx = PrepNestUtil.getDisplayWidthPixels(UserprofileActivity.this);
@@ -989,82 +1006,30 @@ phn_verification_sheet.show();
         FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(sizePx, sizePx);
         layoutParams.gravity = Gravity.CENTER;
 
-        dialogbinding.imageLayout.setLayoutParams(layoutParams);
+        dialogBinding.imageLayout.setLayoutParams(layoutParams);
 
 
-        profileFadeAnimation(dialogbinding.imageLayout);
-        Glide.with(getApplicationContext()).load(Uri.parse(userData.get("profile").toString())).circleCrop().into(dialogbinding.photoView);
+        profileFadeAnimation(dialogBinding.imageLayout);
+        Glide.with(getApplicationContext())
+                .load(Uri.parse(Objects.requireNonNull(userData.get("profile")).toString()))
+                .circleCrop()
+                .into(dialogBinding.photoView);
     }
 
     public void profileFadeAnimation(final View _view) {
         _view.animate().alpha(1f).setDuration(500).start();
     }
 
-    public String getFormattedNumber(final double _value) {
-        if (_value == 1) {
-            return "1st";
-        }
-        if (_value == 2) {
-            return "2nd";
-        }
-        if (_value == 3) {
-            return "3rd";
-        }
-        return String.valueOf((long) _value).concat("th");
-    }
-
-    public void addTotalSemesters(final double _duration) {
-        totalSemestersList.clear();
-        int maxSemesters = (int) (_duration * 2);
-        for (int sem = 1; sem <= maxSemesters; sem++) {
-            {
-                HashMap<String, Object> _item = new HashMap<>();
-                _item.put("semester", String.valueOf((long) (sem)));
-                totalSemestersList.add(_item);
+    @Override
+    public void onDataReturned(HashMap<String, Object> updatedMap) {
+        if (updatedMap.containsKey("type") && updatedMap.containsKey("id")) {
+            final String type = Objects.requireNonNull(updatedMap.get("type")).toString();
+            if (type.equals(ItemListSheetFragment.SheetType.SEMESTER.toString())) {
+                selectedSemesterId = Objects.requireNonNull(updatedMap.get("id")).toString();
+                selectedSemester = Integer.parseInt(selectedSemesterId);
+                binding.semesterTxt.setText(PrepNestUtil.getFormattedNumber(selectedSemester).concat(" semester"));
+                semesterChanged = true;
             }
-        }
-    }
-
-    public class ItemsAdapter extends BaseAdapter {
-
-        ArrayList<HashMap<String, Object>> _data;
-
-        public ItemsAdapter(ArrayList<HashMap<String, Object>> _arr) {
-            _data = _arr;
-        }
-
-        @Override
-        public int getCount() {
-            return _data.size();
-        }
-
-        @Override
-        public HashMap<String, Object> getItem(int _index) {
-            return _data.get(_index);
-        }
-
-        @Override
-        public long getItemId(int _index) {
-            return _index;
-        }
-
-        @Override
-        public View getView(final int _position, View _v, ViewGroup _container) {
-            SheetSingleItemSelectBinding binding = SheetSingleItemSelectBinding.inflate(getLayoutInflater());
-            View _view = binding.getRoot();
-            if (_data.get(_position).containsKey("name")) {
-                binding.text.setText(_data.get(_position).get("name").toString());
-            }
-            if (_data.get(_position).containsKey("semester")) {
-                binding.text.setText(getFormattedNumber(Double.parseDouble(_data.get(_position).get("semester").toString())).concat(" semester"));
-            }
-            if (_data.get(_position).get("semester").toString().equals(String.valueOf((long) selectedSemester))) {
-                binding.selectedCircle.setVisibility(View.VISIBLE);
-            } else {
-                binding.selectedCircle.setVisibility(View.GONE);
-            }
-
-            return _view;
         }
     }
 }

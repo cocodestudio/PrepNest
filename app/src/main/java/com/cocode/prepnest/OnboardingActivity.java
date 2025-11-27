@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -44,7 +45,7 @@ public class OnboardingActivity extends AppCompatActivity {
     }
 
     private void initialize() {
-        appFirstVisitSp = getSharedPreferences("app first visit", Activity.MODE_PRIVATE);
+        appFirstVisitSp = getSharedPreferences("appFirstVisit", Activity.MODE_PRIVATE);
 
         binding.viewpager.addOnPageChangeListener(new OnPageChangeListener() {
             @Override
@@ -55,10 +56,14 @@ public class OnboardingActivity extends AppCompatActivity {
             @Override
             public void onPageSelected(int _position) {
                 if (_position == (datalist.size() - 1)) {
-                    appFirstVisit = new Gson().fromJson(appFirstVisitSp.getString("app first visit", ""), new TypeToken<HashMap<String, Object>>() {
+                    appFirstVisit = new Gson().fromJson(appFirstVisitSp.getString("appFirstVisit", ""), new TypeToken<HashMap<String, Object>>() {
                     }.getType());
-                    appFirstVisit.put("onboarding", "true");
-                    appFirstVisitSp.edit().putString("app first visit", new Gson().toJson(appFirstVisit)).apply();
+                    if (appFirstVisit == null) {
+                        appFirstVisit = new HashMap<>();
+                    }
+                    appFirstVisit.put("onboarding", true);
+                    Log.d("VISIT", "THIS IS TRUE");
+                    appFirstVisitSp.edit().putString("appFirstVisit", new Gson().toJson(appFirstVisit)).apply();
                     PrepNestUtil.TransitionManager(binding.btnsContainer, 200);
                     binding.moveToNextBtn.setVisibility(View.GONE);
                     binding.accountBtnsContainer.setVisibility(View.VISIBLE);

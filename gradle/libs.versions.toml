@@ -26,6 +26,9 @@ startupRuntime = "1.1.1"
 firebaseAppcheckPlayintegrity = "19.0.1"
 activity = "1.11.0"
 constraintlayout = "2.2.1"
+legacySupportV4 = "1.0.0"
+recyclerview = "1.3.0"
+recyclerviewVersion = "1.4.0"
 
 [libraries]
 app-update = { module = "com.google.android.play:app-update", version.ref = "appUpdate" }
@@ -54,6 +57,9 @@ startup-runtime = { group = "androidx.startup", name = "startup-runtime", versio
 firebase-appcheck-playintegrity = { group = "com.google.firebase", name = "firebase-appcheck-playintegrity", version.ref = "firebaseAppcheckPlayintegrity" }
 activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+legacy-support-v4 = { group = "androidx.legacy", name = "legacy-support-v4", version.ref = "legacySupportV4" }
+recyclerview = { group = "androidx.recyclerview", name = "recyclerview", version.ref = "recyclerview" }
+androidx-recyclerview = { group = "androidx.recyclerview", name = "recyclerview", version.ref = "recyclerviewVersion" }
 
 
 [plugins]

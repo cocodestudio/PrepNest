@@ -35,17 +35,18 @@ import com.google.gson.reflect.TypeToken;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Objects;
 
 
 public class BecomeproviderActivity extends AppCompatActivity {
 
     private final FirebaseDatabase _firebase = FirebaseDatabase.getInstance();
-    private final HashMap<String, Object> userData = new HashMap<>();
     private final boolean isPhnVerified = false;
-    private final ArrayList<HashMap<String, Object>> provider_overview_list = new ArrayList<>();
+    private final ArrayList<HashMap<String, Object>> providerOverviewList = new ArrayList<>();
     private final Intent toProfile = new Intent();
     private final DatabaseReference users = _firebase.getReference("users");
-    private final DatabaseReference requests = _firebase.getReference("requests/provider_requests");
+    private final DatabaseReference requests = _firebase.getReference("requests/providerRequests");
+    private final HashMap<String, Object> userData = new HashMap<>();
     private BecomeproviderBinding binding;
     private boolean hasProfile = false;
     private boolean hasPhnNumber = false;
@@ -53,8 +54,8 @@ public class BecomeproviderActivity extends AppCompatActivity {
     private boolean isEligible = false;
     private HashMap<String, Object> appFirstVisit = new HashMap<>();
     private NetworkMonitor networkMonitor;
-    private com.google.android.material.bottomsheet.BottomSheetDialog eligibility_issues_sheet;
-    private com.google.android.material.bottomsheet.BottomSheetDialog provider_overview_sheet;
+    private com.google.android.material.bottomsheet.BottomSheetDialog eligibilityIssuesSheet;
+    private com.google.android.material.bottomsheet.BottomSheetDialog providerOverviewSheet;
     private SharedPreferences appFirstVisitSp;
     private FirebaseAuth auth;
 
@@ -69,7 +70,7 @@ public class BecomeproviderActivity extends AppCompatActivity {
     }
 
     private void initialize(Bundle _savedInstanceState) {
-        appFirstVisitSp = getSharedPreferences("app first visit", Activity.MODE_PRIVATE);
+        appFirstVisitSp = getSharedPreferences("appFirstVisit", Activity.MODE_PRIVATE);
         auth = FirebaseAuth.getInstance();
 
         binding.backIcon.setOnClickListener(_view -> {
@@ -125,45 +126,19 @@ public class BecomeproviderActivity extends AppCompatActivity {
 
     public void getUserData() {
         PrepNestUtil.showLoadingDialog(this, true);
+        assert auth.getCurrentUser() != null;
         users.child(auth.getCurrentUser().getUid()).addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (snapshot.exists()) {
                     userData.clear();
+
                     for (DataSnapshot child : snapshot.getChildren()) {
                         userData.put(child.getKey(), child.getValue());
                     }
-                    if (userData.containsKey("profile") && !userData.get("profile").toString().equals("null")) {
-                        hasProfile = true;
-                    }
-                    if (userData.containsKey("phone number")) {
-                        hasPhnNumber = true;
-						/*
-if (userData.containsKey("phone verified") && userData.get("phone verified").toString().equals("true")) {
-isPhnVerified = true;
-}
-*/
-                    }
-                    if (auth.getCurrentUser() != null) {
-                        auth.getCurrentUser().reload().addOnCompleteListener(checkStatus -> {
-                            if (auth.getCurrentUser().isEmailVerified()) {
-                                isEmailVerified = true;
-                            }
-                            if (hasProfile && (hasPhnNumber && isEmailVerified)) {
-                                isEligible = true;
-                                binding.title.setText(getString(R.string.eligible));
-                                binding.subtext.setText(getString(R.string.provider_eligible_message));
-                                binding.btnVerificationTxt.setText(getString(R.string.send_request));
-                                binding.image.setImageResource(R.drawable.icon_checked);
-                            } else {
-                                isEligible = false;
-                                binding.title.setText(getString(R.string.not_eligible));
-                                binding.subtext.setText(getString(R.string.provider_not_eligible_message));
-                                binding.btnVerificationTxt.setText(getString(R.string.see_eligibility_issues));
-                                binding.image.setImageResource(R.drawable.icon_report_error);
-                            }
-                        });
-                    }
+
+                    loadUserDataToUI();
+
                     PrepNestUtil.showLoadingDialog(BecomeproviderActivity.this, false);
                 } else {
                     PrepNestUtil.showLoadingDialog(BecomeproviderActivity.this, false);
@@ -186,21 +161,54 @@ isPhnVerified = true;
         });
     }
 
+    public void loadUserDataToUI() {
+        if (userData.containsKey("profile") && !Objects.requireNonNull(userData.get("profile")).toString().equals("null")) {
+            hasProfile = true;
+        }
+        if (userData.containsKey("phoneNumber")) {
+            hasPhnNumber = true;
+						/*
+if (userData.containsKey("phone verified") && userData.get("phone verified").toString().equals("true")) {
+isPhnVerified = true;
+}
+*/
+        }
+        if (auth.getCurrentUser() != null) {
+            auth.getCurrentUser().reload().addOnCompleteListener(checkStatus -> {
+                if (auth.getCurrentUser().isEmailVerified()) {
+                    isEmailVerified = true;
+                }
+                if (hasProfile && (hasPhnNumber && isEmailVerified)) {
+                    isEligible = true;
+                    binding.title.setText(getString(R.string.eligible));
+                    binding.subtext.setText(getString(R.string.provider_eligible_message));
+                    binding.btnVerificationTxt.setText(getString(R.string.send_request));
+                    binding.image.setImageResource(R.drawable.icon_checked);
+                } else {
+                    isEligible = false;
+                    binding.title.setText(getString(R.string.not_eligible));
+                    binding.subtext.setText(getString(R.string.provider_not_eligible_message));
+                    binding.btnVerificationTxt.setText(getString(R.string.see_eligibility_issues));
+                    binding.image.setImageResource(R.drawable.icon_report_error);
+                }
+            });
+        }
+    }
 
     public void showOverviewSheet() {
-        if (appFirstVisitSp.contains("app first visit")) {
-            appFirstVisit = new Gson().fromJson(appFirstVisitSp.getString("app first visit", ""), new TypeToken<HashMap<String, Object>>() {
+        if (appFirstVisitSp.contains("appFirstVisit")) {
+            appFirstVisit = new Gson().fromJson(appFirstVisitSp.getString("appFirstVisit", ""), new TypeToken<HashMap<String, Object>>() {
             }.getType());
         }
-        if (appFirstVisit.containsKey("provider overview")) {
-            if (appFirstVisit.get("provider overview").toString().equals("false")) {
+        if (appFirstVisit.containsKey("providerOverview")) {
+            if (!Boolean.parseBoolean(Objects.requireNonNull(appFirstVisit.get("providerOverview")).toString())) {
                 addProviderOverviewItems();
-                provider_overview_sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(BecomeproviderActivity.this);
-                OverviewSheetBinding sheetbinding = OverviewSheetBinding.inflate(getLayoutInflater());
+                providerOverviewSheet = new com.google.android.material.bottomsheet.BottomSheetDialog(BecomeproviderActivity.this);
+                OverviewSheetBinding sheetBinding = OverviewSheetBinding.inflate(getLayoutInflater());
 
-                provider_overview_sheet.setContentView(sheetbinding.getRoot());
+                providerOverviewSheet.setContentView(sheetBinding.getRoot());
 
-                provider_overview_sheet.setOnShowListener(dialog -> {
+                providerOverviewSheet.setOnShowListener(dialog -> {
                     BottomSheetDialog d = (BottomSheetDialog) dialog;
                     FrameLayout bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
 
@@ -224,8 +232,8 @@ isPhnVerified = true;
                 GradientDrawable gd = new GradientDrawable();
                 gd.setColor(Color.parseColor("#FFFFFF"));
                 gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-                sheetbinding.container.setBackground(gd);
-                sheetbinding.viewpager.addOnPageChangeListener(new OnPageChangeListener() {
+                sheetBinding.container.setBackground(gd);
+                sheetBinding.viewpager.addOnPageChangeListener(new OnPageChangeListener() {
                     @Override
                     public void onPageScrolled(int _position, float _positionOffset, int _positionOffsetPixels) {
 
@@ -233,21 +241,21 @@ isPhnVerified = true;
 
                     @Override
                     public void onPageSelected(int _position) {
-                        sheetbinding.dot1.setBackground(new GradientDrawable() {
+                        sheetBinding.dot1.setBackground(new GradientDrawable() {
                             public GradientDrawable getIns(int a, int b) {
                                 this.setCornerRadius(a);
                                 this.setColor(b);
                                 return this;
                             }
                         }.getIns((int) 360, 0xFFF5F5F5));
-                        sheetbinding.dot2.setBackground(new GradientDrawable() {
+                        sheetBinding.dot2.setBackground(new GradientDrawable() {
                             public GradientDrawable getIns(int a, int b) {
                                 this.setCornerRadius(a);
                                 this.setColor(b);
                                 return this;
                             }
                         }.getIns((int) 360, 0xFFF5F5F5));
-                        sheetbinding.dot3.setBackground(new GradientDrawable() {
+                        sheetBinding.dot3.setBackground(new GradientDrawable() {
                             public GradientDrawable getIns(int a, int b) {
                                 this.setCornerRadius(a);
                                 this.setColor(b);
@@ -255,34 +263,34 @@ isPhnVerified = true;
                             }
                         }.getIns((int) 360, 0xFFF5F5F5));
                         if (_position == 0) {
-                            sheetbinding.dot1.setBackground(new GradientDrawable() {
+                            sheetBinding.dot1.setBackground(new GradientDrawable() {
                                 public GradientDrawable getIns(int a, int b) {
                                     this.setCornerRadius(a);
                                     this.setColor(b);
                                     return this;
                                 }
                             }.getIns((int) 360, 0xFF000000));
-                            sheetbinding.btnNext.setText(R.string.next);
+                            sheetBinding.btnNext.setText(R.string.next);
                         } else {
                             if (_position == 1) {
-                                sheetbinding.dot2.setBackground(new GradientDrawable() {
+                                sheetBinding.dot2.setBackground(new GradientDrawable() {
                                     public GradientDrawable getIns(int a, int b) {
                                         this.setCornerRadius(a);
                                         this.setColor(b);
                                         return this;
                                     }
                                 }.getIns((int) 360, 0xFF000000));
-                                sheetbinding.btnNext.setText(R.string.next);
+                                sheetBinding.btnNext.setText(R.string.next);
                             } else {
                                 if (_position == 2) {
-                                    sheetbinding.dot3.setBackground(new GradientDrawable() {
+                                    sheetBinding.dot3.setBackground(new GradientDrawable() {
                                         public GradientDrawable getIns(int a, int b) {
                                             this.setCornerRadius(a);
                                             this.setColor(b);
                                             return this;
                                         }
                                     }.getIns((int) 360, 0xFF000000));
-                                    sheetbinding.btnNext.setText(R.string.done);
+                                    sheetBinding.btnNext.setText(R.string.done);
                                 }
                             }
                         }
@@ -294,44 +302,45 @@ isPhnVerified = true;
                     }
                 });
 
-                sheetbinding.dot1.setBackground(new GradientDrawable() {
+                sheetBinding.dot1.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFF000000));
-                sheetbinding.dot2.setBackground(new GradientDrawable() {
+                sheetBinding.dot2.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                sheetbinding.dot3.setBackground(new GradientDrawable() {
+                sheetBinding.dot3.setBackground(new GradientDrawable() {
                     public GradientDrawable getIns(int a, int b) {
                         this.setCornerRadius(a);
                         this.setColor(b);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                sheetbinding.viewpager.setAdapter(new ViewpagerAdapter(provider_overview_list));
-                sheetbinding.viewpager.getAdapter().notifyDataSetChanged();
-                sheetbinding.btnNext.setOnClickListener(_view -> {
-                    if (sheetbinding.viewpager.getCurrentItem() == 0) {
-                        sheetbinding.viewpager.setCurrentItem(1);
+                sheetBinding.viewpager.setAdapter(new ViewpagerAdapter(providerOverviewList));
+                assert sheetBinding.viewpager.getAdapter() != null;
+                sheetBinding.viewpager.getAdapter().notifyDataSetChanged();
+                sheetBinding.btnNext.setOnClickListener(_view -> {
+                    if (sheetBinding.viewpager.getCurrentItem() == 0) {
+                        sheetBinding.viewpager.setCurrentItem(1);
                     } else {
-                        if (sheetbinding.viewpager.getCurrentItem() == 1) {
-                            sheetbinding.viewpager.setCurrentItem(2);
+                        if (sheetBinding.viewpager.getCurrentItem() == 1) {
+                            sheetBinding.viewpager.setCurrentItem(2);
                         } else {
-                            appFirstVisit.put("provider overview", "true");
-                            appFirstVisitSp.edit().putString("app first visit", new Gson().toJson(appFirstVisit)).apply();
-                            provider_overview_sheet.dismiss();
+                            appFirstVisit.put("providerOverview", true);
+                            appFirstVisitSp.edit().putString("appFirstVisit", new Gson().toJson(appFirstVisit)).apply();
+                            providerOverviewSheet.dismiss();
                         }
                     }
                 });
-                provider_overview_sheet.setCancelable(false);
-                provider_overview_sheet.show();
+                providerOverviewSheet.setCancelable(false);
+                providerOverviewSheet.show();
             }
         }
     }
@@ -340,24 +349,24 @@ isPhnVerified = true;
         HashMap<String, Object> add_items = new HashMap<>();
         add_items.put("title", "What is provider?");
         add_items.put("subtext", "A Provider is a special type of user on PrepNest who can upload and share educational resources within the app. These resources are made available for other users to purchase. Becoming a provider gives you exclusive access to upload your own content and earn from it.");
-        provider_overview_list.add(add_items);
+        providerOverviewList.add(add_items);
         add_items = new HashMap<>();
         add_items.put("title", "Eligibility Criteria");
         add_items.put("subtext", "To become a provider, your account must have a valid and authentic profile picture, a verified email address, and a phone number that is both linked to your account and verified.");
-        provider_overview_list.add(add_items);
+        providerOverviewList.add(add_items);
         add_items = new HashMap<>();
         add_items.put("title", "Benefits");
         add_items.put("subtext", "As a provider, you’ll earn 30% of the amount each time a user purchases your resources. The earnings can be in cash or coins, depending on which payment method the user chooses during the transaction.");
-        provider_overview_list.add(add_items);
+        providerOverviewList.add(add_items);
     }
 
     public void showEligibilityIssuesSheet() {
-        eligibility_issues_sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(BecomeproviderActivity.this);
-        EligibilityIssuesSheetviewBinding sheetbinding = EligibilityIssuesSheetviewBinding.inflate(getLayoutInflater());
+        eligibilityIssuesSheet = new com.google.android.material.bottomsheet.BottomSheetDialog(BecomeproviderActivity.this);
+        EligibilityIssuesSheetviewBinding sheetBinding = EligibilityIssuesSheetviewBinding.inflate(getLayoutInflater());
 
-        eligibility_issues_sheet.setContentView(sheetbinding.getRoot());
+        eligibilityIssuesSheet.setContentView(sheetBinding.getRoot());
 
-        eligibility_issues_sheet.setOnShowListener(dialog -> {
+        eligibilityIssuesSheet.setOnShowListener(dialog -> {
             BottomSheetDialog d = (BottomSheetDialog) dialog;
             View bottomSheet = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheet != null) {
@@ -368,23 +377,23 @@ isPhnVerified = true;
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor("#FFFFFF"));
         gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-        sheetbinding.container.setBackground(gd);
+        sheetBinding.container.setBackground(gd);
         if (hasProfile) {
-            sheetbinding.iconStatusProfile.setImageResource(R.drawable.icon_check_circle_round);
-            sheetbinding.profileStatusTxt.setTextColor(0xFF4CAF50);
-            sheetbinding.iconStatusProfile.setColorFilter(0xFF4CAF50);
-            sheetbinding.profileStatusTxt.setText(R.string.profile_picture_is_uploaded);
+            sheetBinding.iconStatusProfile.setImageResource(R.drawable.icon_check_circle_round);
+            sheetBinding.profileStatusTxt.setTextColor(0xFF4CAF50);
+            sheetBinding.iconStatusProfile.setColorFilter(0xFF4CAF50);
+            sheetBinding.profileStatusTxt.setText(R.string.profile_picture_is_uploaded);
         } else {
-            sheetbinding.iconStatusProfile.setImageResource(R.drawable.icon_cancel);
-            sheetbinding.profileStatusTxt.setTextColor(0xFFD32F2F);
-            sheetbinding.iconStatusProfile.setColorFilter(0xFFD32F2F);
-            sheetbinding.profileStatusTxt.setText(R.string.profile_picture_is_not_uploaded);
+            sheetBinding.iconStatusProfile.setImageResource(R.drawable.icon_cancel);
+            sheetBinding.profileStatusTxt.setTextColor(0xFFD32F2F);
+            sheetBinding.iconStatusProfile.setColorFilter(0xFFD32F2F);
+            sheetBinding.profileStatusTxt.setText(R.string.profile_picture_is_not_uploaded);
         }
         if (hasPhnNumber) {
-            sheetbinding.iconStatusPhone.setImageResource(R.drawable.icon_check_circle_round);
-            sheetbinding.phoneStatusTxt.setTextColor(0xFF4CAF50);
-            sheetbinding.iconStatusPhone.setColorFilter(0xFF4CAF50);
-            sheetbinding.phoneStatusTxt.setText(R.string.phone_number_is_linked);
+            sheetBinding.iconStatusPhone.setImageResource(R.drawable.icon_check_circle_round);
+            sheetBinding.phoneStatusTxt.setTextColor(0xFF4CAF50);
+            sheetBinding.iconStatusPhone.setColorFilter(0xFF4CAF50);
+            sheetBinding.phoneStatusTxt.setText(R.string.phone_number_is_linked);
 			/*
 if (isPhnVerified) {
 
@@ -396,30 +405,30 @@ phone_status_txt.setText("Phone number is not verified");
 }
 */
         } else {
-            sheetbinding.iconStatusPhone.setImageResource(R.drawable.icon_cancel);
-            sheetbinding.phoneStatusTxt.setTextColor(0xFFD32F2F);
-            sheetbinding.iconStatusPhone.setColorFilter(0xFFD32F2F);
-            sheetbinding.phoneStatusTxt.setText(R.string.phone_number_is_not_linked);
+            sheetBinding.iconStatusPhone.setImageResource(R.drawable.icon_cancel);
+            sheetBinding.phoneStatusTxt.setTextColor(0xFFD32F2F);
+            sheetBinding.iconStatusPhone.setColorFilter(0xFFD32F2F);
+            sheetBinding.phoneStatusTxt.setText(R.string.phone_number_is_not_linked);
         }
         if (isEmailVerified) {
-            sheetbinding.iconStatusEmail.setImageResource(R.drawable.icon_check_circle_round);
-            sheetbinding.emailStatusTxt.setTextColor(0xFF4CAF50);
-            sheetbinding.iconStatusEmail.setColorFilter(0xFF4CAF50);
-            sheetbinding.emailStatusTxt.setText(R.string.email_address_is_verified);
+            sheetBinding.iconStatusEmail.setImageResource(R.drawable.icon_check_circle_round);
+            sheetBinding.emailStatusTxt.setTextColor(0xFF4CAF50);
+            sheetBinding.iconStatusEmail.setColorFilter(0xFF4CAF50);
+            sheetBinding.emailStatusTxt.setText(R.string.email_address_is_verified);
         } else {
-            sheetbinding.iconStatusEmail.setImageResource(R.drawable.icon_cancel);
-            sheetbinding.emailStatusTxt.setTextColor(0xFFD32F2F);
-            sheetbinding.iconStatusEmail.setColorFilter(0xFFD32F2F);
-            sheetbinding.emailStatusTxt.setText(R.string.email_address_is_not_verified);
+            sheetBinding.iconStatusEmail.setImageResource(R.drawable.icon_cancel);
+            sheetBinding.emailStatusTxt.setTextColor(0xFFD32F2F);
+            sheetBinding.iconStatusEmail.setColorFilter(0xFFD32F2F);
+            sheetBinding.emailStatusTxt.setText(R.string.email_address_is_not_verified);
         }
-        sheetbinding.btnFix.setOnClickListener(_view -> {
+        sheetBinding.btnFix.setOnClickListener(_view -> {
             toProfile.setClass(BecomeproviderActivity.this, UserprofileActivity.class);
             startActivity(toProfile);
             overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-            eligibility_issues_sheet.dismiss();
+            eligibilityIssuesSheet.dismiss();
         });
-        eligibility_issues_sheet.setCancelable(true);
-        eligibility_issues_sheet.show();
+        eligibilityIssuesSheet.setCancelable(true);
+        eligibilityIssuesSheet.show();
     }
 
     public void sendRequest() {
@@ -427,15 +436,16 @@ phone_status_txt.setText("Phone number is not verified");
         long currentTimeInMS = System.currentTimeMillis();
         HashMap<String, Object> requestMap = new HashMap<>();
         requestMap.put("timestamp", String.valueOf(currentTimeInMS));
+        assert auth.getCurrentUser() != null;
         requests.child(auth.getCurrentUser().getUid()).updateChildren(requestMap).addOnCompleteListener(addRequest -> {
             if (addRequest.isSuccessful()) {
-                users.child(auth.getCurrentUser().getUid()).child("provider verification status").setValue("pending").addOnCompleteListener(updateRequest -> {
+                users.child(auth.getCurrentUser().getUid()).child("providerVerificationStatus").setValue("pending").addOnCompleteListener(updateRequest -> {
                     if (updateRequest.isSuccessful()) {
                         PrepNestUtil.showToast(BecomeproviderActivity.this, "Request is successfully sent.");
                         binding.backIcon.performClick();
                         PrepNestUtil.showLoadingDialog(BecomeproviderActivity.this, false);
                     } else {
-                        PrepNestUtil.showToast(BecomeproviderActivity.this, "An unknown error occured.");
+                        PrepNestUtil.showToast(BecomeproviderActivity.this, "An unknown error occurred.");
                         PrepNestUtil.showLoadingDialog(BecomeproviderActivity.this, false);
                     }
                 });
@@ -493,9 +503,9 @@ phone_status_txt.setText("Phone number is not verified");
             OverviewItemBinding binding = OverviewItemBinding.inflate(LayoutInflater.from(_context), _container, false);
 
 
-            binding.title.setText(_data.get(_position).get("title").toString());
+            binding.title.setText(Objects.requireNonNull(_data.get(_position).get("title")).toString());
 
-            binding.subtext.setText(_data.get(_position).get("subtext").toString());
+            binding.subtext.setText(Objects.requireNonNull(_data.get(_position).get("subtext")).toString());
 
             View _view = binding.getRoot();
             _container.addView(_view);

@@ -82,7 +82,6 @@ public class PrepNestUtil {
         window.setStatusBarColor(Color.WHITE);
     }
 
-
     public static void changeNavBarColor(Activity activity, boolean isLight) {
         if (activity == null) return;
 
@@ -118,6 +117,20 @@ public class PrepNestUtil {
         android.graphics.drawable.RippleDrawable RE = new android.graphics.drawable.RippleDrawable(new android.content.res.ColorStateList(new int[][]{new int[]{}}, new int[]{Color.parseColor(pressedColor)}), GD, null);
 
         view.setBackground(RE);
+    }
+
+
+    public static String getFormattedNumber(final int value) {
+        if (value == 1) {
+            return "1st";
+        }
+        if (value == 2) {
+            return "2nd";
+        }
+        if (value == 3) {
+            return "3rd";
+        }
+        return String.valueOf((long) value).concat("th");
     }
 
     public static void roundView(final View view, final String bgColor, final float radius, final int strokeSize, final String strokeColor) {

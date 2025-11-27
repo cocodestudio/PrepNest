@@ -1,5 +1,8 @@
 package com.cocode.prepnest;
 
+import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -34,9 +37,13 @@ import com.google.gson.reflect.TypeToken;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import okhttp3.Call;
@@ -50,16 +57,24 @@ import okhttp3.Response;
 
 public class UserWishlistActivity extends AppCompatActivity {
 
+    private final Timer timer = new Timer();
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
-    private final FirebaseDatabase firebase_database = FirebaseDatabase.getInstance();
-    private final DatabaseReference users = firebase_database.getReference("users");
-    private final DatabaseReference resources = firebase_database.getReference("resources");
+    private final FirebaseDatabase database = FirebaseDatabase.getInstance();
+    private final DatabaseReference users = database.getReference("users");
+    private final DatabaseReference resources = database.getReference("resources");
     private final ArrayList<HashMap<String, Object>> wishlistedResources = new ArrayList<>();
+    private final Gson gson = new Gson();
+    private TimerTask timerTask;
     private HashMap<String, Object> userData = new HashMap<>();
     private UserWishlistBinding binding;
     private NetworkMonitor networkMonitor;
     private ArrayList<String> resourceIDs = new ArrayList<>();
     private ItemsListAdapter listAdapter;
+    private SharedPreferences cachedData;
+
+    public static <T> T getValue(HashMap<String, Object> map, String key) {
+        return (T) map.get(key);
+    }
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -72,6 +87,7 @@ public class UserWishlistActivity extends AppCompatActivity {
     }
 
     private void initialize(Bundle _savedInstanceState) {
+        cachedData = getSharedPreferences("userCachedData", Activity.MODE_PRIVATE);
 
         binding.backIcon.setOnClickListener(_view -> {
             finish();
@@ -85,7 +101,7 @@ public class UserWishlistActivity extends AppCompatActivity {
         listAdapter = new ItemsListAdapter(wishlistedResources);
         binding.itemsList.setAdapter(listAdapter);
         binding.itemsList.setLayoutManager(new LinearLayoutManager(this));
-        getUserData();
+        loadUserDataFromSP();
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
@@ -93,7 +109,6 @@ public class UserWishlistActivity extends AppCompatActivity {
             }
         });
     }
-
 
     @Override
     public void onResume() {
@@ -119,12 +134,33 @@ public class UserWishlistActivity extends AppCompatActivity {
         PrepNestUtil.changeNavBarColor(this, true);
     }
 
+    public void loadUserDataFromSP() {
+        if (cachedData.contains("userData")) {
+            Gson gson = new Gson();
+            Type type = new TypeToken<HashMap<String, Object>>() {
+            }.getType();
+
+            userData = gson.fromJson(cachedData.getString("userData", "{}"), type);
+
+            if (userData.containsKey("wishlist")) {
+                resourceIDs = getValue(userData, "wishlist");
+            } else {
+                resourceIDs = new ArrayList<>();
+            }
+            getResources(resourceIDs);
+        } else {
+            PrepNestUtil.showToast(this, "An unknown error occurred, try again!");
+            finish();
+        }
+    }
+
     public void getUserData() {
         if (getIntent().hasExtra("user")) {
             userData = new Gson().fromJson(getIntent().getStringExtra("user"), new TypeToken<HashMap<String, Object>>() {
             }.getType());
+            assert userData != null;
             if (userData.containsKey("wishlist")) {
-                resourceIDs = new Gson().fromJson(userData.get("wishlist").toString(), new TypeToken<ArrayList<String>>() {
+                resourceIDs = new Gson().fromJson(Objects.requireNonNull(userData.get("wishlist")).toString(), new TypeToken<ArrayList<String>>() {
                 }.getType());
             } else {
                 resourceIDs = new ArrayList<>();
@@ -139,11 +175,12 @@ public class UserWishlistActivity extends AppCompatActivity {
 
 
     public void getWishlistedResources() {
+        assert auth.getCurrentUser() != null;
         DatabaseReference dataRef = users.child(auth.getCurrentUser().getUid()).child("wishlist");
         dataRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                if (dataSnapshot.exists() && (dataSnapshot.getValue() != null || !dataSnapshot.getValue(String.class).isEmpty())) {
+                if (dataSnapshot.exists() && (dataSnapshot.getValue() != null || !Objects.requireNonNull(dataSnapshot.getValue(String.class)).isEmpty())) {
                     resourceIDs = new Gson().fromJson(dataSnapshot.getValue(String.class), new TypeToken<ArrayList<String>>() {
                     }.getType());
                 } else {
@@ -180,102 +217,70 @@ public class UserWishlistActivity extends AppCompatActivity {
 
 
     public void getResources(final ArrayList<String> _list) {
-
         // Case: empty wishlist
         if (_list == null || _list.isEmpty()) {
             toggleEmptyState(false);
             return;
         }
 
+
         AtomicInteger loadedCount = new AtomicInteger(0);
+        wishlistedResources.clear();
 
         for (String id : _list) {
-
             final String finalId = id;
 
+            DatabaseReference resourceRef = resources.child(finalId);
 
-            DatabaseReference lookupRef = firebase_database
-                    .getReference("other")
-                    .child("resource_lookup")
-                    .child(finalId);
+            resourceRef.addListenerForSingleValueEvent(new ValueEventListener() {
 
-            lookupRef.addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
-                public void onDataChange(@NonNull DataSnapshot lookupSnap) {
+                public void onDataChange(@NonNull DataSnapshot resourceSnap) {
 
-                    if (!lookupSnap.exists()) {
-                        // Count load to avoid freezing
-                        if (loadedCount.incrementAndGet() == _list.size()) {
-                            toggleEmptyState(!wishlistedResources.isEmpty());
-                        }
-                        return;
-                    }
+                    synchronized (wishlistedResources) {
+                        // Remove old entry with same ID
+                        wishlistedResources.removeIf(map ->
+                                finalId.equals(map.get("id")));
 
-                    String courseId = lookupSnap.child("course id").getValue(String.class);
+                        if (resourceSnap.exists()) {
+                            Map<String, Object> item =
+                                    (Map<String, Object>) resourceSnap.getValue();
 
-                    if (courseId == null || courseId.trim().isEmpty()) {
-                        if (loadedCount.incrementAndGet() == _list.size()) {
-                            toggleEmptyState(!wishlistedResources.isEmpty());
-                        }
-                        return;
-                    }
+                            if (item != null) {
+                                // Check isDiscontinue flag safely
+                                boolean isDiscontinued =
+                                        Boolean.TRUE.equals(item.get("isDiscontinue"));
 
-                    DatabaseReference resourceRef =
-                            resources.child(courseId).child(finalId);
-
-                    resourceRef.addListenerForSingleValueEvent(new ValueEventListener() {
-
-                        @Override
-                        public void onDataChange(@NonNull DataSnapshot resourceSnap) {
-
-                            synchronized (wishlistedResources) {
-                                // Remove old entry with same ID
-                                wishlistedResources.removeIf(map ->
-                                        finalId.equals(map.get("id")));
-
-                                if (resourceSnap.exists()) {
-
-                                    Map<String, Object> item =
-                                            (Map<String, Object>) resourceSnap.getValue();
-
-                                    if (item != null) {
-                                        // Check discontinue flag safely
-                                        boolean isDiscontinued =
-                                                Boolean.TRUE.equals(item.get("discontinue"));
-
-                                        if (!isDiscontinued) {
-                                            item.put("id", finalId);
-
-                                            wishlistedResources.add(0, new HashMap<>(item));
-                                        }
+                                if (!isDiscontinued) {
+                                    int slashIndex = finalId.lastIndexOf("/");
+                                    if (slashIndex != -1) {
+                                        String resId = finalId.substring(slashIndex + 1);
+                                        item.put("id", resId);
+                                    } else {
+                                        item.put("id", finalId);
                                     }
+
+                                    wishlistedResources.add(0, new HashMap<>(item));
                                 }
                             }
-
-                            // Count only once per ID
-                            if (loadedCount.incrementAndGet() == _list.size()) {
-                                toggleEmptyState(!wishlistedResources.isEmpty());
-                            }
                         }
+                    }
 
-                        @Override
-                        public void onCancelled(@NonNull DatabaseError error) {
-                            PrepNestUtil.showToast(
-                                    UserWishlistActivity.this,
-                                    "Failed loading resources: " + error.getMessage()
-                            );
-
-                            // Count load anyway
-                            if (loadedCount.incrementAndGet() == _list.size()) {
-                                toggleEmptyState(!wishlistedResources.isEmpty());
-                            }
-                        }
-                    });
+                    // Count only once per ID
+                    if (loadedCount.incrementAndGet() == _list.size()) {
+                        listAdapter.notifyDataSetChanged();
+                        toggleEmptyState(!wishlistedResources.isEmpty());
+                    }
                 }
 
                 @Override
                 public void onCancelled(@NonNull DatabaseError error) {
-                    // Still count load
+                    PrepNestUtil.showToast(
+                            UserWishlistActivity.this,
+                            "Failed loading resources: " + error.getMessage()
+                    );
+
+                    // Count load anyway
                     if (loadedCount.incrementAndGet() == _list.size()) {
                         toggleEmptyState(!wishlistedResources.isEmpty());
                     }
@@ -292,8 +297,9 @@ public class UserWishlistActivity extends AppCompatActivity {
                 break;
             }
         }
-        String newList = new Gson().toJson(resourceIDs);
-        users.child(auth.getCurrentUser().getUid()).child("wishlist").setValue(newList).addOnCompleteListener(task -> {
+//        String newList = new Gson().toJson(resourceIDs);
+        assert auth.getCurrentUser() != null;
+        users.child(auth.getCurrentUser().getUid()).child("wishlist").setValue(resourceIDs).addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
                 wishlistedResources.remove(position);
                 listAdapter.notifyItemRemoved(position);
@@ -301,21 +307,23 @@ public class UserWishlistActivity extends AppCompatActivity {
 //                PrepNestUtil.showToast(UserWishlistActivity.this, String.valueOf(wishlistedResources.isEmpty()));
                 PrepNestUtil.showLoadingDialog(UserWishlistActivity.this, false);
                 PrepNestUtil.showToast(UserWishlistActivity.this, "Removed from wishlist");
+                userData.put("wishlist", resourceIDs);
+                cachedData.edit().putString("userData", gson.toJson(userData)).apply();
             } else {
-                PrepNestUtil.showToast(UserWishlistActivity.this, "An unknown error occurred: " + task.getException().toString());
+                PrepNestUtil.showToast(UserWishlistActivity.this, "An unknown error occurred: " + Objects.requireNonNull(task.getException()));
             }
         });
     }
 
     public void purchaseResourceCF(final HashMap<String, Object> resourceItem, final boolean isCash, final int position) {
         if (isCash) {
-            if ((((Number) userData.get("cash")).longValue()) < (((Number) resourceItem.get("price")).longValue())) {
+            if ((((Number) Objects.requireNonNull(userData.get("cash"))).longValue()) < (((Number) Objects.requireNonNull(resourceItem.get("price"))).longValue())) {
                 PrepNestUtil.showLoadingDialog(UserWishlistActivity.this, false);
                 PrepNestUtil.showToast(UserWishlistActivity.this, "Insufficient balance!");
                 return;
             }
         } else {
-            if ((((Number) userData.get("coins")).longValue()) < (((Number) resourceItem.get("price")).longValue() * 5)) {
+            if ((((Number) Objects.requireNonNull(userData.get("coins"))).longValue()) < (((Number) Objects.requireNonNull(resourceItem.get("price"))).longValue() * 5)) {
                 PrepNestUtil.showLoadingDialog(UserWishlistActivity.this, false);
                 PrepNestUtil.showToast(UserWishlistActivity.this, "Insufficient balance!");
                 return;
@@ -332,9 +340,12 @@ public class UserWishlistActivity extends AppCompatActivity {
                 // Prepare JSON payload
                 Map<String, Object> data = new HashMap<>();
                 data.put("buyerId", user.getUid());
-                data.put("ownerId", resourceItem.get("uploader uid").toString());
+                data.put("ownerId", Objects.requireNonNull(resourceItem.get("uploaderId")).toString());
                 data.put("modeOfPayment", isCash ? "cash" : "coins");
-                data.put("resourceId", resourceItem.get("id").toString());
+                data.put("resourceId", Objects.requireNonNull(resourceItem.get("id")).toString());
+                Log.d("resourceId", Objects.requireNonNull(resourceItem.get("id")).toString());
+                data.put("courseId", Objects.requireNonNull(resourceItem.get("courseId")).toString());
+                Log.d("courseId", Objects.requireNonNull(resourceItem.get("courseId")).toString());
                 data.put("timestamp", String.valueOf(System.currentTimeMillis()));
 
                 // Convert to JSON string
@@ -351,6 +362,7 @@ public class UserWishlistActivity extends AppCompatActivity {
                         runOnUiThread(() -> {
                             PrepNestUtil.showLoadingDialog(UserWishlistActivity.this, false);
                             PrepNestUtil.showToast(UserWishlistActivity.this, "An unknown error occurred");
+                            Log.d("ERROR", e.toString());
                         });
                     }
 
@@ -360,12 +372,17 @@ public class UserWishlistActivity extends AppCompatActivity {
                         if (response.isSuccessful()) {
                             runOnUiThread(() -> {
                                 PrepNestUtil.showToast(UserWishlistActivity.this, "Purchased successfully");
-                                removeWishlist(resourceItem.get("id").toString(), position);
+                                final String resourceIdPath = Objects
+                                        .requireNonNull(resourceItem.get("courseId")).toString()
+                                        .concat("/")
+                                        .concat(Objects.requireNonNull(resourceItem.get("id")).toString());
+                                removeWishlist(resourceIdPath, position);
                             });
                         } else {
                             runOnUiThread(() -> {
                                 PrepNestUtil.showLoadingDialog(UserWishlistActivity.this, false);
                                 PrepNestUtil.showToast(UserWishlistActivity.this, "An unknown error occurred");
+                                Log.d("SUCCESS FAILED", resp);
                             });
                         }
                     }
@@ -377,12 +394,13 @@ public class UserWishlistActivity extends AppCompatActivity {
         }
     }
 
+    @SuppressLint("SetTextI18n")
     public void showPurchaseSheet(final HashMap<String, Object> resourceItem, final int position) {
         com.google.android.material.bottomsheet.BottomSheetDialog resource_purchase_sheet;
         resource_purchase_sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(UserWishlistActivity.this);
-        ResourcePurchaseSheetLayoutBinding sheetbinding = ResourcePurchaseSheetLayoutBinding.inflate(getLayoutInflater());
+        ResourcePurchaseSheetLayoutBinding sheetBinding = ResourcePurchaseSheetLayoutBinding.inflate(getLayoutInflater());
 
-        resource_purchase_sheet.setContentView(sheetbinding.getRoot());
+        resource_purchase_sheet.setContentView(sheetBinding.getRoot());
 
         resource_purchase_sheet.setOnShowListener(dialog -> {
             BottomSheetDialog d = (BottomSheetDialog) dialog;
@@ -392,16 +410,16 @@ public class UserWishlistActivity extends AppCompatActivity {
             }
         });
 
-        sheetbinding.radiogroup.setOnCheckedChangeListener((group, checkedId) -> {
-            PrepNestUtil.TransitionManager(sheetbinding.container, 150);
+        sheetBinding.radiogroup.setOnCheckedChangeListener((group, checkedId) -> {
+            PrepNestUtil.TransitionManager(sheetBinding.container, 150);
 
-            if (checkedId == sheetbinding.cashRadiobutton.getId()) {
+            if (checkedId == sheetBinding.cashRadiobutton.getId()) {
                 if (userData.containsKey("cash")) {
-                    sheetbinding.cashRadiobutton.setText("Cash (₹".concat(String.valueOf(((Number) userData.get("cash")).longValue()).concat(")")));
+                    sheetBinding.cashRadiobutton.setText("Cash (₹".concat(String.valueOf(((Number) Objects.requireNonNull(userData.get("cash"))).longValue()).concat(")")));
                     if (resourceItem.containsKey("price")) {
-                        sheetbinding.btnBuy.setText("Buy for ₹".concat(String.valueOf(((Number) resourceItem.get("price")).longValue())));
-                        sheetbinding.btnBuy.setEnabled(true);
-                        sheetbinding.btnBuy.setAlpha(1f);
+                        sheetBinding.btnBuy.setText("Buy for ₹".concat(String.valueOf(((Number) Objects.requireNonNull(resourceItem.get("price"))).longValue())));
+                        sheetBinding.btnBuy.setEnabled(true);
+                        sheetBinding.btnBuy.setAlpha(1f);
                     } else {
                         resource_purchase_sheet.dismiss();
                         PrepNestUtil.showToast(UserWishlistActivity.this, "An unknown error occurred, please login again!");
@@ -409,18 +427,18 @@ public class UserWishlistActivity extends AppCompatActivity {
                         finishAffinity();
                     }
                 } else {
-                    sheetbinding.cashRadiobutton.setText("Cash (₹0)");
-                    sheetbinding.btnBuy.setText("Buy");
-                    sheetbinding.btnBuy.setEnabled(false);
-                    sheetbinding.btnBuy.setAlpha(0.7f);
+                    sheetBinding.cashRadiobutton.setText("Cash (₹0)");
+                    sheetBinding.btnBuy.setText("Buy");
+                    sheetBinding.btnBuy.setEnabled(false);
+                    sheetBinding.btnBuy.setAlpha(0.7f);
                 }
-            } else if (checkedId == sheetbinding.coinsRadiobutton.getId()) {
+            } else if (checkedId == sheetBinding.coinsRadiobutton.getId()) {
                 if (userData.containsKey("coins")) {
-                    sheetbinding.coinsRadiobutton.setText("Coins (".concat(String.valueOf(((Number) userData.get("coins")).longValue()).concat(")")));
+                    sheetBinding.coinsRadiobutton.setText("Coins (".concat(String.valueOf(((Number) Objects.requireNonNull(userData.get("coins"))).longValue()).concat(")")));
                     if (resourceItem.containsKey("price")) {
-                        sheetbinding.btnBuy.setText("Buy for ".concat(String.valueOf(((Number) resourceItem.get("price")).longValue() * 5)).concat(" coins"));
-                        sheetbinding.btnBuy.setEnabled(true);
-                        sheetbinding.btnBuy.setAlpha(1f);
+                        sheetBinding.btnBuy.setText("Buy for ".concat(String.valueOf(((Number) Objects.requireNonNull(resourceItem.get("price"))).longValue() * 5)).concat(" coins"));
+                        sheetBinding.btnBuy.setEnabled(true);
+                        sheetBinding.btnBuy.setAlpha(1f);
                     } else {
                         resource_purchase_sheet.dismiss();
                         PrepNestUtil.showToast(UserWishlistActivity.this, "An unknown error occurred, please login again!");
@@ -428,63 +446,67 @@ public class UserWishlistActivity extends AppCompatActivity {
                         finishAffinity();
                     }
                 } else {
-                    sheetbinding.coinsRadiobutton.setText("Coins (0)");
-                    sheetbinding.btnBuy.setText("Buy");
-                    sheetbinding.btnBuy.setEnabled(false);
-                    sheetbinding.btnBuy.setAlpha(0.7f);
+                    sheetBinding.coinsRadiobutton.setText("Coins (0)");
+                    sheetBinding.btnBuy.setText("Buy");
+                    sheetBinding.btnBuy.setEnabled(false);
+                    sheetBinding.btnBuy.setAlpha(0.7f);
                 }
             }
         });
 
+        final String resourcePathId = Objects
+                .requireNonNull(resourceItem.get("courseId")).toString()
+                .concat("/")
+                .concat(Objects.requireNonNull(resourceItem.get("id")).toString());
         final boolean[] wishlisted = {true};
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor("#FFFFFF"));
         gd.setCornerRadii(new float[]{30, 30, 30, 30, 0, 0, 0, 0});
-        sheetbinding.container.setBackground(gd);
-        PrepNestUtil.roundViewWithRipple(sheetbinding.btnWishlist, "#F5F5F5", 15, 0, "#000000", "#E0E0E0");
-        PrepNestUtil.roundViewWithRipple(sheetbinding.btnBuy, "#000000", 15, 0, "#000000", "#212121");
-        if (resourceItem.containsKey("resource title")) {
-            sheetbinding.resourceTitle.setText(resourceItem.get("resource title").toString());
+        sheetBinding.container.setBackground(gd);
+        PrepNestUtil.roundViewWithRipple(sheetBinding.btnWishlist, "#F5F5F5", 15, 0, "#000000", "#E0E0E0");
+        PrepNestUtil.roundViewWithRipple(sheetBinding.btnBuy, "#000000", 15, 0, "#000000", "#212121");
+        if (resourceItem.containsKey("resourceTitle")) {
+            sheetBinding.resourceTitle.setText(Objects.requireNonNull(resourceItem.get("resourceTitle")).toString());
         } else {
-            sheetbinding.resourceTitle.setText("No title");
+            sheetBinding.resourceTitle.setText("No title");
         }
 		/*
 if (_item.containsKey("rating")) {
-sheetbinding.ratingTxt.setText(_item.get("rating").toString());
-sheetbinding.ratingContainer.setBackground(new GradientDrawable() { public GradientDrawable getIns(int a, int b) { this.setCornerRadius(a); this.setColor(b); return this; } }.getIns((int)360, 0xFFFFF3E0));
-sheetbinding.ratingContainer.setVisibility(View.VISIBLE);
+sheetBinding.ratingTxt.setText(_item.get("rating").toString());
+sheetBinding.ratingContainer.setBackground(new GradientDrawable() { public GradientDrawable getIns(int a, int b) { this.setCornerRadius(a); this.setColor(b); return this; } }.getIns((int)360, 0xFFFFF3E0));
+sheetBinding.ratingContainer.setVisibility(View.VISIBLE);
 } else {
-sheetbinding.ratingContainer.setVisibility(View.GONE);
+sheetBinding.ratingContainer.setVisibility(View.GONE);
 }
 */
         if (resourceItem.containsKey("subject")) {
-            sheetbinding.subjectNameTxt.setText(resourceItem.get("subject").toString());
-            sheetbinding.subjectNameTxt.setBackground(new GradientDrawable() {
+            sheetBinding.subjectNameTxt.setText(Objects.requireNonNull(resourceItem.get("subject")).toString());
+            sheetBinding.subjectNameTxt.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            sheetbinding.subjectNameTxt.setVisibility(View.VISIBLE);
+            sheetBinding.subjectNameTxt.setVisibility(View.VISIBLE);
         } else {
-            sheetbinding.subjectNameTxt.setVisibility(View.GONE);
+            sheetBinding.subjectNameTxt.setVisibility(View.GONE);
         }
         if (resourceItem.containsKey("session")) {
-            sheetbinding.sessionTxt.setText(resourceItem.get("session").toString());
-            sheetbinding.sessionTxt.setBackground(new GradientDrawable() {
+            sheetBinding.sessionTxt.setText(Objects.requireNonNull(resourceItem.get("session")).toString());
+            sheetBinding.sessionTxt.setBackground(new GradientDrawable() {
                 public GradientDrawable getIns(int a, int b) {
                     this.setCornerRadius(a);
                     this.setColor(b);
                     return this;
                 }
             }.getIns((int) 360, 0xFFF5F5F5));
-            sheetbinding.sessionTxt.setVisibility(View.VISIBLE);
+            sheetBinding.sessionTxt.setVisibility(View.VISIBLE);
         } else {
-            sheetbinding.sessionTxt.setVisibility(View.GONE);
+            sheetBinding.sessionTxt.setVisibility(View.GONE);
         }
         if (resourceItem.containsKey("price")) {
-            sheetbinding.btnBuy.setText("Buy for ₹".concat(resourceItem.get("price").toString()));
+            sheetBinding.btnBuy.setText("Buy for ₹".concat(Objects.requireNonNull(resourceItem.get("price")).toString()));
         } else {
             resource_purchase_sheet.dismiss();
             PrepNestUtil.showToast(UserWishlistActivity.this, "An unknown error occurred, please login again!");
@@ -492,36 +514,36 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             finishAffinity();
         }
         if (userData.containsKey("cash")) {
-            sheetbinding.cashRadiobutton.setText("Cash (₹".concat(String.valueOf(((Number) userData.get("cash")).longValue()).concat(")")));
+            sheetBinding.cashRadiobutton.setText("Cash (₹".concat(String.valueOf(((Number) Objects.requireNonNull(userData.get("cash"))).longValue()).concat(")")));
         } else {
             userData.put("cash", 0);
-            sheetbinding.cashRadiobutton.setText("Cash (₹0)");
+            sheetBinding.cashRadiobutton.setText("Cash (₹0)");
         }
         if (userData.containsKey("coins")) {
-            sheetbinding.coinsRadiobutton.setText("Coins (".concat(String.valueOf(((Number) userData.get("coins")).longValue()).concat(")")));
+            sheetBinding.coinsRadiobutton.setText("Coins (".concat(String.valueOf(((Number) Objects.requireNonNull(userData.get("coins"))).longValue()).concat(")")));
         } else {
             userData.put("coins", 0);
-            sheetbinding.coinsRadiobutton.setText("Coins (0)");
+            sheetBinding.coinsRadiobutton.setText("Coins (0)");
         }
         if (resourceItem.containsKey("id")) {
-            if (resourceIDs.contains(resourceItem.get("id").toString())) {
-                sheetbinding.btnWishlistTxt.setText("Remove from wishlist");
-                sheetbinding.iconWishlist.setImageResource(R.drawable.icon_heart_filled);
+            if (resourceIDs.contains(resourcePathId)) {
+                sheetBinding.btnWishlistTxt.setText("Remove from wishlist");
+                sheetBinding.iconWishlist.setImageResource(R.drawable.icon_heart_filled);
             } else {
-                sheetbinding.btnWishlistTxt.setText("Add to wishlist");
-                sheetbinding.iconWishlist.setImageResource(R.drawable.icon_heart_hollow);
+                sheetBinding.btnWishlistTxt.setText("Add to wishlist");
+                sheetBinding.iconWishlist.setImageResource(R.drawable.icon_heart_hollow);
                 wishlisted[0] = false;
             }
         }
-        sheetbinding.btnWishlist.setOnClickListener(_view -> {
+        sheetBinding.btnWishlist.setOnClickListener(_view -> {
             PrepNestUtil.showLoadingDialog(UserWishlistActivity.this, true);
-            removeWishlist(resourceItem.get("id").toString(), position);
-            sheetbinding.iconWishlist.setImageResource(R.drawable.icon_heart_hollow);
+            removeWishlist(resourcePathId, position);
+            sheetBinding.iconWishlist.setImageResource(R.drawable.icon_heart_hollow);
             resource_purchase_sheet.dismiss();
         });
-        sheetbinding.btnBuy.setOnClickListener(_view -> {
+        sheetBinding.btnBuy.setOnClickListener(_view -> {
             PrepNestUtil.showLoadingDialog(UserWishlistActivity.this, true);
-            purchaseResourceCF(resourceItem, sheetbinding.cashRadiobutton.isChecked(), position);
+            purchaseResourceCF(resourceItem, sheetBinding.cashRadiobutton.isChecked(), position);
             resource_purchase_sheet.dismiss();
         });
         resource_purchase_sheet.show();
@@ -547,11 +569,12 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             return new ViewHolder(resourceItemCardFullBinding);
         }
 
+        @SuppressLint("SetTextI18n")
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, final int position) {
             PrepNestUtil.roundViewWithRipple(holder.binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            if (list.get(position).containsKey("resource title")) {
-                holder.binding.title.setText(list.get(position).get("resource title").toString());
+            if (list.get(position).containsKey("resourceTitle")) {
+                holder.binding.title.setText(Objects.requireNonNull(list.get(position).get("resourceTitle")).toString());
             } else {
                 holder.binding.title.setText("No title");
             }
@@ -563,7 +586,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                holder.binding.subjectNameTxt.setText(list.get(position).get("subject").toString());
+                holder.binding.subjectNameTxt.setText(Objects.requireNonNull(list.get(position).get("subject")).toString());
                 holder.binding.subjectNameTxt.setVisibility(View.VISIBLE);
             } else {
                 holder.binding.subjectNameTxt.setVisibility(View.GONE);
@@ -576,13 +599,13 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                         return this;
                     }
                 }.getIns((int) 360, 0xFFF5F5F5));
-                holder.binding.sessionTxt.setText(list.get(position).get("session").toString());
+                holder.binding.sessionTxt.setText(Objects.requireNonNull(list.get(position).get("session")).toString());
                 holder.binding.sessionTxt.setVisibility(View.VISIBLE);
 
                 ViewGroup.MarginLayoutParams sessionTxtParams =
                         (ViewGroup.MarginLayoutParams) holder.binding.sessionTxt.getLayoutParams();
 
-                if (list.get(position).get("subject").toString().length() >= 20) {
+                if (Objects.requireNonNull(list.get(position).get("subject")).toString().length() >= 20) {
                     holder.binding.subAndSessionContainer.setOrientation(LinearLayout.VERTICAL);
                     sessionTxtParams.setMargins(0, (int) convertToDp(8), 0, 0);
                 } else {
@@ -593,8 +616,8 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             } else {
                 holder.binding.sessionTxt.setVisibility(View.GONE);
             }
-            if (list.get(position).containsKey("best choice")) {
-                if (list.get(position).get("best choice").toString().equals("true")) {
+            if (list.get(position).containsKey("isBestChoice")) {
+                if (Boolean.parseBoolean(Objects.requireNonNull(list.get(position).get("isBestChoice")).toString())) {
                     holder.binding.bestChoiceTag.setBackground(new GradientDrawable() {
                         public GradientDrawable getIns(int a, int b) {
                             this.setCornerRadius(a);
@@ -609,8 +632,8 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             } else {
                 holder.binding.bestChoiceTag.setVisibility(View.GONE);
             }
-            if (list.get(position).containsKey("recommended")) {
-                if (list.get(position).get("recommended").toString().equals("true")) {
+            if (list.get(position).containsKey("isRecommended")) {
+                if (Boolean.parseBoolean(Objects.requireNonNull(list.get(position).get("isRecommended")).toString())) {
                     holder.binding.recommendedTag.setBackground(new GradientDrawable() {
                         public GradientDrawable getIns(int a, int b) {
                             this.setCornerRadius(a);
@@ -626,10 +649,10 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 holder.binding.recommendedTag.setVisibility(View.GONE);
             }
             if (list.get(position).containsKey("type")) {
-                if (list.get(position).get("type").toString().equals("paper")) {
+                if (Objects.requireNonNull(list.get(position).get("type")).toString().equals("paper")) {
                     holder.binding.image.setImageResource(R.drawable.previous_paper);
                 } else {
-                    if (list.get(position).get("type").toString().equals("notes")) {
+                    if (Objects.requireNonNull(list.get(position).get("type")).toString().equals("notes")) {
                         holder.binding.image.setImageResource(R.drawable.short_notes);
                     } else {
                         holder.binding.image.setVisibility(View.INVISIBLE);
@@ -640,28 +663,17 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 holder.binding.image.setVisibility(View.INVISIBLE);
                 holder.binding.image.setEnabled(false);
             }
-            ViewGroup.LayoutParams rawParams = holder.binding.container.getLayoutParams();
-            ViewGroup.MarginLayoutParams paramscontainer;
-
-            if (rawParams instanceof ViewGroup.MarginLayoutParams) {
-                paramscontainer = (ViewGroup.MarginLayoutParams) rawParams;
-            } else {
-                // fallback if getLayoutParams() is null or not a MarginLayoutParams
-                paramscontainer = new ViewGroup.MarginLayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                );
-            }
+            ViewGroup.MarginLayoutParams paramsContainer = getLayoutParams(holder);
 
             if (position == (list.size() - 1)) {
-                paramscontainer.setMargins(
+                paramsContainer.setMargins(
                         (int) convertToDp(20),
                         (int) convertToDp(10),
                         (int) convertToDp(20),
                         (int) convertToDp(10)
                 );
             } else {
-                paramscontainer.setMargins(
+                paramsContainer.setMargins(
                         (int) convertToDp(20),
                         (int) convertToDp(10),
                         (int) convertToDp(20),
@@ -669,10 +681,10 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
                 );
             }
 
-            paramscontainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
-            paramscontainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            paramsContainer.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            paramsContainer.height = ViewGroup.LayoutParams.WRAP_CONTENT;
 
-            holder.binding.container.setLayoutParams(paramscontainer);
+            holder.binding.container.setLayoutParams(paramsContainer);
 
             holder.binding.container.setOnClickListener(_view1 -> {
                 int pos = holder.getAdapterPosition();
@@ -682,6 +694,22 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
             });
         }
 
+        private ViewGroup.MarginLayoutParams getLayoutParams(@NonNull ViewHolder holder) {
+            ViewGroup.LayoutParams rawParams = holder.binding.container.getLayoutParams();
+            ViewGroup.MarginLayoutParams paramsContainer;
+
+            if (rawParams instanceof ViewGroup.MarginLayoutParams) {
+                paramsContainer = (ViewGroup.MarginLayoutParams) rawParams;
+            } else {
+                // fallback if getLayoutParams() is null or not a MarginLayoutParams
+                paramsContainer = new ViewGroup.MarginLayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+            }
+            return paramsContainer;
+        }
+
         @Override
         public int getItemCount() {
             return list.size();
@@ -689,6 +717,7 @@ sheetbinding.ratingContainer.setVisibility(View.GONE);
 
         public class ViewHolder extends RecyclerView.ViewHolder {
             ResourceItemCardFullBinding binding;
+
             public ViewHolder(ResourceItemCardFullBinding binding) {
                 super(binding.getRoot());
                 this.binding = binding;

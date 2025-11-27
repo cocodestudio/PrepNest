@@ -31,11 +31,13 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.GravityCompat;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager.widget.PagerAdapter;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.cocode.prepnest.databinding.HomepageBinding;
 import com.cocode.prepnest.databinding.InAppBannerLayoutBinding;
 import com.cocode.prepnest.databinding.ResourceItemShortBinding;
@@ -65,11 +67,14 @@ import com.takusemba.spotlight.shape.Circle;
 
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -80,15 +85,13 @@ import java.util.stream.Collectors;
 public class HomepageActivity extends AppCompatActivity {
 
     private static final int UPDATE_REQUEST_CODE = 123;
-    private String jsonCourseData = "";
     private final Timer _timer = new Timer();
-    private HashMap<String, Object> userData = new HashMap<>();
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
     private final FirebaseDatabase database = FirebaseDatabase.getInstance();
     private final DatabaseReference users = database.getReference("users");
-    private final DatabaseReference requests = database.getReference("requests/provider_requests");
+    private final DatabaseReference requests = database.getReference("requests/providerRequests");
     private final DatabaseReference resources = database.getReference("resources");
-    private final DatabaseReference banners = database.getReference("other/app_banners");
+    private final DatabaseReference banners = database.getReference("other/appBanners");
     private final ArrayList<HashMap<String, Object>> bannersList = new ArrayList<>();
     private final Intent toLogin = new Intent();
     private final Intent toProfile = new Intent();
@@ -101,17 +104,21 @@ public class HomepageActivity extends AppCompatActivity {
     private final Intent toResources = new Intent();
     private final Intent toReport = new Intent();
     private final Intent toFAQs = new Intent();
+    private final ArrayList<HashMap<String, Object>> recentlyAddedList = new ArrayList<>();
+    private final ArrayList<HashMap<String, Object>> recommendedList = new ArrayList<>();
+    private final ArrayList<HashMap<String, Object>> bestList = new ArrayList<>();
+    private String jsonCourseData = null;
+    private HashMap<String, Object> userData = new HashMap<>();
     private HomepageBinding binding;
     private NetworkMonitor networkMonitor;
-    private ValueEventListener resourceListener;
-    private ArrayList<HashMap<String, Object>> recentlyAddedList = new ArrayList<>();
-    private ArrayList<HashMap<String, Object>> recommendedList = new ArrayList<>();
-    private ArrayList<HashMap<String, Object>> bestList = new ArrayList<>();
-    private com.google.android.material.bottomsheet.BottomSheetDialog provider_verification_status_sheet;
+    private com.google.android.material.bottomsheet.BottomSheetDialog providerVerificationStatusSheet;
     private AppUpdateManager appUpdateManager;
     private SharedPreferences cachedData;
     private Spotlight spotlight;
     private View overlay;
+    private RecentlyAddedListAdapter recentlyAddedListAdapter;
+    private RecommendedListAdapter recommendedListAdapter;
+    private BestListAdapter bestListAdapter;
 
     @Override
     protected void onCreate(Bundle _savedInstanceState) {
@@ -164,7 +171,7 @@ public class HomepageActivity extends AppCompatActivity {
                 toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
                 toResources.putExtra("user", new Gson().toJson(userData));
                 try {
-                    toResources.removeExtra("tag type");
+                    toResources.removeExtra("tagType");
                 } catch (Exception ignored) {
 
                 }
@@ -176,7 +183,7 @@ public class HomepageActivity extends AppCompatActivity {
         binding.seeMoreIcon1.setOnClickListener(_view -> {
             if (binding.cashProgressbar.getVisibility() == View.GONE) {
                 toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
-                toResources.putExtra("tag type", "recommended");
+                toResources.putExtra("tagType", "isRecommended");
                 toResources.putExtra("user", new Gson().toJson(userData));
                 startActivity(toResources);
                 overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
@@ -186,7 +193,7 @@ public class HomepageActivity extends AppCompatActivity {
         binding.seeMoreIcon2.setOnClickListener(_view -> {
             if (binding.cashProgressbar.getVisibility() == View.GONE) {
                 toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
-                toResources.putExtra("tag type", "best");
+                toResources.putExtra("tagType", "isBestChoice");
                 toResources.putExtra("user", new Gson().toJson(userData));
                 startActivity(toResources);
                 overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
@@ -223,11 +230,11 @@ public class HomepageActivity extends AppCompatActivity {
         });
 
         binding.drawer.becomeProviderOp.setOnClickListener(_view -> {
-            if (userData.containsKey("provider verification status")) {
-                if (Objects.requireNonNull(userData.get("provider verification status")).toString().equals("pending")) {
+            if (userData.containsKey("providerVerificationStatus")) {
+                if (Objects.requireNonNull(userData.get("providerVerificationStatus")).toString().equals("pending")) {
                     showProviderVerificationStatusSheet(true);
                 } else {
-                    if (Objects.requireNonNull(userData.get("provider verification status")).toString().equals("failed")) {
+                    if (Objects.requireNonNull(userData.get("providerVerificationStatus")).toString().equals("failed")) {
                         showProviderVerificationStatusSheet(false);
                     } else {
                         PrepNestUtil.showToast(HomepageActivity.this, "Unknown error, try login again!");
@@ -266,6 +273,11 @@ public class HomepageActivity extends AppCompatActivity {
 
         binding.drawer.logoutOp.setOnClickListener(_view -> {
             FirebaseMessaging.getInstance().unsubscribeFromTopic("all");
+            cachedData.edit().remove("userData").apply();
+            cachedData.edit().remove("recentlyAddedResources").apply();
+            cachedData.edit().remove("recommendedResources").apply();
+            cachedData.edit().remove("bestResources").apply();
+
             assert auth.getCurrentUser() != null;
             FirebaseMessaging.getInstance().unsubscribeFromTopic(auth.getCurrentUser().getUid());
             FirebaseAuth.getInstance().signOut();
@@ -275,9 +287,12 @@ public class HomepageActivity extends AppCompatActivity {
             finish();
         });
 
-//        binding.headerTitle.setOnClickListener(_view -> {
+        binding.headerTitle.setOnClickListener(_view -> {
 //            startTutorialOnViewReady();
-//        });
+            Intent temp = new Intent();
+            temp.setClass(HomepageActivity.this, TestActivity.class);
+            startActivity(temp);
+        });
 
         binding.streakContainer.setOnClickListener(_view -> {
 
@@ -292,6 +307,8 @@ public class HomepageActivity extends AppCompatActivity {
         requestPermissions();
         getInAppBanners();
 //        getUserData();
+        loadCourses();
+        loadUserDataFromSP();
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
@@ -306,7 +323,6 @@ public class HomepageActivity extends AppCompatActivity {
         appUpdateManager = AppUpdateManagerFactory.create(this);
         checkForAppUpdate();
         loadBannerAd();
-        loadCourses();
     }
 
     private void startTutorialOnViewReady() {
@@ -405,7 +421,6 @@ public class HomepageActivity extends AppCompatActivity {
     public void onResume() {
         super.onResume();
         networkMonitor.register();
-        loadUserDataFromSP();
 
         appUpdateManager.getAppUpdateInfo().addOnSuccessListener(appUpdateInfo -> {
             if (appUpdateInfo.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
@@ -419,7 +434,7 @@ public class HomepageActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == UPDATE_REQUEST_CODE && resultCode != RESULT_OK) {
             PrepNestUtil.showToast(getApplicationContext(), "Update failed, try again");
-            Log.d("InAppUpdate", "Update flow failed! Code: " + resultCode);
+//            Log.d("InAppUpdate", "Update flow failed! Code: " + resultCode);
         }
     }
 
@@ -502,7 +517,8 @@ public class HomepageActivity extends AppCompatActivity {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 FirebaseMessaging.getInstance().subscribeToTopic("all");
-                FirebaseMessaging.getInstance().subscribeToTopic(auth.getCurrentUser().getUid());
+                if (!isFinishing() || !isDestroyed())
+                    FirebaseMessaging.getInstance().subscribeToTopic(auth.getCurrentUser().getUid());
                 if (snapshot.exists()) {
                     binding.cashAmountTxt.setVisibility(View.GONE);
                     binding.cashProgressbar.setVisibility(View.VISIBLE);
@@ -536,25 +552,28 @@ public class HomepageActivity extends AppCompatActivity {
         if (cachedData.contains("userData")) {
             userData = new Gson()
                     .fromJson(cachedData.getString("userData", ""),
-                            new TypeToken<HashMap<String, Object>>() {}
+                            new TypeToken<HashMap<String, Object>>() {
+                            }
                                     .getType()
                     );
 
             binding.cashProgressbar.setVisibility(View.GONE);
             binding.cashAmountTxt.setVisibility(View.VISIBLE);
             loadUserDataToUI();
+//            Log.d("USER DATA", "DATA LOADED FROM SP");
+            getUserData();
         } else {
             getUserData();
         }
     }
 
     public void loadUserDataToUI() {
-        if (Boolean.parseBoolean(Objects.requireNonNull(userData.getOrDefault("banned", false)).toString())) {
+        if (Boolean.parseBoolean(Objects.requireNonNull(userData.getOrDefault("isBanned", false)).toString())) {
             PrepNestUtil.showToast(this, "Your account has been banned.");
             finishAffinity();
         }
-        if (userData.containsKey("course id")) {
-            FirebaseMessaging.getInstance().subscribeToTopic(Objects.requireNonNull(userData.get("course id")).toString());
+        if (userData.containsKey("courseId")) {
+            FirebaseMessaging.getInstance().subscribeToTopic(Objects.requireNonNull(userData.get("courseId")).toString());
         }
 
         if (userData.containsKey("profile")) {
@@ -564,7 +583,10 @@ public class HomepageActivity extends AppCompatActivity {
             } else {
                 binding.drawer.defaultProfileTitle.setVisibility(View.GONE);
                 binding.drawer.userProfilePicture.setVisibility(View.VISIBLE);
-                Glide.with(getApplicationContext()).load(Uri.parse(Objects.requireNonNull(userData.get("profile")).toString())).into(binding.drawer.userProfilePicture);
+                Glide.with(getApplicationContext())
+                        .load(Uri.parse(Objects.requireNonNull(userData.get("profile")).toString()))
+                        .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                        .into(binding.drawer.userProfilePicture);
             }
         } else {
             binding.drawer.userProfilePicture.setVisibility(View.GONE);
@@ -594,8 +616,8 @@ public class HomepageActivity extends AppCompatActivity {
         } else {
             binding.cashAmountTxt.setText("0");
         }
-        if (userData.containsKey("provider")) {
-            if (Boolean.parseBoolean(Objects.requireNonNull(userData.get("provider")).toString())) {
+        if (userData.containsKey("isProvider")) {
+            if (Boolean.parseBoolean(Objects.requireNonNull(userData.get("isProvider")).toString())) {
                 binding.drawer.becomeProviderOp.setVisibility(View.GONE);
             } else {
                 binding.drawer.becomeProviderOp.setVisibility(View.VISIBLE);
@@ -603,11 +625,11 @@ public class HomepageActivity extends AppCompatActivity {
         } else {
             binding.drawer.becomeProviderOp.setVisibility(View.VISIBLE);
         }
-        if (userData.containsKey("provider verification status")) {
-            if (Objects.requireNonNull(userData.get("provider verification status")).toString().equals("pending")) {
+        if (userData.containsKey("providerVerificationStatus")) {
+            if (Objects.requireNonNull(userData.get("providerVerificationStatus")).toString().equals("pending")) {
                 binding.drawer.providerPendingIcon.setVisibility(View.VISIBLE);
             } else {
-                if (Objects.requireNonNull(userData.get("provider verification status")).toString().equals("failed")) {
+                if (Objects.requireNonNull(userData.get("providerVerificationStatus")).toString().equals("failed")) {
                     binding.drawer.providerPendingIcon.setImageResource(R.drawable.icon_error);
                 } else {
                     binding.drawer.providerPendingIcon.setVisibility(View.GONE);
@@ -618,20 +640,31 @@ public class HomepageActivity extends AppCompatActivity {
         }
 //        loadResources();
         cachedData.edit().putString("userData", new Gson().toJson(userData)).apply();
-        loadAllResources();
+//        Log.d("USER DATA", "DATA SAVED TO SP");
+//        Log.d("USER DATA", cachedData.getString("userData", ""));
+        loadResourcesFromSP();
     }
 
     public void loadCourses() {
-        if (jsonCourseData.isEmpty()) {
+        if (jsonCourseData == null || jsonCourseData.trim().isEmpty()) {
             try {
                 InputStream is = getAssets().open("courses.json");
-                int size = is.available();
-                byte[] buffer = new byte[size];
-                is.read(buffer);
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+
+                byte[] buffer = new byte[1024];
+                int length;
+                while ((length = is.read(buffer)) != -1) {
+                    bos.write(buffer, 0, length);
+                }
+
+                jsonCourseData = bos.toString(StandardCharsets.UTF_8);
+
+//                Log.d("COURSE_JSON", jsonCourseData);
+
+                bos.close();
                 is.close();
-                jsonCourseData = new String(buffer, "UTF-8");
             } catch (IOException ex) {
-                PrepNestUtil.showToast(getApplicationContext(), ex.toString());
+                Log.e("ERROR", ex.toString());
             }
         }
     }
@@ -642,18 +675,17 @@ public class HomepageActivity extends AppCompatActivity {
             JSONObject course = allCourses.getJSONObject(courseID);
             return course.getInt("duration") * 2;
         } catch (Exception e) {
-            PrepNestUtil.showToast(getApplicationContext(), e.toString());
+            Log.e("ERROR", e.toString());
+//            PrepNestUtil.showToast(getApplicationContext(), e.toString());
         }
         return 0;
     }
 
     public void loadAllResources() {
         ArrayList<HashMap<String, Object>> tempList = new ArrayList<>();
-        final int currentSemester = (int)Float.parseFloat(Objects.requireNonNull(userData.get("semester")).toString());
-        final int maxSemester = getCourseMaxSemesters(Objects.requireNonNull(userData.get("course id")).toString());
 
-//        Log.d("CURRENT SEMESTER", String.valueOf(currentSemester));
-//        Log.d("MAX SEMESTER", String.valueOf(maxSemester));
+        final int currentSemester = (int) Float.parseFloat(Objects.requireNonNull(userData.get("semester")).toString());
+        final int maxSemester = getCourseMaxSemesters(Objects.requireNonNull(userData.get("courseId")).toString());
 
         int difference = maxSemester - currentSemester;
 
@@ -666,8 +698,10 @@ public class HomepageActivity extends AppCompatActivity {
         AtomicInteger loadedCount = new AtomicInteger(0);
 
         for (int semValue = currentSemester; semValue < (currentSemester + MAX); semValue++) {
+//            Log.d("SEM VALUE", String.valueOf(semValue));
+//            Log.d("SEM MAX", String.valueOf(currentSemester + MAX));
             resources
-                    .child(Objects.requireNonNull(userData.get("course id")).toString())
+                    .child(Objects.requireNonNull(userData.get("courseId")).toString())
                     .orderByChild("semester")
                     .equalTo(semValue)
                     .addListenerForSingleValueEvent(new ValueEventListener() {
@@ -677,16 +711,18 @@ public class HomepageActivity extends AppCompatActivity {
                                 if (loadedCount.incrementAndGet() == MAX) {
                                     filterResources(tempList);
                                 }
-                                return;
-                            }
+                            } else {
 
-                            for (DataSnapshot childSnapshot : snapshot.getChildren()) {
-                                HashMap<String, Object> item = (HashMap<String, Object>) childSnapshot.getValue();
-                                tempList.add(item);
-                            }
+                                for (DataSnapshot childSnapshot : snapshot.getChildren()) {
+                                    HashMap<String, Object> item = (HashMap<String, Object>) childSnapshot.getValue();
+                                    assert item != null;
+                                    item.put("id", childSnapshot.getKey());
+                                    tempList.add(item);
+                                }
 
-                            if (loadedCount.incrementAndGet() == MAX) {
-                                filterResources(tempList);
+                                if (loadedCount.incrementAndGet() == MAX) {
+                                    filterResources(tempList);
+                                }
                             }
                         }
 
@@ -699,84 +735,50 @@ public class HomepageActivity extends AppCompatActivity {
 
     }
 
-    public void loadRecommendedResources() {
+    public void loadResourcesFromSP() {
+        Gson gson = new Gson();
+        Type type = new TypeToken<ArrayList<HashMap<String, Object>>>() {
+        }.getType();
         ArrayList<HashMap<String, Object>> tempList = new ArrayList<>();
 
-        resources
-                .child(Objects.requireNonNull(userData.get("course id")).toString())
-                .orderByChild("recommended")
-                .equalTo(true)
-                .addListenerForSingleValueEvent(new ValueEventListener() {
-                    @Override
-                    public void onDataChange(@NonNull DataSnapshot snapshot) {
-                        if (!snapshot.exists()) {
-                            filterRecommendedResources(tempList);
-                            toggleRecommendedListEmptyState(!tempList.isEmpty());
-                            loadBestResources();
-                            return;
-                        }
+        if (cachedData.contains("recentlyAddedResources")) {
+            tempList = gson.fromJson(cachedData.getString("recentlyAddedResources", "[]"), type);
+            recentlyAddedList.clear();
+            recentlyAddedList.addAll(tempList);
+            toggleRecentListEmptyState(!recentlyAddedList.isEmpty());
+            recentlyAddedListAdapter.updateData(new ArrayList<>(recentlyAddedList));
+        }
 
-                        Log.d("DATA", snapshot.toString());
+        tempList = new ArrayList<>();
 
-                        for (DataSnapshot childSnapshot : snapshot.getChildren()) {
-                            HashMap<String, Object> item = (HashMap<String, Object>) childSnapshot.getValue();
-                            tempList.add(item);
-                        }
+        if (cachedData.contains("recommendedResources")) {
+            tempList = gson.fromJson(cachedData.getString("recommendedResources", "[]"), type);
+            recommendedList.clear();
+            recommendedList.addAll(tempList);
+            toggleRecommendedListEmptyState(!recommendedList.isEmpty());
+            recommendedListAdapter.updateData(new ArrayList<>(recommendedList));
+        }
 
-                        Log.d("RECOMMENDED", tempList.toString());
-                        filterRecommendedResources(tempList);
-                        toggleRecommendedListEmptyState(!tempList.isEmpty());
-                        loadBestResources();
-                    }
+        tempList = new ArrayList<>();
 
-                    @Override
-                    public void onCancelled(@NonNull DatabaseError error) {
-                        PrepNestUtil.showToast(HomepageActivity.this, error.getMessage());
-                    }
-                });
+        if (cachedData.contains("bestResources")) {
+            tempList = gson.fromJson(cachedData.getString("bestResources", "[]"), type);
+            bestList.clear();
+            bestList.addAll(tempList);
+            toggleBestListEmptyState(!bestList.isEmpty());
+            bestListAdapter.updateData(new ArrayList<>(bestList));
+        }
 
-    }
-
-    public void loadBestResources() {
-        ArrayList<HashMap<String, Object>> tempList = new ArrayList<>();
-
-        resources
-                .child(Objects.requireNonNull(userData.get("course id")).toString())
-                .orderByChild("best choice")
-                .equalTo(true)
-                .addListenerForSingleValueEvent(new ValueEventListener() {
-                    @Override
-                    public void onDataChange(@NonNull DataSnapshot snapshot) {
-                        if (!snapshot.exists()) {
-                            filterBestResources(tempList);
-                            toggleBestListEmptyState(!tempList.isEmpty());
-                            return;
-                        }
-
-                        for (DataSnapshot childSnapshot : snapshot.getChildren()) {
-                            HashMap<String, Object> item = (HashMap<String, Object>) childSnapshot.getValue();
-                            tempList.add(item);
-                        }
-
-                        filterBestResources(tempList);
-                        toggleBestListEmptyState(!tempList.isEmpty());
-                    }
-
-                    @Override
-                    public void onCancelled(@NonNull DatabaseError error) {
-                        PrepNestUtil.showToast(HomepageActivity.this, error.getMessage());
-                    }
-                });
-
+        loadAllResources();
     }
 
 
     public void showProviderVerificationStatusSheet(final boolean isPending) {
-        provider_verification_status_sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(HomepageActivity.this);
+        providerVerificationStatusSheet = new com.google.android.material.bottomsheet.BottomSheetDialog(HomepageActivity.this);
         StatusViewBinding binding = StatusViewBinding.inflate(getLayoutInflater());
-        provider_verification_status_sheet.setContentView(binding.getRoot());
+        providerVerificationStatusSheet.setContentView(binding.getRoot());
 
-        provider_verification_status_sheet.setOnShowListener(dialog -> {
+        providerVerificationStatusSheet.setOnShowListener(dialog -> {
             BottomSheetDialog d = (BottomSheetDialog) dialog;
             View bottomSheetInternal = d.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheetInternal != null) {
@@ -819,19 +821,19 @@ public class HomepageActivity extends AppCompatActivity {
                 toBecomeProvider.setClass(HomepageActivity.this, BecomeproviderActivity.class);
                 startActivity(toBecomeProvider);
                 overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
-                provider_verification_status_sheet.dismiss();
+                providerVerificationStatusSheet.dismiss();
             }
         });
         binding.btnCancel.setOnClickListener(_view -> {
             if (isPending) {
-                provider_verification_status_sheet.dismiss();
+                providerVerificationStatusSheet.dismiss();
             } else {
                 cancelProviderRequest();
-                provider_verification_status_sheet.dismiss();
+                providerVerificationStatusSheet.dismiss();
             }
         });
-        provider_verification_status_sheet.setCancelable(true);
-        provider_verification_status_sheet.show();
+        providerVerificationStatusSheet.setCancelable(true);
+        providerVerificationStatusSheet.show();
     }
 
 
@@ -861,7 +863,7 @@ public class HomepageActivity extends AppCompatActivity {
         assert auth.getCurrentUser() != null;
         requests.child(auth.getCurrentUser().getUid()).removeValue().addOnCompleteListener(removeTask -> {
             if (removeTask.isSuccessful()) {
-                users.child(auth.getCurrentUser().getUid()).child("provider verification status").removeValue().addOnCompleteListener(updateTask -> {
+                users.child(auth.getCurrentUser().getUid()).child("providerVerificationStatus").removeValue().addOnCompleteListener(updateTask -> {
                     if (updateTask.isSuccessful()) {
                         PrepNestUtil.showLoadingDialog(HomepageActivity.this, false);
                         PrepNestUtil.showToast(HomepageActivity.this, "Request cancelled successfully.");
@@ -889,45 +891,6 @@ public class HomepageActivity extends AppCompatActivity {
         binding.shimmerView3.startShimmer();
     }
 
-    public void loadResources() {
-        if (resourceListener != null) {
-            resources.child(Objects.requireNonNull(userData.get("course id")).toString()).removeEventListener(resourceListener);
-        }
-        resourceListener = new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                if (!dataSnapshot.exists() || !dataSnapshot.hasChildren()) {
-                    toggleAllEmptyState();
-                    return;
-                }
-
-                recentlyAddedList.clear();
-                recommendedList.clear();
-                bestList.clear();
-                ArrayList<HashMap<String, Object>> tempList = new ArrayList<>();
-
-                for (DataSnapshot child : dataSnapshot.getChildren()) {
-                    Map<String, Object> item = (Map<String, Object>) child.getValue();
-
-                    if (item != null) {
-                        if (getRequiredResources(new HashMap<>(item))) {
-                            item.put("id", child.getKey());
-                            tempList.add(new HashMap<>(item));
-                        }
-                    }
-                }
-
-                filterResources(tempList);
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                toggleAllEmptyState();
-            }
-        };
-
-        resources.child(Objects.requireNonNull(userData.get("course id")).toString()).addValueEventListener(resourceListener);
-    }
 
     public void toggleRecentListEmptyState(final boolean isVisible) {
         binding.shimmerView1.stopShimmer();
@@ -940,13 +903,13 @@ public class HomepageActivity extends AppCompatActivity {
             binding.recentlyAddedList.setVisibility(View.GONE);
             binding.noRecentResourcesMessage.setVisibility(View.VISIBLE);
             binding.recentRealItemsContainer.setGravity(Gravity.CENTER_VERTICAL | Gravity.CENTER_HORIZONTAL);
-            LinearLayout.LayoutParams paramsrecentRealItemsContainer = (LinearLayout.LayoutParams) binding.recentRealItemsContainer.getLayoutParams();
+            LinearLayout.LayoutParams paramsRecentRealItemsContainer = (LinearLayout.LayoutParams) binding.recentRealItemsContainer.getLayoutParams();
 
-            paramsrecentRealItemsContainer.width = LinearLayout.LayoutParams.MATCH_PARENT;
+            paramsRecentRealItemsContainer.width = LinearLayout.LayoutParams.MATCH_PARENT;
 
-            paramsrecentRealItemsContainer.height = (int) convertToDp(130);
+            paramsRecentRealItemsContainer.height = (int) convertToDp(130);
 
-            binding.recentRealItemsContainer.setLayoutParams(paramsrecentRealItemsContainer);
+            binding.recentRealItemsContainer.setLayoutParams(paramsRecentRealItemsContainer);
 
         }
     }
@@ -962,13 +925,13 @@ public class HomepageActivity extends AppCompatActivity {
             binding.recommendedList.setVisibility(View.GONE);
             binding.noRecommendedResourcesMessage.setVisibility(View.VISIBLE);
             binding.recommendedRealItemsContainer.setGravity(Gravity.CENTER_VERTICAL | Gravity.CENTER_HORIZONTAL);
-            LinearLayout.LayoutParams paramsrecommendedRealItemsContainer = (LinearLayout.LayoutParams) binding.recommendedRealItemsContainer.getLayoutParams();
+            LinearLayout.LayoutParams paramsRecommendedRealItemsContainer = (LinearLayout.LayoutParams) binding.recommendedRealItemsContainer.getLayoutParams();
 
-            paramsrecommendedRealItemsContainer.width = LinearLayout.LayoutParams.MATCH_PARENT;
+            paramsRecommendedRealItemsContainer.width = LinearLayout.LayoutParams.MATCH_PARENT;
 
-            paramsrecommendedRealItemsContainer.height = (int) convertToDp(130);
+            paramsRecommendedRealItemsContainer.height = (int) convertToDp(130);
 
-            binding.recommendedRealItemsContainer.setLayoutParams(paramsrecommendedRealItemsContainer);
+            binding.recommendedRealItemsContainer.setLayoutParams(paramsRecommendedRealItemsContainer);
 
         }
     }
@@ -984,84 +947,90 @@ public class HomepageActivity extends AppCompatActivity {
             binding.bestList.setVisibility(View.GONE);
             binding.noBestResourcesMessage.setVisibility(View.VISIBLE);
             binding.bestRealItemsContainer.setGravity(Gravity.CENTER_VERTICAL | Gravity.CENTER_HORIZONTAL);
-            LinearLayout.LayoutParams paramsbestRealItemsContainer = (LinearLayout.LayoutParams) binding.bestRealItemsContainer.getLayoutParams();
+            LinearLayout.LayoutParams paramsBestRealItemsContainer = (LinearLayout.LayoutParams) binding.bestRealItemsContainer.getLayoutParams();
 
-            paramsbestRealItemsContainer.width = LinearLayout.LayoutParams.MATCH_PARENT;
+            paramsBestRealItemsContainer.width = LinearLayout.LayoutParams.MATCH_PARENT;
 
-            paramsbestRealItemsContainer.height = (int) convertToDp(130);
+            paramsBestRealItemsContainer.height = (int) convertToDp(130);
 
-            binding.bestRealItemsContainer.setLayoutParams(paramsbestRealItemsContainer);
+            binding.bestRealItemsContainer.setLayoutParams(paramsBestRealItemsContainer);
 
         }
     }
 
-    public void toggleAllEmptyState() {
-        toggleRecentListEmptyState(false);
-        toggleRecommendedListEmptyState(false);
-        toggleBestListEmptyState(false);
-    }
-
-    public boolean getRequiredResources(final HashMap<String, Object> _item) {
-        boolean matchesSemester = ((Number) (Objects.requireNonNull(_item.get("semester")))).intValue() <= (((Number) (Objects.requireNonNull(userData.get("semester")))).intValue() + 2);
-        boolean isActive = !_item.containsKey("discontinue") || Boolean.FALSE.equals(_item.get("discontinue"));
-        return matchesSemester && isActive;
-    }
-
-    public void filterRecentlyAddedResources(final ArrayList<HashMap<String, Object>> list) {
-        ArrayList<HashMap<String, Object>> sortedList = new ArrayList<>(list);
-        ListMapUtils.sortListByKey(sortedList, "date of verification", true, ListMapUtils.SortType.TIMESTAMP_STRING);
-        recentlyAddedList = sortedList.stream().limit(3).collect(Collectors.toCollection(ArrayList::new));
-
-        binding.recentlyAddedList.setAdapter(new RecentlyAddedListAdapter(recentlyAddedList));
-        toggleRecentListEmptyState(!recentlyAddedList.isEmpty());
-    }
-
-    public void filterRecommendedResources(final ArrayList<HashMap<String, Object>> list) {
-        ArrayList<HashMap<String, Object>> sortedList = new ArrayList<>(list);
-        ListMapUtils.sortListByKey(sortedList, "date of verification", true, ListMapUtils.SortType.TIMESTAMP_STRING);
-        recommendedList = sortedList.stream().limit(3).collect(Collectors.toCollection(ArrayList::new));
-
-        binding.recommendedList.setAdapter(new RecommendedListAdapter(recommendedList));
-        toggleRecommendedListEmptyState(!recommendedList.isEmpty());
-    }
-
-    public void filterBestResources(final ArrayList<HashMap<String, Object>> list) {
-        ArrayList<HashMap<String, Object>> sortedList = new ArrayList<>(list);
-        ListMapUtils.sortListByKey(sortedList, "date of verification", true, ListMapUtils.SortType.TIMESTAMP_STRING);
-        bestList = sortedList.stream().limit(3).collect(Collectors.toCollection(ArrayList::new));
-
-        binding.bestList.setAdapter(new BestListAdapter(bestList));
-        toggleBestListEmptyState(!bestList.isEmpty());
-    }
-
     public void filterResources(final ArrayList<HashMap<String, Object>> _list) {
+//        Log.d("LIST SIZE", String.valueOf(_list.size()));
         ArrayList<HashMap<String, Object>> sortedList = new ArrayList<>(_list);
-        ListMapUtils.sortListByKey(sortedList, "date of verification", true, ListMapUtils.SortType.TIMESTAMP_STRING);
-        recentlyAddedList = sortedList.stream().limit(3).collect(Collectors.toCollection(ArrayList::new));
-        binding.recentlyAddedList.setAdapter(new RecentlyAddedListAdapter(recentlyAddedList));
+        Gson gson = new Gson();
+
+        sortedList.removeIf(item -> Boolean.TRUE.equals(item.get("isDiscontinue")));
+
+        ListMapUtils.sortListByKey(
+                sortedList,
+                "dateOfVerification",
+                false,
+                ListMapUtils.SortType.NUMBER
+        );
+
+
+        cachedData.edit().putString("resources", gson.toJson(sortedList)).apply();
+
+//        Log.d("RESOURCES", sortedList.toString());
+
+        recentlyAddedList.clear();
+        recentlyAddedList.addAll(
+                sortedList
+                        .stream()
+                        .limit(3)
+                        .collect(Collectors.toCollection(ArrayList::new))
+        );
+
+        cachedData.edit().putString("recentlyAddedResources", new Gson().toJson(recentlyAddedList)).apply();
+//        Log.d("RECENT", cachedData.getString("recentlyAddedResources", ""));
         toggleRecentListEmptyState(!recentlyAddedList.isEmpty());
-        recommendedList = sortedList.stream()
+        recentlyAddedListAdapter.updateData(new ArrayList<>(recentlyAddedList));
+
+        recommendedList.clear();
+        recommendedList.addAll(sortedList.stream()
                 .filter(item -> {
-                    Object value = item.get("recommended");
+                    Object value = item.get("isRecommended");
                     return Boolean.TRUE.equals(value);
                 })
-                .limit(3).collect(Collectors.toCollection(ArrayList::new));
+                .limit(3)
+                .collect(Collectors.toCollection(ArrayList::new))
+        );
+
+        cachedData.edit().putString("recommendedResources", new Gson().toJson(recommendedList)).apply();
         toggleRecommendedListEmptyState(!recommendedList.isEmpty());
-        binding.recommendedList.setAdapter(new RecommendedListAdapter(recommendedList));
-        bestList = sortedList.stream()
+        recommendedListAdapter.updateData(new ArrayList<>(recommendedList));
+
+        bestList.clear();
+        bestList.addAll(sortedList.stream()
                 .filter(item -> {
-                    Object value = item.get("best choice");
+                    Object value = item.get("isBestChoice");
                     return Boolean.TRUE.equals(value);
                 })
-                .limit(3).collect(Collectors.toCollection(ArrayList::new));
+                .limit(3)
+                .collect(Collectors.toCollection(ArrayList::new))
+        );
+
+        cachedData.edit().putString("bestResources", new Gson().toJson(bestList)).apply();
         toggleBestListEmptyState(!bestList.isEmpty());
-        binding.bestList.setAdapter(new BestListAdapter(bestList));
+        bestListAdapter.updateData(new ArrayList<>(bestList));
     }
 
     public void attachAdaptersToRecyclerViews() {
+        recentlyAddedListAdapter = new RecentlyAddedListAdapter(recentlyAddedList);
+        recommendedListAdapter = new RecommendedListAdapter(recommendedList);
+        bestListAdapter = new BestListAdapter(bestList);
+
         binding.recentlyAddedList.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         binding.recommendedList.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         binding.bestList.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+
+        binding.recentlyAddedList.setAdapter(recentlyAddedListAdapter);
+        binding.recommendedList.setAdapter(recommendedListAdapter);
+        binding.bestList.setAdapter(bestListAdapter);
     }
 
     public String getPrettyResourceTitle(final String title) {
@@ -1088,7 +1057,7 @@ public class HomepageActivity extends AppCompatActivity {
     }
 
     public void checkAppMaintenance() {
-        DatabaseReference appMaintenance = database.getReference("other/app_maintenance/closed");
+        DatabaseReference appMaintenance = database.getReference("other/appMaintenance/isClosed");
 
         appMaintenance.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -1122,8 +1091,8 @@ public class HomepageActivity extends AppCompatActivity {
 
                 for (DataSnapshot childSnapshot : dataSnapshot.getChildren()) {
                     HashMap<String, Object> bannerMap = new HashMap<>();
-                    String imageURL = childSnapshot.child("image url").getValue(String.class);
-                    bannerMap.put("image url", imageURL);
+                    String imageURL = childSnapshot.child("imageUrl").getValue(String.class);
+                    bannerMap.put("imageUrl", imageURL);
                     bannerMap.put("id", childSnapshot.getKey());
                     bannersList.add(bannerMap);
                 }
@@ -1204,6 +1173,14 @@ public class HomepageActivity extends AppCompatActivity {
             return itemCount;
         }
 
+        private int dp(int value) {
+            return (int) TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP,
+                    value,
+                    context.getResources().getDisplayMetrics()
+            );
+        }
+
         public class ShimmerViewHolder extends RecyclerView.ViewHolder {
             ShimmerLayoutBinding binding;
 
@@ -1211,14 +1188,6 @@ public class HomepageActivity extends AppCompatActivity {
                 super(binding.getRoot());
                 this.binding = binding;
             }
-        }
-
-        private int dp(int value) {
-            return (int) TypedValue.applyDimension(
-                    TypedValue.COMPLEX_UNIT_DIP,
-                    value,
-                    context.getResources().getDisplayMetrics()
-            );
         }
     }
 
@@ -1270,11 +1239,13 @@ public class HomepageActivity extends AppCompatActivity {
             );
 
             // Load image safely
-            Object urlObj = data.get(position).get("image url");
+            Object urlObj = data.get(position).get("imageUrl");
             String imageUrl = urlObj != null ? urlObj.toString() : "";
 
             Glide.with(context)
                     .load(Uri.parse(imageUrl))
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+//                    .onlyRetrieveFromCache(true)
                     .into(binding.image);
 
             View root = binding.getRoot();
@@ -1292,6 +1263,13 @@ public class HomepageActivity extends AppCompatActivity {
             this.list = list;
         }
 
+        public void updateData(List<HashMap<String, Object>> newData) {
+            DiffUtil.DiffResult result = DiffUtil.calculateDiff(new ResourceDiffCallback(list, newData));
+            list.clear();
+            list.addAll(newData);
+            result.dispatchUpdatesTo(this);
+        }
+
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -1307,8 +1285,8 @@ public class HomepageActivity extends AppCompatActivity {
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, final int position) {
             PrepNestUtil.roundViewWithRipple(holder.binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            if (list.get(position).containsKey("resource title")) {
-                holder.binding.title.setText(getPrettyResourceTitle(Objects.requireNonNull(list.get(position).get("resource title")).toString()));
+            if (list.get(position).containsKey("resourceTitle")) {
+                holder.binding.title.setText(getPrettyResourceTitle(Objects.requireNonNull(list.get(position).get("resourceTitle")).toString()));
             } else {
                 holder.binding.title.setText("No title");
             }
@@ -1351,7 +1329,7 @@ public class HomepageActivity extends AppCompatActivity {
             } else {
                 holder.binding.image.setVisibility(View.INVISIBLE);
             }
-//            LinearLayout.LayoutParams paramscontainer = (LinearLayout.LayoutParams) holder.binding.container.getLayoutParams();
+//            LinearLayout.LayoutParams paramsContainer = (LinearLayout.LayoutParams) holder.binding.container.getLayoutParams();
             ViewGroup.LayoutParams params = holder.binding.container.getLayoutParams();
             if (params instanceof ViewGroup.MarginLayoutParams) {
                 ViewGroup.MarginLayoutParams marginParams = (ViewGroup.MarginLayoutParams) params;
@@ -1370,7 +1348,7 @@ public class HomepageActivity extends AppCompatActivity {
                     toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
                     toResources.putExtra("user", new Gson().toJson(userData));
                     try {
-                        toResources.removeExtra("tag type");
+                        toResources.removeExtra("tagType");
                     } catch (Exception ignored) {
 
                     }
@@ -1403,6 +1381,13 @@ public class HomepageActivity extends AppCompatActivity {
             this.list = list;
         }
 
+        public void updateData(List<HashMap<String, Object>> newData) {
+            DiffUtil.DiffResult result = DiffUtil.calculateDiff(new ResourceDiffCallback(list, newData));
+            list.clear();
+            list.addAll(newData);
+            result.dispatchUpdatesTo(this);
+        }
+
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -1418,8 +1403,8 @@ public class HomepageActivity extends AppCompatActivity {
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, final int position) {
             PrepNestUtil.roundViewWithRipple(holder.binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            if (list.get(position).containsKey("resource title")) {
-                holder.binding.title.setText(getPrettyResourceTitle(Objects.requireNonNull(list.get(position).get("resource title")).toString()));
+            if (list.get(position).containsKey("resourceTitle")) {
+                holder.binding.title.setText(getPrettyResourceTitle(Objects.requireNonNull(list.get(position).get("resourceTitle")).toString()));
             } else {
                 holder.binding.title.setText("No title");
             }
@@ -1479,7 +1464,7 @@ public class HomepageActivity extends AppCompatActivity {
                     toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
                     toResources.putExtra("user", new Gson().toJson(userData));
                     try {
-                        toResources.removeExtra("tag type");
+                        toResources.removeExtra("tagType");
                     } catch (Exception ignored) {
 
                     }
@@ -1512,6 +1497,14 @@ public class HomepageActivity extends AppCompatActivity {
             this.list = list;
         }
 
+        public void updateData(List<HashMap<String, Object>> newData) {
+            DiffUtil.DiffResult result = DiffUtil.calculateDiff(new ResourceDiffCallback(list, newData));
+            list.clear();
+            list.addAll(newData);
+            result.dispatchUpdatesTo(this);
+        }
+
+
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -1527,8 +1520,8 @@ public class HomepageActivity extends AppCompatActivity {
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, final int position) {
             PrepNestUtil.roundViewWithRipple(holder.binding.container, "#FAFAFA", 20, 3, "#EEEEEE", "#E0E0E0");
-            if (list.get(position).containsKey("resource title")) {
-                holder.binding.title.setText(getPrettyResourceTitle(Objects.requireNonNull(list.get(position).get("resource title")).toString()));
+            if (list.get(position).containsKey("resourceTitle")) {
+                holder.binding.title.setText(getPrettyResourceTitle(Objects.requireNonNull(list.get(position).get("resourceTitle")).toString()));
             } else {
                 holder.binding.title.setText("No title");
             }
@@ -1589,7 +1582,7 @@ public class HomepageActivity extends AppCompatActivity {
                     toResources.setClass(HomepageActivity.this, ResourcesActivity.class);
                     toResources.putExtra("user", new Gson().toJson(userData));
                     try {
-                        toResources.removeExtra("tag type");
+                        toResources.removeExtra("tagType");
                     } catch (Exception ignored) {
 
                     }
@@ -1611,6 +1604,39 @@ public class HomepageActivity extends AppCompatActivity {
                 super(binding.getRoot());
                 this.binding = binding;
             }
+        }
+    }
+
+    public class ResourceDiffCallback extends DiffUtil.Callback {
+
+        private final List<HashMap<String, Object>> oldList;
+        private final List<HashMap<String, Object>> newList;
+
+        public ResourceDiffCallback(List<HashMap<String, Object>> oldList, List<HashMap<String, Object>> newList) {
+            this.oldList = oldList;
+            this.newList = newList;
+        }
+
+        @Override
+        public int getOldListSize() {
+            return oldList.size();
+        }
+
+        @Override
+        public int getNewListSize() {
+            return newList.size();
+        }
+
+        @Override
+        public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
+            String oldId = String.valueOf(oldList.get(oldItemPosition).get("id"));
+            String newId = String.valueOf(newList.get(newItemPosition).get("id"));
+            return oldId.equals(newId);
+        }
+
+        @Override
+        public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
+            return oldList.get(oldItemPosition).equals(newList.get(newItemPosition));
         }
     }
 }
