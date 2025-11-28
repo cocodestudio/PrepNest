@@ -83,7 +83,7 @@ public class UserpurchasedresourcesFragmentActivity extends Fragment {
             Matcher matcher = pattern.matcher(url);
             if (matcher.find()) {
                 String encodedPath = matcher.group(1);
-                return URLDecoder.decode(encodedPath, StandardCharsets.UTF_8);
+                return URLDecoder.decode(encodedPath, "UTF-8");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -567,7 +567,7 @@ sheetBinding.ratingContainer.setVisibility(View.GONE);
                 bos.write(buffer, 0, length);
             }
 
-            jsonCourseData = bos.toString(StandardCharsets.UTF_8);
+            jsonCourseData = bos.toString("UTF-8");
         } catch (Exception e) {
             e.printStackTrace();
         }

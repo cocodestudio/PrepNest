@@ -610,7 +610,7 @@ btn_phone_verification.setText("VERIFY");
                 bos.write(buffer, 0, length);
             }
 
-            jsonCourseData = bos.toString(StandardCharsets.UTF_8);
+            jsonCourseData = bos.toString("UTF-8");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -823,7 +823,7 @@ phn_verification_sheet.show();
 
         final java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
 
-        byte[] b = pwd.getBytes(StandardCharsets.UTF_8);
+        byte[] b = pwd.getBytes("UTF-8");
 
         digest.update(b, 0, b.length);
 

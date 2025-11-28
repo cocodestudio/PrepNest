@@ -90,11 +90,11 @@ public class DebugActivity extends AppCompatActivity {
         PrepNestUtil.showLoadingDialog(this, true);
         DatabaseReference reports = FirebaseDatabase.getInstance().getReference("reports/errorReports");
         HashMap<String, Object> errorMap = new HashMap<>();
-        errorMap.put("error", getIntent().getStringExtra("error"));
+        errorMap.put("issue", getIntent().getStringExtra("error"));
         if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-            errorMap.put("user", FirebaseAuth.getInstance().getCurrentUser().getUid());
+            errorMap.put("reportBy", FirebaseAuth.getInstance().getCurrentUser().getUid());
         } else {
-            errorMap.put("user", "null");
+            errorMap.put("reportBy", "null");
         }
         errorMap.put("timestamp", System.currentTimeMillis());
         reports.child(Objects.requireNonNull(reports.push().getKey())).setValue(errorMap).addOnCompleteListener(task -> {

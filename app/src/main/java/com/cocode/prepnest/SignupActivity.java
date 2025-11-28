@@ -334,7 +334,7 @@ public class SignupActivity extends AppCompatActivity implements ItemListSheetFr
                 addUser.put("courseId", selectedCourseId);
                 addUser.put("semester", selectedSemester);
                 addUser.put("currentYear", (selectedSemester + 1) / 2);
-                addUser.put("provider", false);
+                addUser.put("isProvider", false);
 //                addUser.put("referred by", "");
 //                addWelcomeBonusToUser(addUser);
                 createNewUser(addUser);
@@ -463,7 +463,7 @@ public class SignupActivity extends AppCompatActivity implements ItemListSheetFr
                 bos.write(buffer, 0, length);
             }
 
-            jsonCourseData = bos.toString(StandardCharsets.UTF_8);
+            jsonCourseData = bos.toString("UTF-8");
         } catch (Exception e) {
             e.printStackTrace();
         }
