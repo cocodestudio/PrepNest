@@ -43,8 +43,6 @@ import com.cocode.prepnest.databinding.InAppBannerLayoutBinding;
 import com.cocode.prepnest.databinding.ResourceItemShortBinding;
 import com.cocode.prepnest.databinding.ShimmerLayoutBinding;
 import com.cocode.prepnest.databinding.StatusViewBinding;
-import com.google.android.gms.ads.AdRequest;
-import com.google.android.gms.ads.MobileAds;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.play.core.appupdate.AppUpdateInfo;
 import com.google.android.play.core.appupdate.AppUpdateManager;
@@ -71,7 +69,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Type;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -287,12 +284,11 @@ public class HomepageActivity extends AppCompatActivity {
             finish();
         });
 
-        binding.headerTitle.setOnClickListener(_view -> {
-//            startTutorialOnViewReady();
-            Intent temp = new Intent();
-            temp.setClass(HomepageActivity.this, TestActivity.class);
-            startActivity(temp);
-        });
+//        binding.headerTitle.setOnClickListener(_view -> {
+//            Intent temp = new Intent();
+//            temp.setClass(HomepageActivity.this, TestActivity.class);
+//            startActivity(temp);
+//        });
 
         binding.streakContainer.setOnClickListener(_view -> {
 
@@ -322,7 +318,6 @@ public class HomepageActivity extends AppCompatActivity {
 
         appUpdateManager = AppUpdateManagerFactory.create(this);
         checkForAppUpdate();
-        loadBannerAd();
     }
 
     private void startTutorialOnViewReady() {
@@ -402,13 +397,6 @@ public class HomepageActivity extends AppCompatActivity {
                 .build();
 
         spotlight.start();
-    }
-
-    private void loadBannerAd() {
-        MobileAds.initialize(this, initializationStatus -> {
-        });
-        AdRequest adRequest = new AdRequest.Builder().build();
-        binding.adView.loadAd(adRequest);
     }
 
     @Override

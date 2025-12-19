@@ -24,8 +24,6 @@ import com.cocode.prepnest.databinding.ResourceItemCardFullBinding;
 import com.cocode.prepnest.databinding.ResourcePurchaseSheetLayoutBinding;
 import com.cocode.prepnest.databinding.ResourcesBinding;
 import com.cocode.prepnest.databinding.ResourcesFilterSheetBinding;
-import com.google.android.gms.ads.AdRequest;
-import com.google.android.gms.ads.MobileAds;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
@@ -114,14 +112,6 @@ public class ResourcesActivity extends AppCompatActivity {
                 binding.backIcon.performClick();
             }
         });
-        loadBannerAd();
-    }
-
-    private void loadBannerAd() {
-        MobileAds.initialize(this, initializationStatus -> {
-        });
-        AdRequest adRequest = new AdRequest.Builder().build();
-        binding.adView.loadAd(adRequest);
     }
 
     @Override
