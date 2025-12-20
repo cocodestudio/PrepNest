@@ -331,14 +331,14 @@ setFilterOption(sheetBinding.ratingSortLowTxt, sheetBinding.ratingSortHighTxt, n
             Type type = new TypeToken<HashMap<String, Object>>() {
             }.getType();
             userData = gson.fromJson(cachedData.getString("userData", "{}"), type);
-            loadUserDataToUI();
+            setResourcesData();
         } else {
             PrepNestUtil.showToast(this, "An unknown error occurred, restart the app");
             finishAffinity();
         }
     }
 
-    public void loadUserDataToUI() {
+    public void setResourcesData() {
         if (userData.containsKey("wishlist")) {
             wishlistedResources = getValue(userData, "wishlist");
         } else {
@@ -625,10 +625,15 @@ sheetBinding.ratingContainer.setVisibility(View.GONE);
     }
 
 
-    public void checkResource(final HashMap<String, Object> _item) {
+    public void checkResource(final HashMap<String, Object> resourceItem) {
         boolean canPurchase = true;
-        if (_item.containsKey("id")) {
-            if (uploadedResources.contains(Objects.requireNonNull(_item.get("id")).toString())) {
+        final String resourcePathId = Objects
+                .requireNonNull(resourceItem.get("courseId")).toString()
+                .concat("/")
+                .concat(Objects.requireNonNull(resourceItem.get("id")).toString());
+
+        if (resourceItem.containsKey("id")) {
+            if (uploadedResources.contains(resourcePathId)) {
                 canPurchase = false;
                 toManageResources.setClass(ResourcesActivity.this, ManageresourcesActivity.class);
                 toManageResources.putExtra("navigationType", "owner");
@@ -636,7 +641,7 @@ sheetBinding.ratingContainer.setVisibility(View.GONE);
                 overridePendingTransition(R.anim.slide_in_right_fade, R.anim.slide_out_left_fade);
                 finish();
             }
-            if (purchasedResources.contains(Objects.requireNonNull(_item.get("id")).toString())) {
+            if (purchasedResources.contains(resourcePathId)) {
                 canPurchase = false;
                 toManageResources.setClass(ResourcesActivity.this, ManageresourcesActivity.class);
                 toManageResources.putExtra("navigationType", "purchased");
@@ -646,7 +651,7 @@ sheetBinding.ratingContainer.setVisibility(View.GONE);
             }
         }
         if (canPurchase) {
-            showPurchaseSheet(_item);
+            showPurchaseSheet(resourceItem);
         }
     }
 
